@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/sbBg"
+    android:orientation="vertical">
+
+    <TextView
+        android:id="@+id/chatTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/sbHeader"
+        android:ellipsize="end"
+        android:padding="12dp"
+        android:singleLine="true"
+        android:textColor="@color/header_text"
+        android:textSize="19sp"
+        android:textStyle="bold" />
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <ListView
+            android:id="@+id/chatList"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:divider="@android:color/transparent"
+            android:dividerHeight="0dp"
+            android:drawSelectorOnTop="true"
+            android:listSelector="@drawable/list_selector"
+            android:nextFocusDown="@+id/chatInput"
+            android:stackFromBottom="true"
+            android:transcriptMode="alwaysScroll" />
+
+        <TextView
+            android:id="@+id/chatEmpty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:padding="24dp"
+            android:text="@string/chat_empty"
+            android:textColor="?attr/sbTextSecondary"
+            android:textSize="16sp" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/sbRow"
+        android:orientation="horizontal"
+        android:padding="6dp">
+
+        <EditText
+            android:id="@+id/chatInput"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="@string/chat_hint"
+            android:imeOptions="actionSend"
+            android:inputType="textCapSentences|textMultiLine"
+            android:maxLines="3"
+            android:nextFocusRight="@+id/chatSend"
+            android:nextFocusUp="@id/chatList"
+            android:textColor="?attr/sbText"
+            android:textSize="18sp" />
+
+        <Button
+            android:id="@+id/chatSend"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="6dp"
+            android:background="@drawable/btn_primary"
+            android:minHeight="48dp"
+            android:nextFocusLeft="@id/chatInput"
+            android:nextFocusUp="@id/chatList"
+            android:padding="10dp"
+            android:text="@string/chat_send"
+            android:textColor="#FFFFFFFF" />
+    </LinearLayout>
+</LinearLayout>

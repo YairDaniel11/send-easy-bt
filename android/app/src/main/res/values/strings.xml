@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">שליחה קלה - BT</string>
+    <string name="notification_title">שליחה קלה - BT</string>
+    <string name="notification_ready">מוכן לקבל קבצים והודעות בבלוטוס</string>
+    <string name="channel_service">קבלה ברקע</string>
+    <string name="channel_events">קבצים והודעות שהתקבלו</string>
+
+    <string name="main_title">שליחה קלה - BT</string>
+    <string name="main_hint_menu">אישור=פעולות  תפריט=אפשרויות  חזרה=יציאה</string>
+    <string name="main_pick_device">בחר מכשיר לשליחה</string>
+    <string name="main_no_devices">אין מכשירים מצומדים. צמד את המחשב בהגדרות הבלוטוס של הטלפון ופתח את התוכנה בו.</string>
+    <string name="main_bt_off">הבלוטוס כבוי. הפעל אותו כדי לשלוח ולקבל.</string>
+    <string name="main_no_bt">במכשיר הזה אין בלוטוס.</string>
+    <string name="main_receiving_on">קבלה פעילה</string>
+    <string name="main_receiving_off">קבלה כבויה</string>
+    <string name="main_receive_dir">נשמר בתיקיית: %1$s</string>
+
+    <string name="act_send_file">שלח קובץ</string>
+    <string name="act_send_text">שלח הודעה</string>
+    <string name="act_chat">צ\'אט</string>
+    <string name="act_cancel">ביטול</string>
+
+    <string name="menu_toggle_receive">הפעל / כבה קבלה</string>
+    <string name="menu_receive_dir">איפה נשמרים הקבצים</string>
+    <string name="menu_about">אודות</string>
+    <string name="about_text">שליחה וקבלת קבצים והודעות בבלוטוס בין הטלפון למחשב.\nקוד פתוח (MIT):\ngithub.com/YairDaniel11/send-easy-bt</string>
+
+    <string name="send_title">שליחה</string>
+    <string name="send_connecting">מתחבר אל %1$s…</string>
+    <string name="send_retry">לא הצלחתי להתחבר, מנסה שוב (%1$d מתוך %2$d)…</string>
+    <string name="send_waiting_accept">ממתין לאישור…</string>
+    <string name="send_file_of">קובץ %1$d מתוך %2$d: %3$s</string>
+    <string name="send_done">נשלח בהצלחה</string>
+    <string name="send_failed">השליחה נכשלה: %1$s</string>
+    <string name="send_rejected">הצד השני סירב לקבל את הקובץ</string>
+    <string name="send_cancelled">השליחה בוטלה</string>
+    <string name="send_close">סגור</string>
+    <string name="send_cancel">בטל שליחה</string>
+    <string name="send_hint_cancel">חזרה או המקש הימני = ביטול</string>
+
+    <string name="browser_title">בחר קבצים</string>
+    <string name="browser_hint">אישור=כניסה/סימון  תפריט=שלח  חזרה=למעלה</string>
+    <string name="browser_up">.. (למעלה)</string>
+    <string name="browser_empty">התיקייה ריקה</string>
+    <string name="browser_selected">נבחרו %1$d</string>
+    <string name="browser_send">שלח את הנבחרים</string>
+    <string name="browser_no_perm">אין הרשאה לקרוא קבצים. אשר גישה לאחסון ונסה שוב.</string>
+
+    <string name="chat_title">צ\'אט עם %1$s</string>
+    <string name="chat_hint">כתוב הודעה…</string>
+    <string name="chat_send">שלח</string>
+    <string name="chat_empty">אין הודעות עדיין</string>
+    <string name="chat_failed">ההודעה לא נשלחה</string>
+
+    <string name="rx_file">התקבל קובץ: %1$s</string>
+    <string name="rx_text">הודעה מ-%1$s</string>
+    <string name="rx_progress">מקבל %1$s…</string>
+
+    <string name="perm_needed">נדרשת הרשאת בלוטוס כדי לעבוד.</string>
+</resources>

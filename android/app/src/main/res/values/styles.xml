@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- בלי AndroidX: ערכת נושא גולמית עם attrs מופשטים -->
+    <style name="AppTheme" parent="android:Theme.Holo.Light.NoActionBar">
+        <item name="sbBg">@color/bg_light</item>
+        <item name="sbHeader">@color/header_black</item>
+        <item name="sbAccent">@color/accent_blue</item>
+        <item name="sbText">@color/text_dark</item>
+        <item name="sbTextSecondary">@color/text_dark_secondary</item>
+        <item name="sbRow">@color/row_light</item>
+        <item name="sbBubbleIn">@color/bubble_in_light</item>
+        <item name="sbBubbleOut">@color/bubble_out_light</item>
+        <item name="android:windowBackground">@color/bg_light</item>
+    </style>
+
+    <style name="AppTheme.Light" parent="AppTheme" />
+
+    <style name="AppTheme.Dark" parent="android:Theme.Holo.NoActionBar">
+        <item name="sbBg">@color/bg_night</item>
+        <item name="sbHeader">@color/header_night</item>
+        <item name="sbAccent">@color/accent_blue_light</item>
+        <item name="sbText">@color/text_night</item>
+        <item name="sbTextSecondary">@color/text_night_secondary</item>
+        <item name="sbRow">@color/row_night</item>
+        <item name="sbBubbleIn">@color/bubble_in_night</item>
+        <item name="sbBubbleOut">@color/bubble_out_night</item>
+        <item name="android:windowBackground">@color/bg_night</item>
+    </style>
+
+    <style name="ActionButton">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="android:padding">12dp</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:textColor">#FFFFFFFF</item>
+        <item name="android:gravity">center</item>
+        <item name="android:focusable">true</item>
+        <item name="android:background">@drawable/btn_primary</item>
+    </style>
+</resources>

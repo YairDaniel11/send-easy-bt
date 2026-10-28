@@ -62,5 +62,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "v$env:VERSION" release/SendEasyBT-Setup.exe `
+            --latest `
             --title "שליחה קלה - BT $env:VERSION" `
             --notes "גרסה אוטומטית מהקוד של $env:GITHUB_SHA. מתקינים את SendEasyBT-Setup.exe."

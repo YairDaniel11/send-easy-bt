@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <attr name="sbBg" format="color" />
+    <attr name="sbHeader" format="color" />
+    <attr name="sbAccent" format="color" />
+    <attr name="sbText" format="color" />
+    <attr name="sbTextSecondary" format="color" />
+    <attr name="sbRow" format="color" />
+    <attr name="sbBubbleIn" format="color" />
+    <attr name="sbBubbleOut" format="color" />
+</resources>
