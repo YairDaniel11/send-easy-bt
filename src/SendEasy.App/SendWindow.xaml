@@ -1,0 +1,99 @@
+﻿<ui:FluentWindow x:Class="SendEasy.App.SendWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        Title="שליחה קלה - BT" Width="440" Height="640" MinWidth="380" MinHeight="480"
+        FlowDirection="RightToLeft" WindowStartupLocation="CenterScreen"
+        WindowBackdropType="Mica" ExtendsContentIntoTitleBar="True"
+        AllowDrop="True" DragOver="Window_DragOver" Drop="Window_Drop">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0" Title="שליחה קלה - BT" FlowDirection="LeftToRight"/>
+
+        <!-- מה שולחים -->
+        <Border Grid.Row="1" Margin="16,8,16,8" Padding="14,10" CornerRadius="8"
+                Background="{DynamicResource ControlFillColorDefaultBrush}">
+            <StackPanel>
+                <TextBlock x:Name="WhatText" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                <TextBlock x:Name="DetailText" Margin="0,2,0,0" Opacity="0.7" TextWrapping="Wrap"/>
+            </StackPanel>
+        </Border>
+
+        <TextBlock x:Name="AutoText" Grid.Row="2" Visibility="Collapsed" FontSize="15" TextWrapping="Wrap"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" Margin="24"/>
+
+        <ScrollViewer PanningMode="VerticalOnly" x:Name="DeviceScroll" Grid.Row="2" VerticalScrollBarVisibility="Auto" Padding="16,0,16,0">
+            <StackPanel>
+                <TextBlock Text="מכשירים מצומדים (★ = מועדף)" FontWeight="SemiBold" Margin="2,4,0,6"/>
+                <ListBox x:Name="PairedList" SelectionChanged="PairedList_SelectionChanged"
+                         ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                         ItemTemplate="{DynamicResource DeviceTemplate}"/>
+                <TextBlock x:Name="NoPairedText" Text="אין מכשירים מצומדים. פתח את אפשרות החיפוש למטה."
+                           Opacity="0.6" Margin="2,4,0,0" Visibility="Collapsed"/>
+
+                <Expander Margin="0,14,0,8" IsExpanded="False" HorizontalAlignment="Stretch">
+                    <Expander.Header>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock x:Name="NearbyTitle" Text="מכשירים נוספים בקרבת מקום" VerticalAlignment="Center"/>
+                            <ui:ProgressRing x:Name="Spinner" IsIndeterminate="True" Width="16" Height="16"
+                                             Margin="10,0,0,0"/>
+                        </StackPanel>
+                    </Expander.Header>
+                    <StackPanel>
+                        <TextBlock Text="מכשיר לא מצומד יצומד אוטומטית בעת השליחה (יתכן שתתבקש לאשר)."
+                                   Opacity="0.6" TextWrapping="Wrap" Margin="2,0,0,6"/>
+                        <ListBox x:Name="NearbyList" SelectionChanged="NearbyList_SelectionChanged"
+                                 ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                                 ItemTemplate="{DynamicResource DeviceTemplate}"/>
+                    </StackPanel>
+                </Expander>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Border Grid.Row="3" Padding="16,10,16,14">
+            <StackPanel>
+                <TextBlock x:Name="StatusText" Text="מחפש מכשירים..." Margin="0,0,0,6" TextWrapping="Wrap"/>
+                <ProgressBar x:Name="Bar" Maximum="1000" Height="6" Margin="0,0,0,10"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <ui:Button x:Name="SendBtn" Content="שלח" Appearance="Primary" IsEnabled="False"
+                               HorizontalAlignment="Stretch" Height="38" Click="SendBtn_Click"/>
+                    <ui:Button x:Name="CancelBtn" Grid.Column="2" Content="בטל שליחה" Margin="8,0,0,0"
+                               Height="38" Visibility="Collapsed" Click="CancelBtn_Click"/>
+                    <ui:Button x:Name="AddBtn" Grid.Column="1" Content="הוסף קבצים" Margin="8,0,0,0"
+                               Height="38" Click="AddBtn_Click"/>
+                </Grid>
+            </StackPanel>
+        </Border>
+    </Grid>
+
+    <ui:FluentWindow.Resources>
+        <DataTemplate x:Key="DeviceTemplate">
+            <Grid Margin="4,6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="40"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="{Binding Icon}" FontSize="22" VerticalAlignment="Center"/>
+                <Button Grid.Column="2" Content="{Binding Star}" Tag="{Binding}" Click="Star_Click"
+                        Background="Transparent" BorderThickness="0" FontSize="18" Padding="6,0"
+                        ToolTip="הוסף/הסר ממועדפים" Cursor="Hand"/>
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="{Binding DisplayName}" FontSize="14" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock Text="{Binding Subtitle}" Opacity="0.65" FontSize="12"/>
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+    </ui:FluentWindow.Resources>
+</ui:FluentWindow>

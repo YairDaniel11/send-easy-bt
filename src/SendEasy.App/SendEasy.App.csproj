@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>SendEasy.App</RootNamespace>
+    <AssemblyName>SendEasyBT</AssemblyName>
+    <Product>שליחה קלה - BT</Product>
+    <Version>0.1.0</Version>
+    <StartupObject>SendEasy.App.Program</StartupObject>
+    <ApplicationIcon>Assets/app.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="WPF-UI" Version="3.0.5" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SendEasy.Core\SendEasy.Core.csproj" />
+  </ItemGroup>
+</Project>

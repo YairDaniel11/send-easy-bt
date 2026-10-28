@@ -1,0 +1,66 @@
+﻿name: build
+
+# בונה ומפרסם גרסה חדשה רק כשהקוד או סקריפטי הבנייה משתנים.
+# שינוי ב-README, ברישיון או בקובצי תיעוד אחרים לא מפעיל את התהליך.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'build/**'
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: מספר גרסה
+        shell: pwsh
+        run: |
+          $v = "0.1.${{ github.run_number }}"
+          $f = 'src/SendEasy.App/SendEasy.App.csproj'
+          (Get-Content $f -Raw -Encoding UTF8) -replace '<Version>[^<]*</Version>', "<Version>$v</Version>" | Set-Content $f -Encoding UTF8 -NoNewline
+          "VERSION=$v" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+
+      - name: בדיקות
+        run: dotnet test tests/SendEasy.Tests -c Release
+
+      - name: כלי חבילה ומתקין
+        run: |
+          dotnet restore build/fetch/buildtools.csproj
+          dotnet restore build/fetch/innosetup.csproj
+
+      - name: מפתח החתימה (סוד של המאגר)
+        shell: pwsh
+        env:
+          PFX_B64: ${{ secrets.SIGNING_PFX_BASE64 }}
+          PFX_PASSWORD: ${{ secrets.SIGNING_PFX_PASSWORD }}
+        run: |
+          if (-not $env:PFX_B64) { Write-Host 'אין מפתח חתימה במאגר: ייווצר מפתח חדש זמני'; exit 0 }
+          New-Item -ItemType Directory -Force keys | Out-Null
+          [IO.File]::WriteAllBytes('keys/SendEasyBT.pfx', [Convert]::FromBase64String($env:PFX_B64))
+          Set-Content keys/pfx-password.txt $env:PFX_PASSWORD -NoNewline
+
+      - name: בניית המתקין
+        shell: pwsh
+        run: ./build/build_release.ps1
+
+      - name: פרסום גרסה
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v$env:VERSION" release/SendEasyBT-Setup.exe `
+            --title "שליחה קלה - BT $env:VERSION" `
+            --notes "גרסה אוטומטית מהקוד של $env:GITHUB_SHA. מתקינים את SendEasyBT-Setup.exe."

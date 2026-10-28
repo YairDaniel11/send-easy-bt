@@ -1,0 +1,28 @@
+﻿<Window x:Class="SendEasy.App.ConfirmDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        Title="שליחה קלה - BT" Width="400" SizeToContent="Height" ResizeMode="NoResize"
+        WindowStyle="None" FlowDirection="RightToLeft" WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False" Background="{DynamicResource ApplicationBackgroundBrush}"
+        MouseLeftButtonDown="Drag">
+    <Border BorderThickness="1" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}">
+        <StackPanel Margin="24,22,24,18">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <ui:SymbolIcon x:Name="Icon" Symbol="Info24" FontSize="32" VerticalAlignment="Top" Margin="0,2,16,0"/>
+                <StackPanel Grid.Column="1">
+                    <TextBlock x:Name="Head" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="Body" Margin="0,6,0,0" Opacity="0.75" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Grid>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,22,0,0">
+                <ui:Button x:Name="YesBtn" Appearance="Primary" MinWidth="90" Margin="0,0,8,0" Click="Yes_Click"/>
+                <ui:Button x:Name="NoBtn" MinWidth="90" Click="No_Click"/>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>
