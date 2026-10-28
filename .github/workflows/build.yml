@@ -1,4 +1,4 @@
-﻿name: build
+name: build
 
 # בונה ומפרסם גרסה חדשה רק כשהקוד או סקריפטי הבנייה משתנים.
 # שינוי ב-README, ברישיון או בקובצי תיעוד אחרים לא מפעיל את התהליך.
@@ -49,8 +49,8 @@ jobs:
         run: |
           if (-not $env:PFX_B64) { Write-Host 'אין מפתח חתימה במאגר: ייווצר מפתח חדש זמני'; exit 0 }
           New-Item -ItemType Directory -Force keys | Out-Null
-          [IO.File]::WriteAllBytes('keys/SendEasyBT.pfx', [Convert]::FromBase64String($env:PFX_B64))
-          Set-Content keys/pfx-password.txt $env:PFX_PASSWORD -NoNewline
+          [IO.File]::WriteAllBytes('keys/SendEasyBT.pfx', [Convert]::FromBase64String($env:PFX_B64.Trim()))
+          Set-Content keys/pfx-password.txt $env:PFX_PASSWORD.Trim() -NoNewline
 
       - name: בניית המתקין
         shell: pwsh
