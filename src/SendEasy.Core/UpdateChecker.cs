@@ -76,8 +76,10 @@ public static class UpdateChecker
         return dest;
     }
 
-    /// <summary>מוריד את ה-APK האחרון של אפליקציית האנדרואיד (התגית android-v*) לתיקיית היעד. מחזיר נתיב וגרסה.</summary>
-    public static async Task<(string Path, string Version)> DownloadLatestAndroidAsync(string repo, string destDir, IProgress<double>? progress, CancellationToken ct)
+    /// <summary>פרטי ה-APK האחרון של אפליקציית האנדרואיד (התגית android-v* הגבוהה ביותר).</summary>
+    public sealed record AndroidRelease(string Version, string FileName, string Url, long Size, string? Sha256);
+
+    public static async Task<AndroidRelease> FindLatestAndroidAsync(string repo, CancellationToken ct)
     {
         using var http = NewClient(TimeSpan.FromSeconds(15));
         http.DefaultRequestHeaders.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue { NoCache = true };
@@ -104,9 +106,23 @@ public static class UpdateChecker
             }
         }
         if (bestUrl == null || bestName == null || bestTag == null) throw new IOException("לא נמצאה גרסת אנדרואיד ב-GitHub");
-        var dest = Path.Combine(destDir, bestName);
-        await DownloadFileAsync(bestUrl, bestSize, bestSha, dest, progress, ct);
-        return (dest, bestTag.Substring("android-v".Length));
+        return new AndroidRelease(bestTag.Substring("android-v".Length), bestName, bestUrl, bestSize, bestSha);
+    }
+
+    /// <summary>הנתיב של ה-APK האחרון אם הוא כבר קיים בתיקייה (בגודל הנכון), אחרת null.</summary>
+    public static string? LocalAndroid(AndroidRelease r, string destDir)
+    {
+        var p = Path.Combine(destDir, r.FileName);
+        return File.Exists(p) && (r.Size <= 0 || new FileInfo(p).Length == r.Size) ? p : null;
+    }
+
+    /// <summary>מוריד את ה-APK האחרון של אפליקציית האנדרואיד (התגית android-v*) לתיקיית היעד. מחזיר נתיב וגרסה.</summary>
+    public static async Task<(string Path, string Version)> DownloadLatestAndroidAsync(string repo, string destDir, IProgress<double>? progress, CancellationToken ct)
+    {
+        var r = await FindLatestAndroidAsync(repo, ct);
+        var dest = Path.Combine(destDir, r.FileName);
+        await DownloadFileAsync(r.Url, r.Size, r.Sha256, dest, progress, ct);
+        return (dest, r.Version);
     }
     /// <summary>מוריד קובץ מ-GitHub אל dest (דרך קובץ זמני), עם בדיקת גודל ו-SHA-256 כשידועים.</summary>
     static async Task DownloadFileAsync(string url, long expectedSize, string? sha256, string dest, IProgress<double>? progress, CancellationToken ct)

@@ -21,6 +21,7 @@ public partial class SettingsWindow : Wpf.Ui.Controls.FluentWindow
         _favs = s.Favorites.Select(f => new FavoriteDevice { Name = f.Name, Address = f.Address, Hotkey = f.Hotkey }).ToList();
         _default = s.DefaultDevice;
         InitializeComponent();
+        Loaded += (_, _) => CheckLocalApk();
         ModeBox.SelectedIndex = (int)s.ReceiveMode;
         DirBox.Text = s.ReceiveDir;
         (s.ChatStyle == 0 ? ChatWa : ChatGc).IsChecked = true;
@@ -40,8 +41,30 @@ public partial class SettingsWindow : Wpf.Ui.Controls.FluentWindow
     }
 
     /// <summary>מוריד את גרסת האנדרואיד האחרונה מ-GitHub לתיקיית הקבלה ופותח את התיקייה.</summary>
+    string? _apkLocal;
+
+    /// <summary>אם ה-APK האחרון כבר נמצא בתיקיית הקבלה: מציגים שיש הגרסה העדכנית, והכפתור פותח את הקובץ במקום להוריד שוב.</summary>
+    async void CheckLocalApk()
+    {
+        try
+        {
+            var dir = DirBox.Text.Trim().Length > 0 ? DirBox.Text.Trim() : _s.ReceiveDir;
+            var r = await UpdateChecker.FindLatestAndroidAsync(_s.UpdateRepo, default);
+            _apkLocal = UpdateChecker.LocalAndroid(r, dir);
+            if (_apkLocal == null) return;
+            ApkBtn.Content = "הצג את הקובץ בתיקייה";
+            ApkStatus.Text = $"יש לך את גרסת האפליקציה העדכנית (גרסה {TrayApp.Ltr(r.Version)}): {TrayApp.Ltr(_apkLocal)}";
+        }
+        catch { }
+    }
+
     async void Apk_Click(object s, RoutedEventArgs e)
     {
+        if (_apkLocal != null && System.IO.File.Exists(_apkLocal))
+        {
+            System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{_apkLocal}\"");
+            return;
+        }
         ApkBtn.IsEnabled = false;
         ApkBar.Visibility = Visibility.Visible; ApkBar.Value = 0;
         ApkStatus.Text = "מוריד את האפליקציה מ-GitHub...";
@@ -50,6 +73,8 @@ public partial class SettingsWindow : Wpf.Ui.Controls.FluentWindow
             var prog = new Progress<double>(f => ApkBar.Value = Math.Clamp(f * 1000, 0, 1000));
             var dir = DirBox.Text.Trim().Length > 0 ? DirBox.Text.Trim() : _s.ReceiveDir;
             var (path, ver) = await UpdateChecker.DownloadLatestAndroidAsync(_s.UpdateRepo, dir, prog, default);
+            _apkLocal = path;
+            ApkBtn.Content = "הצג את הקובץ בתיקייה";
             ApkStatus.Text = $"הורדה הסתיימה (גרסה {TrayApp.Ltr(ver)}): {TrayApp.Ltr(path)}\nהעבר את האפליקצייה לטלפון באמצעות הבלוטוס או באמצעות כבל, והתקן אותו במכשיר.\n(במכשיר עם גישה לאינטרנט - תוכל לעדכן את האפליקצייה מתוך הגדרות האפליקצייה)";
             System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{path}\"");
         }
