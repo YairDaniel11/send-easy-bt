@@ -47,14 +47,15 @@ public sealed class ObexServer : IDisposable
 
     public void Dispose() => Stop();
 
-    static async Task<(string Name, bool Paired)> RemoteInfoAsync(StreamSocket sock)
+    static async Task<(string Name, bool Paired)> RemoteInfoAsync(StreamSocket sock, Settings cfg)
     {
         try
         {
             var raw = sock.Information.RemoteHostName.RawName.Trim('(', ')').Replace(":", "");
-            var dev = await BluetoothDevice.FromBluetoothAddressAsync(Convert.ToUInt64(raw, 16));
+            ulong addr = Convert.ToUInt64(raw, 16);
+            var dev = await BluetoothDevice.FromBluetoothAddressAsync(addr);
             if (dev != null)
-                return (string.IsNullOrWhiteSpace(dev.Name) ? "מכשיר לא מזוהה" : dev.Name,
+                return (cfg.DisplayName(addr, string.IsNullOrWhiteSpace(dev.Name) ? "מכשיר לא מזוהה" : dev.Name),
                         dev.DeviceInformation.Pairing.IsPaired);
         }
         catch { }
@@ -73,7 +74,7 @@ public sealed class ObexServer : IDisposable
             Directory.CreateDirectory(cfg.ReceiveDir);
             var r = new DataReader(sock.InputStream);
             var w = new DataWriter(sock.OutputStream);
-            var (from, paired) = await RemoteInfoAsync(sock);
+            var (from, paired) = await RemoteInfoAsync(sock, cfg);
             IncomingFile? file = null; long got = 0;
 
             while (true)

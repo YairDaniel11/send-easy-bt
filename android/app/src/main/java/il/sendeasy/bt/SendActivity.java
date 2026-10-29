@@ -32,6 +32,7 @@ public class SendActivity extends Activity {
     private final Handler ui = new Handler(Looper.getMainLooper());
     private final AtomicBoolean cancel = new AtomicBoolean(false);
     private volatile Session session;
+    private final Connector.Canceller canceller = new Connector.Canceller();
     private TextView statusT, nameT, infoT;
     private ProgressBar bar;
     private Button btn;
@@ -82,14 +83,16 @@ public class SendActivity extends Activity {
     @Override
     protected void onDestroy() {
         cancel.set(true);
+        canceller.cancel();
         Session s = session;
         if (s != null) s.close();
         super.onDestroy();
     }
 
     private void requestCancel() {
+        // הכפתור נשאר פעיל וממוקד (במכשיר מקשים אחרת אובד הפוקוס); showResult הופך אותו ל"סגור"
         cancel.set(true);
-        btn.setEnabled(false);
+        canceller.cancel(); // מפיל התחברות שתקועה ב-connect()
         statusT.setText(R.string.send_cancelled);
     }
 
@@ -124,7 +127,7 @@ public class SendActivity extends Activity {
             BluetoothAdapter bt = BluetoothAdapter.getDefaultAdapter();
             if (bt == null) throw new IOException(getString(R.string.main_no_bt));
             final BluetoothDevice dev = bt.getRemoteDevice(address);
-            setStatus(getString(R.string.send_connecting, MainActivity.nameOf(dev)));
+            setStatus(getString(R.string.send_connecting, DeviceNames.display(this, dev)));
 
             List<Item> items = new ArrayList<Item>();
             for (Uri u : uris) items.add(describe(u));
@@ -132,7 +135,7 @@ public class SendActivity extends Activity {
             Session s = Connector.connect(this, dev, new Connector.QuietListener(), new Connector.Status() {
                 @Override public void onRetry(int next, int max) { setStatus(getString(R.string.send_retry, next, max)); }
                 @Override public boolean cancelled() { return cancel.get(); }
-            });
+            }, canceller);
             session = s;
             try {
                 int total = items.size();

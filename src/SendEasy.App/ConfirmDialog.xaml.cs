@@ -21,6 +21,19 @@ public partial class ConfirmDialog : Window
 
     void Drag(object s, MouseButtonEventArgs e) { if (e.ButtonState == MouseButtonState.Pressed) DragMove(); }
     void Yes_Click(object s, RoutedEventArgs e) => DialogResult = true;
+
+    /// <summary>חלון עם שדה טקסט. מחזיר את הטקסט שהוזן, או null אם בוטל. ריק = מחיקה.</summary>
+    public static string? Prompt(Window? owner, string head, string body, string initial, string yes = "שמור")
+    {
+        var d = new ConfirmDialog(head, body, yes, "ביטול", SymbolRegular.Edit24);
+        d.Field.Visibility = Visibility.Visible;
+        d.Field.Text = initial;
+        d.Loaded += (_, _) => { d.Field.Focus(); d.Field.SelectAll(); };
+        d.Field.KeyDown += (_, e) => { if (e.Key == System.Windows.Input.Key.Enter) d.DialogResult = true; };
+        if (owner is { IsLoaded: true }) d.Owner = owner; else d.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        return d.ShowDialog() == true ? d.Field.Text : null;
+    }
+
     void No_Click(object s, RoutedEventArgs e) => DialogResult = false;
 
     public static bool Ask(Window? owner, string head, string body, string yes = "כן", string no = "ביטול")

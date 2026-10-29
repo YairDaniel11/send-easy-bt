@@ -57,8 +57,6 @@
                 <TextBlock Opacity="0.6" TextWrapping="Wrap" Margin="0,6,0,0" FontSize="12"
                            Text="החילוץ תמיד בטוח: נתיבים חשודים או ארכיון גדול מדי נדחים, ולעולם לא נדרס קובץ קיים."/>
 
-                <TextBlock Text="עדכונים" FontWeight="SemiBold" Margin="0,18,0,6"/>
-                <ui:TextBox x:Name="RepoBox" PlaceholderText="מאגר GitHub לבדיקת עדכונים, למשל owner/repo (ריק = כבוי)"/>
             </StackPanel>
         </ScrollViewer>
 

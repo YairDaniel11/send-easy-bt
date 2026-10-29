@@ -73,4 +73,15 @@
     <string name="rx_voice">הודעה קולית מ-%1$s</string>
 
     <string name="perm_needed">נדרשת הרשאת בלוטוס כדי לעבוד.</string>
+    <string name="act_rename">שנה שם</string>
+    <string name="rename_title">שם המכשיר (רק במכשיר הזה)</string>
+    <string name="rename_save">שמור</string>
+    <string name="rename_reset">אפס לשם המקורי</string>
+    <string name="menu_check_update">בדוק עדכון עכשיו</string>
+    <string name="upd_new">יש גרסה חדשה %1$s. לפתוח את דף ההורדה?</string>
+    <string name="upd_open">פתח</string>
+    <string name="upd_later">אחר כך</string>
+    <string name="upd_current">אתה מעודכן</string>
+    <string name="upd_no_net">אין חיבור לאינטרנט</string>
+    <string name="upd_failed">לא ניתן לבדוק עדכון כרגע</string>
 </resources>

@@ -84,11 +84,15 @@
                     <ColumnDefinition Width="40"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock Text="{Binding Icon}" FontSize="22" VerticalAlignment="Center"/>
                 <Button Grid.Column="2" Content="{Binding Star}" Tag="{Binding}" Click="Star_Click"
                         Background="Transparent" BorderThickness="0" FontSize="18" Padding="6,0"
                         ToolTip="הוסף/הסר ממועדפים" Cursor="Hand"/>
+                <Button Grid.Column="3" Content="✎" Tag="{Binding}" Click="Rename_Click"
+                        Background="Transparent" BorderThickness="0" FontSize="15" Padding="6,0"
+                        ToolTip="שנה שם למכשיר" Cursor="Hand"/>
                 <StackPanel Grid.Column="1">
                     <TextBlock Text="{Binding DisplayName}" FontSize="14" TextTrimming="CharacterEllipsis"/>
                     <TextBlock Text="{Binding Subtitle}" Opacity="0.65" FontSize="12"/>

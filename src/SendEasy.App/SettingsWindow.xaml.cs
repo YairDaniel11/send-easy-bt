@@ -32,7 +32,6 @@ public partial class SettingsWindow : Wpf.Ui.Controls.FluentWindow
         DirectBox.IsChecked = s.HotkeyDirect;
         ClipBox.IsChecked = s.ClipboardHotkeyEnabled;
         ClipText.Text = s.ClipboardHotkey;
-        RepoBox.Text = s.UpdateRepo;
         AttachCapture(HotkeyText);
         AttachCapture(ClipText);
         BuildFavorites();
@@ -44,39 +43,55 @@ public partial class SettingsWindow : Wpf.Ui.Controls.FluentWindow
         FavEmpty.Visibility = _favs.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         foreach (var f in _favs)
         {
-            var g = new Grid { Margin = new Thickness(0, 3, 0, 3) };
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var card = new Border
+            {
+                Margin = new Thickness(0, 0, 0, 10), Padding = new Thickness(12, 10, 12, 10), CornerRadius = new CornerRadius(8),
+                Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(18, 128, 128, 128)),
+            };
+            var sp = new StackPanel();
+            card.Child = sp;
 
-            var def = new RadioButton { Content = "★ " + f.Name, GroupName = "default", IsChecked = f.Address == _default, VerticalAlignment = VerticalAlignment.Center,
-                                        ToolTip = "מכשיר ברירת מחדל" };
+            static TextBlock Label(string text) => new() { Text = text, FontSize = 12, Opacity = 0.7, Margin = new Thickness(0, 8, 0, 3) };
+
+            // שם המכשיר (כינוי): כך אפשר לזהות למי שייך
+            sp.Children.Add(new TextBlock { Text = "שם המכשיר (אפשר לשנות, למשל לשם הבעלים)", FontSize = 12, Opacity = 0.7, Margin = new Thickness(0, 0, 0, 3) });
+            var nameBox = new TextBox { Text = f.Name, MaxLength = 60 };
+            if (!System.Text.RegularExpressions.Regex.IsMatch(f.Name, "[\u0590-\u05FF]")) nameBox.FlowDirection = FlowDirection.LeftToRight;
+            nameBox.TextChanged += (_, _) => f.Name = nameBox.Text.Trim();
+            sp.Children.Add(nameBox);
+
+            var def = new RadioButton
+            {
+                Content = "מכשיר ברירת מחדל (אליו נשלח כשלא בוחרים מכשיר)", GroupName = "default",
+                IsChecked = f.Address == _default, Margin = new Thickness(0, 10, 0, 0),
+            };
             def.Checked += (_, _) => _default = f.Address;
-            g.Children.Add(def);
+            sp.Children.Add(def);
 
-            var hk = new TextBox { Text = f.Hotkey, IsReadOnly = true, Margin = new Thickness(8, 0, 0, 0),
-                                   ToolTip = "קיצור ששולח ישירות למכשיר הזה" };
+            sp.Children.Add(Label("קיצור מקשים לשליחה ישירה למכשיר הזה"));
+            var row = new Grid();
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var hk = new Wpf.Ui.Controls.TextBox { Text = f.Hotkey, IsReadOnly = true, PlaceholderText = "לחץ כאן ואז על הצירוף הרצוי (למשל Ctrl+Alt+1)" };
             hk.TextChanged += (_, _) => f.Hotkey = hk.Text;
             AttachCapture(hk);
-            Grid.SetColumn(hk, 1); g.Children.Add(hk);
-
-            var clear = new Button { Content = "נקה", Margin = new Thickness(6, 0, 0, 0), Background = System.Windows.Media.Brushes.Transparent, BorderThickness = new Thickness(0), ToolTip = "נקה קיצור" };
+            row.Children.Add(hk);
+            var clear = new Wpf.Ui.Controls.Button { Content = "נקה קיצור", Margin = new Thickness(8, 0, 0, 0) };
             clear.Click += (_, _) => hk.Text = "";
-            Grid.SetColumn(clear, 2); g.Children.Add(clear);
+            Grid.SetColumn(clear, 1); row.Children.Add(clear);
+            sp.Children.Add(row);
 
-            var rm = new Button { Content = "הסר", Margin = new Thickness(2, 0, 0, 0), Background = System.Windows.Media.Brushes.Transparent, BorderThickness = new Thickness(0) };
+            var rm = new Wpf.Ui.Controls.Button { Content = "הסר מהמועדפים", Margin = new Thickness(0, 10, 0, 0), HorizontalAlignment = HorizontalAlignment.Left };
             rm.Click += (_, _) =>
             {
                 _favs.Remove(f);
                 if (_default == f.Address) _default = _favs.FirstOrDefault()?.Address ?? 0;
                 BuildFavorites();
             };
-            Grid.SetColumn(rm, 3); g.Children.Add(rm);
-            FavPanel.Children.Add(g);
+            sp.Children.Add(rm);
+            FavPanel.Children.Add(card);
         }
     }
-
     /// <summary>הופך תיבת טקסט ללוכדת צירוף מקשים: לוחצים בתוכה ואז על הצירוף.</summary>
     static void AttachCapture(TextBox tb)
     {
@@ -131,7 +146,7 @@ public partial class SettingsWindow : Wpf.Ui.Controls.FluentWindow
         _s.HotkeyDirect = DirectBox.IsChecked == true;
         _s.ClipboardHotkeyEnabled = ClipBox.IsChecked == true;
         _s.ClipboardHotkey = ClipText.Text;
-        _s.UpdateRepo = RepoBox.Text.Trim();
+        foreach (var f in _favs) if (f.Name.Length > 0) _s.SetAlias(f.Address, f.Name);
         _s.Favorites = _favs;
         _s.DefaultDevice = _favs.Any(f => f.Address == _default) ? _default : (_favs.FirstOrDefault()?.Address ?? 0);
         DialogResult = true;

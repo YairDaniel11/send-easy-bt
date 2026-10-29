@@ -21,7 +21,7 @@ sealed record Msg(bool Mine, string Sender, DateTime Time, MsgKind Kind, string 
 sealed class Conv
 {
     public ulong Address { get; init; }
-    public required string Name { get; init; }
+    public required string Name { get; set; }
     public required string Kind { get; init; }
     public bool Online { get; init; }
     public Color Color { get; init; }
@@ -56,6 +56,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         InitializeComponent();
         LoadConversations();
         _wa = _settings.ChatStyle == 0;
+        HeaderName.MouseLeftButtonUp += HeaderName_Click;
         ActionBtn.Content = "🎤";
         ActionBtn.ToolTip = "הקלטת הודעה קולית";
         _recTimer.Tick += (_, _) => RecordLabel.Text = $"● מקליט  {Fmt(_voice.ElapsedSeconds)}   (לחץ ➤ לשליחה)";
@@ -96,7 +97,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         var c = new Conv
         {
             Address = address, Kind = "",
-            Name = string.IsNullOrWhiteSpace(name) ? "מכשיר " + address.ToString("X12") : name,
+            Name = _settings.DisplayName(address, string.IsNullOrWhiteSpace(name) ? "מכשיר " + address.ToString("X12") : name),
             Color = ColorFor(address),
         };
         c.Messages.AddRange(ChatLog.Load(address).Select(ToMsg));
@@ -277,10 +278,30 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
 
     void ShowHeader()
     {
-        HeaderName.Text = Disp(_cur.Name);
+        HeaderName.Text = Disp(_cur.Name) + "  ✎";
+        HeaderName.Cursor = Cursors.Hand;
+        HeaderName.ToolTip = "לחץ כדי לשנות את שם המכשיר";
         HeaderStatus.Text = PeerConnections.IsConnected(_cur.Address) ? "מחובר בבלוטוס" : "ההודעות נשלחות דרך האפליקציה בטלפון";
         HeaderInitial.Text = _cur.Name.TrimStart('ה', '-', ' ').Substring(0, 1).ToUpperInvariant();
         HeaderAvatar.Background = new SolidColorBrush(_cur.Color);
+    }
+
+    /// <summary>שינוי שם (כינוי) למכשיר של השיחה הנוכחית.</summary>
+    void HeaderName_Click(object s, MouseButtonEventArgs e)
+    {
+        var c = _cur;
+        if (c == null) return;
+        var res = ConfirmDialog.Prompt(this, "שינוי שם למכשיר", "השאר ריק כדי לחזור לשם המקורי של המכשיר.", c.Name);
+        if (res == null) return;
+        _settings.SetAlias(c.Address, res.Trim());
+        var fav = _settings.Favorites.FirstOrDefault(f => f.Address == c.Address);
+        var original = ChatLog.Conversations().FirstOrDefault(x => x.Address == c.Address).Name;
+        c.Name = _settings.DisplayName(c.Address, string.IsNullOrWhiteSpace(original) ? (fav?.Name ?? c.Name) : original);
+        if (fav != null) fav.Name = c.Name;
+        try { _settings.Save(); } catch { }
+        RebuildConvList();
+        ShowHeader();
+        RenderMessages();
     }
 
     // ---- הודעות ----

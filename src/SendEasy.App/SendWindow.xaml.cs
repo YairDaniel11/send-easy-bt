@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -24,7 +24,10 @@ sealed class Dev
     public DeviceInformation Info { get; set; } = null!;
 
     public string Icon => Major == 1 ? "💻" : Major == 2 ? "📱" : "📟";
-    public string DisplayName => Name.Length > 0 ? Name : "מכשיר ללא שם";
+    /// <summary>כינוי שנתן המשתמש (אם יש).</summary>
+    public string? Alias { get; set; }
+    public string OriginalName => Name.Length > 0 ? Name : "מכשיר ללא שם";
+    public string DisplayName => string.IsNullOrWhiteSpace(Alias) ? OriginalName : Alias;
     public string Subtitle => (Major == 1 ? "מחשב" : Major == 2 ? "טלפון" : "מכשיר") + (Connected ? " · מחובר" : "");
     public string Star => IsFavorite ? "★" : "☆";
     public bool Relevant => (Major is 0 or 1 or 2 or 3 or 6) && (Name.Length > 0 || Major is 1 or 2);
@@ -134,6 +137,22 @@ public partial class SendWindow : Wpf.Ui.Controls.FluentWindow
         RefreshButtons();
     }
 
+    // ---- שינוי שם ----
+
+    void Rename_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (((FrameworkElement)sender).Tag is not Dev d || d.Address == 0) return;
+        var res = ConfirmDialog.Prompt(this, "שינוי שם למכשיר", "השם המקורי: " + TrayApp.Ltr(d.OriginalName) + ". השאר ריק כדי לחזור אליו.", d.Alias ?? d.OriginalName);
+        if (res == null) return;
+        var name = res.Trim();
+        _settings.SetAlias(d.Address, name == d.OriginalName ? "" : name);
+        var fav = _settings.Favorites.FirstOrDefault(f => f.Address == d.Address);
+        if (fav != null) fav.Name = _settings.DisplayName(d.Address, d.OriginalName);
+        try { _settings.Save(); } catch { }
+        Rebuild();
+    }
+
     // ---- מועדפים ----
 
     void Star_Click(object sender, RoutedEventArgs e)
@@ -224,8 +243,11 @@ public partial class SendWindow : Wpf.Ui.Controls.FluentWindow
         _syncing = true;
         PairedList.Items.Clear(); NearbyList.Items.Clear();
         foreach (var d in _devs.Values.Where(d => d.Relevant))
+        {
             d.IsFavorite = _settings.Favorites.Any(f => f.Address == d.Address && d.Address != 0);
-        foreach (var d in _devs.Values.Where(d => d.Relevant).OrderByDescending(d => d.IsFavorite).ThenBy(d => d.Name))
+            d.Alias = _settings.Alias(d.Address);
+        }
+        foreach (var d in _devs.Values.Where(d => d.Relevant).OrderByDescending(d => d.IsFavorite).ThenBy(d => d.DisplayName))
         {
             var list = d.Paired ? PairedList : NearbyList;
             list.Items.Add(d);

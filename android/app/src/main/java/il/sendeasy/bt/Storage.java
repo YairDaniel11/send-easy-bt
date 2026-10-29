@@ -9,6 +9,7 @@ import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
+import android.os.StatFs;
 import android.provider.MediaStore;
 import android.webkit.MimeTypeMap;
 
@@ -47,7 +48,9 @@ final class Storage {
         if (s.length() > 120) {
             int dot = s.lastIndexOf('.');
             String ext = (dot > 0 && s.length() - dot <= 12) ? s.substring(dot) : "";
-            s = s.substring(0, 120 - ext.length()) + ext;
+            int cut = 120 - ext.length();
+            if (cut > 0 && Character.isHighSurrogate(s.charAt(cut - 1))) cut--; // לא באמצע זוג חלופי
+            s = s.substring(0, cut) + ext;
         }
         String stem = s;
         int dot = s.indexOf('.');
@@ -99,7 +102,8 @@ final class Storage {
             }
             if (!dir.exists() && !dir.mkdirs()) return null;
             File dest = uniqueFile(dir, name);
-            copy(new FileInputStream(temp), new FileOutputStream(dest));
+            // אותה מערכת קבצים: שינוי שם מיידי, בלי העתקה ארוכה. אחרת (או בכשל) מעתיקים
+            if (!temp.renameTo(dest)) copyToFile(temp, dest);
             MediaScannerConnection.scanFile(c, new String[]{dest.getAbsolutePath()}, null, null);
             return dest.getAbsolutePath();
         } catch (Exception e) {
@@ -120,11 +124,21 @@ final class Storage {
         try {
             OutputStream os = cr.openOutputStream(uri);
             if (os == null) throw new IOException("אין פלט");
-            copy(new FileInputStream(temp), os);
+            InputStream is;
+            try {
+                is = new FileInputStream(temp);
+            } catch (IOException e) {
+                try { os.close(); } catch (IOException ignored) { }
+                throw e;
+            }
+            copy(is, os);
             ContentValues done = new ContentValues();
             done.put(MediaStore.MediaColumns.IS_PENDING, 0);
             cr.update(uri, done, null, null);
         } catch (IOException e) {
+            cr.delete(uri, null, null);
+            throw e;
+        } catch (RuntimeException e) {
             cr.delete(uri, null, null);
             throw e;
         }
@@ -156,7 +170,7 @@ final class Storage {
     static String storeVoice(Context c, File temp, String name) {
         try {
             File dest = uniqueFile(voiceDir(c), sanitize(name));
-            copy(new FileInputStream(temp), new FileOutputStream(dest));
+            copyToFile(temp, dest);
             return dest.getName();
         } catch (Exception e) {
             return null;
@@ -173,6 +187,57 @@ final class Storage {
             if (!f.exists()) return f;
         }
         return new File(dir, stem + "-" + System.currentTimeMillis() + ext);
+    }
+
+    /** מעתיק קובץ; בכשל באמצע מוחק את היעד החלקי. הזרמים נפתחים בנפרד כדי שלא ידלפו. */
+    private static void copyToFile(File src, File dest) throws IOException {
+        InputStream in = new FileInputStream(src);
+        OutputStream out;
+        try {
+            out = new FileOutputStream(dest);
+        } catch (IOException e) {
+            try { in.close(); } catch (IOException ignored) { }
+            throw e;
+        }
+        boolean ok = false;
+        try {
+            copy(in, out); // סוגר את שני הזרמים
+            ok = true;
+        } finally {
+            if (!ok) dest.delete();
+        }
+    }
+
+    // ---- בדיקת מקום פנוי לפני קבלה ----
+
+    static final long SPACE_MARGIN = 20L * 1024 * 1024;
+
+    private static long freeBytes(File f) {
+        while (f != null && !f.exists()) f = f.getParentFile();
+        if (f == null) return Long.MAX_VALUE; // לא ידוע: לא חוסמים
+        try {
+            return new StatFs(f.getPath()).getAvailableBytes(); // API 18+
+        } catch (RuntimeException e) {
+            return Long.MAX_VALUE;
+        }
+    }
+
+    /** האם יש מקום לקובץ בגודל size בתיקיית ה-cache (קובץ זמני) וביעד הסופי. כולל מרווח של 20MB. */
+    static boolean hasSpaceFor(Context c, long size, String name) {
+        long need = size + SPACE_MARGIN;
+        if (freeBytes(c.getCacheDir()) < need) return false;
+        File dest;
+        if (isVoiceName(name)) {
+            dest = c.getFilesDir();
+        } else if (Build.VERSION.SDK_INT >= 29) {
+            dest = Environment.getExternalStorageDirectory();
+        } else if (canWritePublic(c)) {
+            dest = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), DIR_NAME);
+        } else {
+            dest = c.getExternalFilesDir(null);
+            if (dest == null) dest = c.getFilesDir();
+        }
+        return freeBytes(dest) >= need;
     }
 
     private static void copy(InputStream in, OutputStream out) throws IOException {

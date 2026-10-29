@@ -38,12 +38,32 @@ public sealed class Settings
     public bool ClipboardHotkeyEnabled { get; set; } = true;
     public string ClipboardHotkey { get; set; } = "Ctrl+Alt+V";
     /// <summary>בדיקת עדכונים: מאגר GitHub בפורמט owner/repo. ריק = כבוי.</summary>
-    public string UpdateRepo { get; set; } = "YairDaniel11/send-easy-bt";
+    public const string DefaultUpdateRepo = "YairDaniel11/send-easy-bt";
+    public string UpdateRepo { get; set; } = DefaultUpdateRepo;
     public long MaxReceiveBytes { get; set; } = 4L * 1024 * 1024 * 1024;
     public long MaxExtractBytes { get; set; } = 8L * 1024 * 1024 * 1024;
     public int MaxExtractFiles { get; set; } = 20000;
     /// <summary>מזהה קבוע של המחשב (16 בייט, הקסה) בפרוטוקול הפרטי. נוצר בשימוש הראשון.</summary>
     public string DeviceId { get; set; } = "";
+
+    /// <summary>כינוי שהמשתמש נתן למכשיר (מפתח: כתובת בלוטוס בהקסה). מוצג במקום השם המקורי בכל התוכנה.</summary>
+    public Dictionary<string, string> Aliases { get; set; } = new();
+
+    static string AliasKey(ulong address) => address.ToString("x12");
+
+    /// <summary>השם להצגה: הכינוי אם יש, אחרת השם שהמכשיר מדווח.</summary>
+    public string DisplayName(ulong address, string fallback) =>
+        address != 0 && Aliases.TryGetValue(AliasKey(address), out var a) && !string.IsNullOrWhiteSpace(a) ? a : fallback;
+
+    public string? Alias(ulong address) =>
+        address != 0 && Aliases.TryGetValue(AliasKey(address), out var a) && !string.IsNullOrWhiteSpace(a) ? a : null;
+
+    /// <summary>קובע כינוי. ריק = מחיקה (חזרה לשם המקורי). הכינוי מתעדכן גם במועדפים.</summary>
+    public void SetAlias(ulong address, string? name)
+    {
+        if (address == 0) return;
+        if (string.IsNullOrWhiteSpace(name)) Aliases.Remove(AliasKey(address)); else Aliases[AliasKey(address)] = name.Trim();
+    }
 
     public byte[] GetOrCreateDeviceId()
     {
@@ -60,7 +80,15 @@ public sealed class Settings
 
     public static Settings Load()
     {
-        try { if (File.Exists(FilePath)) return JsonSerializer.Deserialize<Settings>(File.ReadAllText(FilePath)) ?? new(); }
+        try
+        {
+            if (File.Exists(FilePath))
+            {
+                var s = JsonSerializer.Deserialize<Settings>(File.ReadAllText(FilePath)) ?? new();
+                if (string.IsNullOrWhiteSpace(s.UpdateRepo)) s.UpdateRepo = DefaultUpdateRepo; // שדה העדכונים הוסר מההגדרות
+                return s;
+            }
+        }
         catch { }
         return new();
     }

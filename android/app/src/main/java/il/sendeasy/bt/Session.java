@@ -19,6 +19,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * חיבור אחד בפרוטוקול הפרטי (ראה PROTOCOL.md): מסגור, לחיצת יד, פינג, טקסט וקבצים.
@@ -82,7 +83,10 @@ final class Session {
     private volatile byte[] peerId;
     private volatile String peerName = "";
     private volatile int lastRejectReason;
-    private IncomingFile incoming; // רק בשרשור הקריאה
+    /** מוחלף בצורה אטומית: closeInternal רץ גם מהפינגר, ו-onFileFailed חייב להיקרא פעם אחת בלבד. */
+    private final AtomicReference<IncomingFile> incoming = new AtomicReference<IncomingFile>();
+    /** true בזמן שהשרשור שלנו עסוק בעבודה מקומית ארוכה (העתקת קובץ): לא נחשב "אין תקשורת". */
+    private volatile boolean busy;
 
     private Thread reader;
     private Thread pinger;
@@ -110,8 +114,7 @@ final class Session {
         reader.setDaemon(true);
         reader.start();
 
-        byte[] nm = myName.getBytes(UTF8);
-        if (nm.length > 64) nm = Arrays.copyOf(nm, 64);
+        byte[] nm = utf8Limit(myName, 64);
         byte[] hello = new byte[1 + 2 + 16 + 1 + nm.length];
         hello[0] = (byte) Protocol.VERSION;
         // caps (2 בייט): 0 בגרסה 1
@@ -178,6 +181,15 @@ final class Session {
         return r;
     }
 
+    /** מקודד ל-UTF-8 וחותך עד max בייטים על גבול תו (לא באמצע רצף). */
+    static byte[] utf8Limit(String s, int max) {
+        byte[] b = s.getBytes(UTF8);
+        if (b.length <= max) return b;
+        int cut = max;
+        while (cut > 0 && (b[cut] & 0xC0) == 0x80) cut--; // b[cut] הוא הבייט הראשון שנשמט
+        return Arrays.copyOf(b, cut);
+    }
+
     private long newId() {
         long id;
         do { id = rnd.nextLong(); } while (id == 0);
@@ -221,7 +233,8 @@ final class Session {
             case Protocol.T_CANCEL:
                 if (p.length >= 8) {
                     long id = getLong(p, 0);
-                    if (incoming != null && incoming.id == id) {
+                    IncomingFile cur = incoming.get();
+                    if (cur != null && cur.id == id) {
                         failIncoming(Protocol.DONE_CANCELLED);
                     } else {
                         xferEvents.offer(new long[]{Protocol.T_CANCEL, id, 0});
@@ -270,7 +283,12 @@ final class Session {
     }
 
     private void onOffer(byte[] p) throws IOException {
-        if (p.length < 18) return;
+        if (p.length < 18) {
+            if (p.length >= 8) {
+                send(Protocol.T_FILE_REJECT, concat(longBytes(getLong(p, 0)), new byte[]{(byte) Protocol.REJECT_NAME}), null, 0, 0);
+            }
+            return; // בלי מזהה אין למי לענות
+        }
         long id = getLong(p, 0);
         long size = getLong(p, 8);
         int nl = ((p[16] & 0xFF) << 8) | (p[17] & 0xFF);
@@ -279,7 +297,7 @@ final class Session {
             return;
         }
         String name = Storage.sanitize(new String(p, 18, nl, UTF8));
-        if (incoming != null) {
+        if (incoming.get() != null) {
             send(Protocol.T_FILE_REJECT, concat(longBytes(id), new byte[]{(byte) Protocol.REJECT_BUSY}), null, 0, 0);
             return;
         }
@@ -308,12 +326,12 @@ final class Session {
             return;
         }
         cancelIncoming = false;
-        incoming = f;
+        incoming.set(f);
         send(Protocol.T_FILE_ACCEPT, concat(longBytes(id), longBytes(0)), null, 0, 0);
     }
 
     private void onChunk(byte[] p) throws IOException {
-        IncomingFile f = incoming;
+        IncomingFile f = incoming.get();
         if (f == null || p.length < 8 || getLong(p, 0) != f.id) return;
         if (cancelIncoming) {
             send(Protocol.T_CANCEL, longBytes(f.id), null, 0, 0);
@@ -339,7 +357,7 @@ final class Session {
     }
 
     private void onEnd(byte[] p) throws IOException {
-        IncomingFile f = incoming;
+        IncomingFile f = incoming.get();
         if (f == null || p.length < 40 || getLong(p, 0) != f.id) return;
         int status;
         try {
@@ -356,19 +374,27 @@ final class Session {
         } else if (!MessageDigest.isEqual(expect, f.md.digest())) {
             status = Protocol.DONE_HASH;
         } else {
-            boolean ok = listener.onFileReceived(this, f, f.temp);
+            // ההעתקה ליעד סינכרונית וארוכה: מסמנים עסוק כדי שהפינגר לא יסגור את החיבור
+            boolean ok;
+            busy = true;
+            try {
+                ok = listener.onFileReceived(this, f, f.temp);
+            } finally {
+                lastRx = System.currentTimeMillis();
+                busy = false;
+            }
             status = ok ? Protocol.DONE_OK : Protocol.DONE_IO;
         }
         File t = f.temp;
-        incoming = null;
+        boolean mine = incoming.compareAndSet(f, null);
         if (t != null) t.delete();
+        if (!mine) return; // החיבור נסגר בינתיים ו-closeInternal כבר דיווח כשל
         send(Protocol.T_FILE_DONE, concat(longBytes(f.id), new byte[]{(byte) status}), null, 0, 0);
         if (status != Protocol.DONE_OK) listener.onFileFailed(this, f, status);
     }
 
     private void failIncoming(int status) {
-        IncomingFile f = incoming;
-        incoming = null;
+        IncomingFile f = incoming.getAndSet(null);
         if (f == null) return;
         try { if (f.out != null) f.out.close(); } catch (IOException ignored) { }
         if (f.temp != null) f.temp.delete();
@@ -391,7 +417,7 @@ final class Session {
                 return;
             }
             long now = System.currentTimeMillis();
-            if (now - lastRx > Protocol.DEAD_AFTER_MS) {
+            if (!busy && now - lastRx > Protocol.DEAD_AFTER_MS) {
                 closeInternal(new IOException("אין תקשורת מהצד השני"));
                 return;
             }
@@ -442,10 +468,7 @@ final class Session {
     int sendFile(InputStream src, String name, long size, SendProgress progress, AtomicBoolean cancel)
             throws IOException, InterruptedException {
         synchronized (sendLock) {
-            byte[] nb = name.getBytes(UTF8);
-            if (nb.length > Protocol.MAX_NAME_BYTES) {
-                nb = Arrays.copyOf(nb, Protocol.MAX_NAME_BYTES);
-            }
+            byte[] nb = utf8Limit(name, Protocol.MAX_NAME_BYTES);
             long id = newId();
             xferEvents.clear();
             byte[] head = new byte[8 + 8 + 2 + nb.length];
@@ -529,8 +552,7 @@ final class Session {
         if (!closed.compareAndSet(false, true)) return;
         try { closer.close(); } catch (IOException ignored) { }
         helloLatch.countDown();
-        IncomingFile f = incoming;
-        incoming = null;
+        IncomingFile f = incoming.getAndSet(null);
         if (f != null) {
             try { if (f.out != null) f.out.close(); } catch (IOException ignored) { }
             if (f.temp != null) f.temp.delete();

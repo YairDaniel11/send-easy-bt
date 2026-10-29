@@ -61,16 +61,23 @@ public class BtService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if (!Perms.hasBluetooth(this)) {
+        // אחרי startForegroundService חובה לקרוא ל-startForeground, גם אם עומדים לעצור (אחרת קריסה ב-API 26+)
+        boolean fg = false;
+        try {
+            createChannels();
+            Notification n = buildServiceNotification();
+            if (Build.VERSION.SDK_INT >= 29) {
+                startForeground(ID_FOREGROUND, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE);
+            } else {
+                startForeground(ID_FOREGROUND, n);
+            }
+            fg = true;
+        } catch (RuntimeException e) {
+            // כולל ForegroundServiceStartNotAllowedException (API 31+, תת-מחלקה של IllegalStateException)
+        }
+        if (!fg || !Perms.hasBluetooth(this)) {
             stopSelf();
             return START_NOT_STICKY;
-        }
-        createChannels();
-        Notification n = buildServiceNotification();
-        if (Build.VERSION.SDK_INT >= 29) {
-            startForeground(ID_FOREGROUND, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE);
-        } else {
-            startForeground(ID_FOREGROUND, n);
         }
         if (!alive) {
             alive = true;
@@ -112,7 +119,21 @@ public class BtService extends Service {
 
     // ------------------------------------------------------------ האזנה
 
+    /** מוחק קבצי קבלה חלקיים ישנים (מעל שעה) שנשארו אחרי קריסה או ניתוק. */
+    private void cleanOldParts() {
+        try {
+            File[] fs = Connector.tmpDir(this).listFiles();
+            if (fs == null) return;
+            long cutoff = System.currentTimeMillis() - 60L * 60 * 1000;
+            for (File f : fs) {
+                String n = f.getName();
+                if (n.startsWith("rx_") && n.endsWith(".part") && f.lastModified() < cutoff) f.delete();
+            }
+        } catch (RuntimeException ignored) { }
+    }
+
     private void acceptLoop() {
+        cleanOldParts();
         long backoff = 1000;
         while (alive) {
             BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
@@ -123,15 +144,25 @@ public class BtService extends Service {
             try {
                 BluetoothServerSocket ss = adapter.listenUsingRfcommWithServiceRecord(Protocol.SERVICE_NAME, Protocol.SERVICE_UUID);
                 server = ss;
+                if (!alive) { // onDestroy רץ לפני ההצבה ולא ראה את השרת: סוגרים בעצמנו (גם ב-finally)
+                    closeServer();
+                    return;
+                }
                 backoff = 1000;
                 while (alive) {
                     BluetoothSocket sock = ss.accept(); // חוסם; close() משחרר
-                    handleIncoming(sock);
+                    try {
+                        handleIncoming(sock);
+                    } catch (RuntimeException e) {
+                        // חיבור בעייתי אחד לא יהרוג את שרשור ההאזנה
+                        try { sock.close(); } catch (IOException ignored) { }
+                    }
                 }
             } catch (IOException e) {
                 // סגירת השרת בכוונה, או בלוטוס שנכבה: מנסים שוב
             } catch (SecurityException e) {
-                return; // אין הרשאה: אין טעם להמשיך
+                stopSelf(); // אין הרשאה: אין טעם להמשיך, ושלא יישאר שירות חזית ריק
+                return;
             } finally {
                 closeServer();
             }
@@ -192,9 +223,12 @@ public class BtService extends Service {
 
     private final class Incoming implements Session.Listener {
         private final String address;
-        private final String name;
+        private final String realName;
 
-        Incoming(String address, String name) { this.address = address; this.name = name; }
+        Incoming(String address, String name) { this.address = address; this.realName = name; }
+
+        /** נקרא בכל אירוע כדי שכינוי שהשתנה באמצע חיבור ייכנס לתוקף. */
+        private String name() { return DeviceNames.resolve(BtService.this, address, realName); }
 
         @Override public void onHello(Session s) { }
 
@@ -202,12 +236,13 @@ public class BtService extends Service {
         public void onText(Session s, long msgId, String text) {
             ChatStore.append(BtService.this, address, false, text, System.currentTimeMillis());
             Events.post(Events.CHAT, address);
-            notifyEvent(getString(R.string.rx_text, name), text, address);
+            notifyEvent(getString(R.string.rx_text, name()), text, address);
         }
 
         @Override
         public int onFileOffer(Session s, Session.IncomingFile f) {
             if (!Prefs.receiveEnabled(BtService.this)) return Protocol.REJECT_USER;
+            if (!Storage.hasSpaceFor(BtService.this, f.size, f.name)) return Protocol.REJECT_STORAGE;
             return 0;
         }
 
@@ -231,7 +266,7 @@ public class BtService extends Service {
                 ChatStore.add(BtService.this, address, new ChatStore.Msg(System.currentTimeMillis(), false, ChatStore.T_VOICE, stored));
                 Events.post(Events.CHAT, address);
                 int secs = Storage.voiceSeconds(stored);
-                notifyEvent(getString(R.string.rx_voice, name), getString(R.string.voice_label, (secs / 60) + ":" + (secs % 60 < 10 ? "0" : "") + (secs % 60)), address);
+                notifyEvent(getString(R.string.rx_voice, name()), getString(R.string.voice_label, (secs / 60) + ":" + (secs % 60 < 10 ? "0" : "") + (secs % 60)), address);
                 return true;
             }
             String where = Storage.publish(BtService.this, temp, f.name);

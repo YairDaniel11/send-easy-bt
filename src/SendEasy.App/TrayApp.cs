@@ -57,6 +57,10 @@ sealed class TrayApp : IDisposable
         _hotkey.Pressed += OnHotkey;
         ApplyHotkeys();
         _ = CheckUpdateAsync();
+        // בדיקת עדכון אוטומטית כל 6 שעות כשהתוכנה פתוחה (ההתראה מוצגת פעם אחת לכל גרסה)
+        var updTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromHours(6) };
+        updTimer.Tick += (_, _) => _ = CheckUpdateAsync();
+        updTimer.Start();
     }
 
     /// <summary>אייקון התוכנה (מוטמע בקובץ ההרצה). אם נכשל: אייקון מערכת.</summary>
@@ -115,6 +119,7 @@ sealed class TrayApp : IDisposable
     public void ShowSettings()
     {
         var w = new SettingsWindow(_settings);
+        w.Loaded += (_, _) => WindowFront.Bring(w);
         if (w.ShowDialog() == true) { _settings.Save(); ApplyHotkeys(); _chat?.ReloadStyle(); }
     }
 
@@ -353,11 +358,14 @@ sealed class TrayApp : IDisposable
 
     // ---- עדכונים ----
 
+    Version? _notifiedVersion;
+
     async Task CheckUpdateAsync()
     {
         var cur = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0);
         var r = await UpdateChecker.CheckAsync(_settings.UpdateRepo, cur);
-        if (r == null) return;
+        if (r == null || r.Value.Version == _notifiedVersion) return;
+        _notifiedVersion = r.Value.Version;
         _updateUrl = r.Value.Url;
         _ui.BeginInvoke(() => _tray.ShowBalloonTip(8000, "יש גרסה חדשה של שליחה קלה - BT",
             $"גרסה {r.Value.Version}. לחץ כאן כדי להוריד.", ToolTipIcon.Info));

@@ -20,6 +20,25 @@ final class Connector {
         boolean cancelled();
     }
 
+    /**
+     * ביטול מיידי של חיבור שמתבצע: sock.connect() לא ניתן להפסקה, אבל סגירת הסוקט מכשילה אותו.
+     * הסוקט מוחזק רק בזמן ההתחברות; אחרי חיבור מוצלח הביטול עובר דרך הפרוטוקול (CANCEL).
+     */
+    static final class Canceller {
+        private volatile boolean cancelled;
+        private volatile BluetoothSocket sock;
+
+        boolean isCancelled() { return cancelled; }
+
+        void cancel() {
+            cancelled = true;
+            BluetoothSocket s = sock;
+            if (s != null) {
+                try { s.close(); } catch (IOException ignored) { }
+            }
+        }
+    }
+
     /** מאזין לחיבור יוצא: לא מקבל קבצים (מחזיר "עסוק"), ולא עושה דבר עם שאר האירועים. */
     static final class QuietListener implements Session.Listener {
         @Override public void onHello(Session s) { }
@@ -50,6 +69,11 @@ final class Connector {
 
     static Session connect(Context ctx, BluetoothDevice dev, Session.Listener l, Status st)
             throws IOException, InterruptedException {
+        return connect(ctx, dev, l, st, null);
+    }
+
+    static Session connect(Context ctx, BluetoothDevice dev, Session.Listener l, Status st, Canceller cn)
+            throws IOException, InterruptedException {
         BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
         if (adapter == null) throw new IOException("אין בלוטוס במכשיר");
         if (!adapter.isEnabled()) throw new IOException("הבלוטוס כבוי");
@@ -59,10 +83,17 @@ final class Connector {
 
         IOException last = null;
         for (int attempt = 1; attempt <= ATTEMPTS; attempt++) {
-            if (st != null && st.cancelled()) throw new IOException("בוטל");
+            if ((st != null && st.cancelled()) || (cn != null && cn.cancelled)) throw new IOException("בוטל");
             BluetoothSocket sock = null;
             try {
                 sock = dev.createRfcommSocketToServiceRecord(Protocol.SERVICE_UUID);
+                if (cn != null) {
+                    cn.sock = sock;
+                    if (cn.cancelled) { // ביטול הגיע לפני ההצבה
+                        sock.close();
+                        throw new IOException("בוטל");
+                    }
+                }
                 sock.connect();
                 Session s = new Session(sock.getInputStream(), sock.getOutputStream(), sock,
                         Prefs.deviceId(ctx), myName(ctx), tmpDir(ctx), l);
@@ -71,6 +102,7 @@ final class Connector {
                     s.close();
                     throw new IOException("הצד השני לא ענה. ודא שהתוכנה פתוחה במחשב.");
                 }
+                if (cn != null) cn.sock = null; // מכאן הביטול דרך הפרוטוקול, לא בסגירת הסוקט
                 return s;
             } catch (SecurityException e) {
                 throw new IOException("אין הרשאת בלוטוס");
@@ -79,6 +111,8 @@ final class Connector {
                 if (sock != null) {
                     try { sock.close(); } catch (IOException ignored) { }
                 }
+                if (cn != null) cn.sock = null;
+                if (cn != null && cn.cancelled) throw new IOException("בוטל");
                 if (attempt < ATTEMPTS) {
                     if (st != null) st.onRetry(attempt + 1, ATTEMPTS);
                     Thread.sleep(1500);

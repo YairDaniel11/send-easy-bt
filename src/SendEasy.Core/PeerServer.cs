@@ -68,6 +68,7 @@ public sealed class PeerServer : IDisposable
             var (from, paired, addr) = await RemoteInfoAsync(sock);
             if (!paired) { sock.Dispose(); return; }
             var cfg = _settings();
+            from = cfg.DisplayName(addr, from); // כינוי שהמשתמש נתן למכשיר
             session = new PeerSession(sock.InputStream.AsStreamForRead(), sock.OutputStream.AsStreamForWrite(), sock,
                 cfg.GetOrCreateDeviceId(), Environment.MachineName, Path.Combine(Path.GetTempPath(), "SendEasyBT", "rx"), paired);
             session.OfferHandler = async f =>

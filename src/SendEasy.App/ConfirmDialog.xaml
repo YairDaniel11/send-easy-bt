@@ -19,6 +19,7 @@
                     <TextBlock x:Name="Body" Margin="0,6,0,0" Opacity="0.75" TextWrapping="Wrap"/>
                 </StackPanel>
             </Grid>
+            <TextBox x:Name="Field" Margin="0,14,0,0" Visibility="Collapsed" MaxLength="60"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,22,0,0">
                 <ui:Button x:Name="YesBtn" Appearance="Primary" MinWidth="90" Margin="0,0,8,0" Click="Yes_Click"/>
                 <ui:Button x:Name="NoBtn" MinWidth="90" Click="No_Click"/>

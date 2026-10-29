@@ -53,6 +53,7 @@ public class ChatActivity extends Activity implements Events.Listener {
 
     private String address;
     private String deviceName;
+    private String realName;
     private ListView list;
     private TextView emptyT, recT, titleT, subT, avatarT, micBtn, sendBtn;
     private EditText input;
@@ -60,7 +61,8 @@ public class ChatActivity extends Activity implements Events.Listener {
     private final List<ChatStore.Msg> msgs = new ArrayList<ChatStore.Msg>();
     private Adapter adapter;
     private final ExecutorService io = Executors.newSingleThreadExecutor();
-    private Session session; // רק מהשרשור של io
+    private volatile Session session; // נכתב מהשרשור של io; onDestroy סוגר אותו ישירות
+    private volatile boolean destroyed;
     private final SimpleDateFormat fmt = new SimpleDateFormat("HH:mm", Locale.US);
     private final Handler ui = new Handler(Looper.getMainLooper());
 
@@ -104,10 +106,11 @@ public class ChatActivity extends Activity implements Events.Listener {
         address = getIntent().getStringExtra(EXTRA_ADDRESS);
         if (address == null) { finish(); return; }
         BluetoothAdapter bt = BluetoothAdapter.getDefaultAdapter();
-        deviceName = address;
+        realName = address;
         if (bt != null) {
-            try { deviceName = MainActivity.nameOf(bt.getRemoteDevice(address)); } catch (RuntimeException ignored) { }
+            try { realName = MainActivity.nameOf(bt.getRemoteDevice(address)); } catch (RuntimeException ignored) { }
         }
+        deviceName = DeviceNames.resolve(this, address, realName);
 
         root = findViewById(R.id.chatRoot);
         header = findViewById(R.id.chatHeader);
@@ -246,13 +249,11 @@ public class ChatActivity extends Activity implements Events.Listener {
     protected void onDestroy() {
         recorder.cancel();
         stopPlay();
-        io.execute(new Runnable() {
-            @Override public void run() {
-                if (session != null) session.close();
-                session = null;
-            }
-        });
-        io.shutdown();
+        destroyed = true;
+        Session s = session;
+        session = null;
+        if (s != null) s.close();
+        io.shutdownNow(); // מפסיק גם שליחה/המתנה שרצה
         super.onDestroy();
     }
 
@@ -279,7 +280,12 @@ public class ChatActivity extends Activity implements Events.Listener {
     private Session ensureSession() throws IOException, InterruptedException {
         if (session == null || session.isClosed()) {
             BluetoothDevice dev = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(address);
-            session = Connector.connect(this, dev, new Connector.QuietListener(), null);
+            Session s = Connector.connect(getApplicationContext(), dev, new Connector.QuietListener(), null);
+            if (destroyed) { // ה-Activity נסגר בזמן ההתחברות: לא משאירים חיבור יתום
+                s.close();
+                throw new InterruptedException();
+            }
+            session = s;
         }
         return session;
     }
@@ -429,6 +435,8 @@ public class ChatActivity extends Activity implements Events.Listener {
                 }
                 if (r == Session.R_OK) return null;
                 if (r == Session.R_REJECTED) return getString(R.string.send_rejected);
+                if (r == Session.R_CANCELLED) return getString(R.string.send_cancelled);
+                if (r == Session.R_HASH) return "ההודעה הגיעה פגומה";
                 return "שגיאה בצד המקבל";
             } catch (IOException e) {
                 s.close();
@@ -487,13 +495,21 @@ public class ChatActivity extends Activity implements Events.Listener {
     // ------------------------------------------------------------ מקשים ותפריט
 
     private void showMenu() {
-        final String[] items = {getString(R.string.voice_record), getString(R.string.chat_menu_file), getString(R.string.chat_menu_style)};
+        final String[] items = {getString(R.string.voice_record), getString(R.string.chat_menu_file), getString(R.string.chat_menu_style), getString(R.string.act_rename)};
         new AlertDialog.Builder(this)
                 .setItems(items, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int which) {
                         if (which == 0) toggleRecording();
                         else if (which == 1) FilePicker.pick(ChatActivity.this);
-                        else chooseStyle();
+                        else if (which == 2) chooseStyle();
+                        else DeviceNames.rename(ChatActivity.this, address, realName, new Runnable() {
+                            @Override public void run() {
+                                deviceName = DeviceNames.resolve(ChatActivity.this, address, realName);
+                                titleT.setText(Fmt.ltr(deviceName));
+                                UiKit.avatar(avatarT, deviceName, 40);
+                                adapter.notifyDataSetChanged();
+                            }
+                        });
                     }
                 })
                 .show();
@@ -532,7 +548,9 @@ public class ChatActivity extends Activity implements Events.Listener {
             }
             return true;
         }
-        if (Keys.isMenu(code)) {
+        // בשדה הקלט # הוא תו רגיל; התפריט נשאר זמין במקשי MENU והמקש הרך השמאלי
+        boolean typingPound = code == KeyEvent.KEYCODE_POUND && input != null && input.hasFocus();
+        if (Keys.isMenu(code) && !typingPound) {
             if (e.getAction() == KeyEvent.ACTION_DOWN && e.getRepeatCount() == 0) showMenu();
             return true;
         }
@@ -541,8 +559,8 @@ public class ChatActivity extends Activity implements Events.Listener {
 
     @Override
     public boolean onKeyDown(int code, KeyEvent e) {
-        // במקלדת T9 אין מקש מחיקה: חזרה בשדה עם טקסט מוחקת תו אחרון, ורק בשדה ריק יוצאים
-        if (code == KeyEvent.KEYCODE_BACK && input != null && input.hasFocus() && input.getText().length() > 0) {
+        // במקלדת T9 אין מקש מחיקה: חזרה/CLEAR בשדה עם טקסט מוחקת תו אחרון, ורק בשדה ריק יוצאים
+        if ((code == KeyEvent.KEYCODE_BACK || code == KeyEvent.KEYCODE_CLEAR) && input != null && input.hasFocus() && input.getText().length() > 0) {
             int len = input.getText().length();
             input.getText().delete(len - 1, len);
             return true;

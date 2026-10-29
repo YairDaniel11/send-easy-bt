@@ -58,6 +58,28 @@ final class Prefs {
         sp(c).edit().putInt(K_CHAT_STYLE, s).apply();
     }
 
+    /** כינוי מקומי למכשיר מצומד (לפי כתובת). null = אין כינוי. */
+    static String alias(Context c, String address) {
+        String a = sp(c).getString("alias_" + address, null);
+        return a == null || a.trim().length() == 0 ? null : a;
+    }
+
+    /** ריק = מחיקת הכינוי. */
+    static void setAlias(Context c, String address, String name) {
+        String n = name == null ? "" : name.trim();
+        SharedPreferences.Editor e = sp(c).edit();
+        if (n.length() == 0) e.remove("alias_" + address); else e.putString("alias_" + address, n);
+        e.apply();
+    }
+
+    static long lastUpdateCheck(Context c) {
+        return sp(c).getLong("updCheck", 0L);
+    }
+
+    static void setLastUpdateCheck(Context c, long t) {
+        sp(c).edit().putLong("updCheck", t).apply();
+    }
+
     static String toHex(byte[] b) {
         StringBuilder sb = new StringBuilder();
         for (byte x : b) sb.append(String.format("%02x", x & 0xFF));

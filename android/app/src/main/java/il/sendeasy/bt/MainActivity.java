@@ -89,6 +89,7 @@ public class MainActivity extends Activity implements Events.Listener {
         Events.add(this);
         reload();
         startServiceIfNeeded();
+        checkUpdate(false);
     }
 
     @Override
@@ -152,7 +153,7 @@ public class MainActivity extends Activity implements Events.Listener {
             Collections.sort(devices, new Comparator<BluetoothDevice>() {
                 @Override public int compare(BluetoothDevice x, BluetoothDevice y) {
                     int c = Boolean.valueOf(isComputer(y)).compareTo(isComputer(x));
-                    return c != 0 ? c : nameOf(x).compareToIgnoreCase(nameOf(y));
+                    return c != 0 ? c : DeviceNames.display(MainActivity.this, x).compareToIgnoreCase(DeviceNames.display(MainActivity.this, y));
                 }
             });
             if (devices.isEmpty()) showEmpty(getString(R.string.main_no_devices)); else empty.setVisibility(View.GONE);
@@ -201,7 +202,7 @@ public class MainActivity extends Activity implements Events.Listener {
         @Override public View getView(int pos, View convert, ViewGroup parent) {
             View v = convert != null ? convert : LayoutInflater.from(MainActivity.this).inflate(R.layout.row_item, parent, false);
             BluetoothDevice d = devices.get(pos);
-            String name = nameOf(d);
+            String name = DeviceNames.display(MainActivity.this, d);
             ((TextView) v.findViewById(R.id.rowTitle)).setText(name);
             ((TextView) v.findViewById(R.id.rowSub)).setText(Fmt.ltr(d.getAddress()) + (isComputer(d) ? "  ·  מחשב" : ""));
             UiKit.avatar((TextView) v.findViewById(R.id.avatar), name, 48);
@@ -225,12 +226,16 @@ public class MainActivity extends Activity implements Events.Listener {
             pickHint.setVisibility(View.GONE);
             return;
         }
-        final String[] items = {getString(R.string.act_send_file), getString(R.string.act_chat)};
+        final String[] items = {getString(R.string.act_send_file), getString(R.string.act_chat), getString(R.string.act_rename)};
         new AlertDialog.Builder(this)
-                .setTitle(nameOf(d))
+                .setTitle(DeviceNames.display(this, d))
                 .setItems(items, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface dlg, int which) {
-                        if (which == 0) pickFiles(d.getAddress()); else openChat(d.getAddress());
+                        if (which == 0) pickFiles(d.getAddress());
+                        else if (which == 1) openChat(d.getAddress());
+                        else DeviceNames.rename(MainActivity.this, d.getAddress(), nameOf(d), new Runnable() {
+                            @Override public void run() { reload(); }
+                        });
                     }
                 })
                 .show();
@@ -258,11 +263,47 @@ public class MainActivity extends Activity implements Events.Listener {
     private void startSend(String address, List<Uri> uris) {
         FilePicker.startSend(this, address, uris);
     }
+
+    // ------------------------------------------------------------ עדכונים
+
+    /** גרסה שהמשתמש בחר "אחר כך" לגביה בהפעלה הנוכחית של התהליך. */
+    private static String dismissedVersion;
+
+    private void checkUpdate(final boolean manual) {
+        UpdateChecker.check(this, manual, new UpdateChecker.Callback() {
+            @Override public void onResult(int status, final String version, final String url) {
+                if (status == UpdateChecker.NEWER) {
+                    if (!manual && version.equals(dismissedVersion)) return;
+                    new AlertDialog.Builder(MainActivity.this)
+                            .setMessage(getString(R.string.upd_new, Fmt.ltr(version)))
+                            .setPositiveButton(R.string.upd_open, new DialogInterface.OnClickListener() {
+                                @Override public void onClick(DialogInterface d, int w) {
+                                    try {
+                                        startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+                                    } catch (RuntimeException ignored) { } // כולל ActivityNotFoundException
+                                }
+                            })
+                            .setNegativeButton(R.string.upd_later, new DialogInterface.OnClickListener() {
+                                @Override public void onClick(DialogInterface d, int w) { dismissedVersion = version; }
+                            })
+                            .show();
+                } else if (manual) {
+                    int msg = status == UpdateChecker.NO_NET ? R.string.upd_no_net
+                            : status == UpdateChecker.UP_TO_DATE ? R.string.upd_current : R.string.upd_failed;
+                    new AlertDialog.Builder(MainActivity.this)
+                            .setMessage(msg)
+                            .setPositiveButton(android.R.string.ok, null).show();
+                }
+            }
+        });
+    }
+
     private void showMenu() {
         final String[] items = {
                 getString(R.string.menu_toggle_receive),
                 getString(R.string.menu_receive_dir),
                 getString(R.string.menu_chat_style),
+                getString(R.string.menu_check_update),
                 getString(R.string.menu_about)};
         new AlertDialog.Builder(this)
                 .setItems(items, new DialogInterface.OnClickListener() {
@@ -282,6 +323,8 @@ public class MainActivity extends Activity implements Events.Listener {
                                     .setSingleChoiceItems(new String[]{getString(R.string.style_wa), getString(R.string.style_gc)}, Prefs.chatStyle(MainActivity.this), new DialogInterface.OnClickListener() {
                                         @Override public void onClick(DialogInterface d, int w) { Prefs.setChatStyle(MainActivity.this, w); d.dismiss(); }
                                     }).show();
+                        } else if (which == 3) {
+                            checkUpdate(true);
                         } else {
                             new AlertDialog.Builder(MainActivity.this)
                                     .setMessage(R.string.about_text)
