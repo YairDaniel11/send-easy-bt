@@ -80,26 +80,34 @@ public static class UpdateChecker
     public static async Task<(string Path, string Version)> DownloadLatestAndroidAsync(string repo, string destDir, IProgress<double>? progress, CancellationToken ct)
     {
         using var http = NewClient(TimeSpan.FromSeconds(15));
-        var json = await http.GetStringAsync($"https://api.github.com/repos/{repo}/releases?per_page=20", ct);
+        http.DefaultRequestHeaders.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue { NoCache = true };
+        var json = await http.GetStringAsync($"https://api.github.com/repos/{repo}/releases?per_page=50", ct);
         using var doc = JsonDocument.Parse(json);
+
+        // בוחרים את הגרסה הגבוהה ביותר (לפי מספר הגרסה בתגית), לא את הראשונה ברשימה
+        Version? bestVersion = null; string? bestTag = null, bestUrl = null, bestName = null, bestSha = null; long bestSize = 0;
         foreach (var rel in doc.RootElement.EnumerateArray())
         {
             var tag = rel.GetProperty("tag_name").GetString() ?? "";
             if (!tag.StartsWith("android-v", StringComparison.OrdinalIgnoreCase) || !rel.TryGetProperty("assets", out var assets)) continue;
+            if (!Version.TryParse(tag.Substring("android-v".Length), out var ver)) continue;
+            if (bestVersion != null && ver <= bestVersion) continue;
             foreach (var a in assets.EnumerateArray())
             {
                 var name = a.GetProperty("name").GetString() ?? "";
                 if (!name.EndsWith(".apk", StringComparison.OrdinalIgnoreCase)) continue;
-                var url = a.GetProperty("browser_download_url").GetString()!;
-                long size = a.TryGetProperty("size", out var sz) ? sz.GetInt64() : 0;
-                var dest = Path.Combine(destDir, name);
-                await DownloadFileAsync(url, size, DigestOf(a), dest, progress, ct);
-                return (dest, tag.Substring("android-v".Length));
+                bestVersion = ver; bestTag = tag; bestName = name;
+                bestUrl = a.GetProperty("browser_download_url").GetString();
+                bestSize = a.TryGetProperty("size", out var sz) ? sz.GetInt64() : 0;
+                bestSha = DigestOf(a);
+                break;
             }
         }
-        throw new IOException("לא נמצאה גרסת אנדרואיד ב-GitHub");
+        if (bestUrl == null || bestName == null || bestTag == null) throw new IOException("לא נמצאה גרסת אנדרואיד ב-GitHub");
+        var dest = Path.Combine(destDir, bestName);
+        await DownloadFileAsync(bestUrl, bestSize, bestSha, dest, progress, ct);
+        return (dest, bestTag.Substring("android-v".Length));
     }
-
     /// <summary>מוריד קובץ מ-GitHub אל dest (דרך קובץ זמני), עם בדיקת גודל ו-SHA-256 כשידועים.</summary>
     static async Task DownloadFileAsync(string url, long expectedSize, string? sha256, string dest, IProgress<double>? progress, CancellationToken ct)
     {

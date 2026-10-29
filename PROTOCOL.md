@@ -28,7 +28,7 @@ LEN(4) | TYPE(1) | FLAGS(1) | PAYLOAD
 | 0x10 | TEXT | `msgId(8)` `text(UTF-8, עד 16KB)` |
 | 0x11 | ACK | `msgId(8)` |
 | 0x12 | READ | `msgId(8)` (אישור שההודעה הוצגה למשתמש בצד המקבל; מקורו וי ירוק) |
-| 0x20 | FILE_OFFER | `xferId(8)` `size(8)` `nameLen(2)` `name(UTF-8)` |
+| 0x20 | FILE_OFFER | `xferId(8)` `size(8)` `nameLen(2)` `name(UTF-8)` `flags(1, אופציונלי)` (ביט 0 = נשלח מתוך הצ'אט: הצד המקבל לא מציג חלון קבלה) |
 | 0x21 | FILE_ACCEPT | `xferId(8)` `offset(8)` (בגרסה 1 תמיד 0) |
 | 0x22 | FILE_REJECT | `xferId(8)` `reason(1)` |
 | 0x23 | FILE_CHUNK | `xferId(8)` `data` (עד 16KB) |

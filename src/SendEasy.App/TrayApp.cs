@@ -205,9 +205,20 @@ sealed class TrayApp : IDisposable
         ChatLog.Add(addr, new ChatEntry { Mine = false, Kind = "text", Text = text, Device = from, Status = "delivered", MsgId = msgId });
         if (_chat is { IsLoaded: true }) _chat.Refresh(addr, from);
         if (_chat is { IsActive: true }) return; // החלון פתוח ובחזית: ההודעה כבר מוצגת
-        _chatBalloonAddr = addr; _chatBalloonName = from;
         var shown = text.Length > 200 ? text[..200] + "…" : text;
-        _tray.ShowBalloonTip(6000, "הודעה מ-" + from, shown, ToolTipIcon.Info);
+        NotifyMessage(addr, from, shown);
+    }
+
+    MessageToast? _msgToast;
+
+    /// <summary>הודעה חדשה: חלון קטן שקט (אם מופעל) וצליל (אם מופעל). לחיצה על החלון פותחת את השיחה.</summary>
+    void NotifyMessage(ulong addr, string from, string preview)
+    {
+        if (_settings.NotifySound) System.Media.SystemSounds.Asterisk.Play();
+        if (!_settings.NotifyPopup) return;
+        try { _msgToast?.Close(); } catch { }
+        _msgToast = new MessageToast("הודעה מ-" + from, preview, () => OpenChat(addr, from));
+        _msgToast.Show();
     }
 
     void OnFileInChat(ulong addr, IncomingFile f, string path)
@@ -215,11 +226,8 @@ sealed class TrayApp : IDisposable
         bool voice = ChatLog.IsVoiceName(f.Name);
         ChatLog.Add(addr, new ChatEntry { Mine = false, Kind = voice ? "voice" : "file", Text = f.Name, Size = f.Size, Path = path, Device = f.FromName, Status = "delivered" });
         if (_chat is { IsLoaded: true }) _chat.Refresh(addr, f.FromName);
-        if (voice && _chat is not { IsActive: true })
-        {
-            _chatBalloonAddr = addr; _chatBalloonName = f.FromName;
-            _tray.ShowBalloonTip(6000, "הודעה קולית מ-" + f.FromName, "לחץ כדי לפתוח את הצ'אט", ToolTipIcon.Info);
-        }
+        if (voice && _chat is not { IsActive: true }) NotifyMessage(addr, f.FromName, "🎤 הודעה קולית");
+        else if (!voice && f.FromChat && _chat is not { IsActive: true }) NotifyMessage(addr, f.FromName, "📎 " + f.Name);
     }
     Task<bool> AskAsync(IncomingFile f)
     {
@@ -246,6 +254,8 @@ sealed class TrayApp : IDisposable
 
     void OnProgress(IncomingFile f, long got)
     {
+        // הקלטות ותמונות מהצ'אט מופיעות בשיחה ולא בחלון קבלה
+        if (f.FromChat || ChatLog.IsVoiceName(f.Name)) return;
         if (!_toasts.TryGetValue(f, out var toast))
         {
             toast = new ReceiveToast(f);

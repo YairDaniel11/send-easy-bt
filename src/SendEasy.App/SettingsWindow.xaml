@@ -50,6 +50,10 @@
                 <RadioButton x:Name="ChatWa" GroupName="chatstyle" Content="ווטסאפ"/>
                 <RadioButton x:Name="ChatGc" GroupName="chatstyle" Content="גוגל צ&apos;אט"/>
 
+                <TextBlock Text="הודעות" FontWeight="SemiBold" Margin="0,18,0,6"/>
+                <CheckBox x:Name="PopupBox" Content="הצג חלון קטן בפינה בכל הודעה חדשה ממכשיר"/>
+                <CheckBox x:Name="SoundBox" Content="השמע צליל בעת קבלת הודעה"/>
+
                 <TextBlock Text="אפליקציית אנדרואיד" FontWeight="SemiBold" Margin="0,18,0,6"/>
                 <ui:Button x:Name="ApkBtn" Content="הורד את אפליקציית האנדרואיד למחשב" HorizontalAlignment="Stretch" Click="Apk_Click"/>
                 <ProgressBar x:Name="ApkBar" Maximum="1000" Height="5" Margin="0,8,0,0" Visibility="Collapsed"/>

@@ -244,7 +244,9 @@ public sealed class PeerSession : IDisposable
         var name = FileNames.Sanitize(Encoding.UTF8.GetString(p, 18, nl));
         if (name.Length == 0 || size < 0 || size > PeerProtocol.MaxFileSize) { await RejectAsync(id, PeerProtocol.RejectName); return; }
 
-        var file = new IncomingFile(PeerName, name, size, _paired);
+        // בית אופציונלי אחרי השם: דגלים. ביט 0 = נשלח מתוך הצ'אט (גרסאות ישנות פשוט לא שולחות אותו)
+        bool fromChat = p.Length > 18 + nl && (p[18 + nl] & 1) != 0;
+        var file = new IncomingFile(PeerName, name, size, _paired) { FromChat = fromChat };
         int r = OfferHandler != null ? await OfferHandler(file) : 0;
         if (r != 0) { await RejectAsync(id, r); return; }
 
@@ -386,7 +388,7 @@ public sealed class PeerSession : IDisposable
     }
 
     /// <summary>שולח קובץ אחד. קובץ אחד בכל רגע: שליחות נוספות ממתינות.</summary>
-    public async Task<PeerSendResult> SendFileAsync(Stream src, string name, long size, IProgress<long>? progress, CancellationToken ct)
+    public async Task<PeerSendResult> SendFileAsync(Stream src, string name, long size, IProgress<long>? progress, CancellationToken ct, bool fromChat = false)
     {
         await _sendLock.WaitAsync(ct);
         try
@@ -395,11 +397,12 @@ public sealed class PeerSession : IDisposable
             if (nb.Length > PeerProtocol.MaxNameBytes) nb = nb[..PeerProtocol.MaxNameBytes];
             long id = Random.Shared.NextInt64(1, long.MaxValue);
             while (_xfer.Reader.TryRead(out _)) { }
-            var head = new byte[8 + 8 + 2 + nb.Length];
+            var head = new byte[8 + 8 + 2 + nb.Length + (fromChat ? 1 : 0)];
             BinaryPrimitives.WriteInt64BigEndian(head, id);
             BinaryPrimitives.WriteInt64BigEndian(head.AsSpan(8), size);
             head[16] = (byte)(nb.Length >> 8); head[17] = (byte)nb.Length;
             nb.CopyTo(head, 18);
+            if (fromChat) head[18 + nb.Length] = 1; // דגל: נשלח מתוך הצ'אט
             await SendFrameAsync(PeerProtocol.FileOffer, head, default);
 
             var ev = await WaitEventAsync(id, TimeSpan.FromSeconds(60), ct);

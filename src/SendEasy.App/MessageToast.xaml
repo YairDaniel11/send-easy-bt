@@ -1,0 +1,22 @@
+﻿<Window x:Class="SendEasy.App.MessageToast"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ShowInTaskbar="False" Topmost="True" ResizeMode="NoResize" SizeToContent="Height" Width="360"
+        ShowActivated="False" FlowDirection="RightToLeft" Cursor="Hand">
+    <Grid Margin="10" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
+        <Border CornerRadius="10" Background="{DynamicResource ApplicationBackgroundBrush}">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="16" ShadowDepth="2" Opacity="0.35"/>
+            </Border.Effect>
+        </Border>
+        <Border CornerRadius="10" Padding="14,12" UseLayoutRounding="True" SnapsToDevicePixels="True"
+                Background="{DynamicResource ApplicationBackgroundBrush}"
+                BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1">
+            <StackPanel>
+                <TextBlock x:Name="TitleText" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                <TextBlock x:Name="BodyText" Opacity="0.8" Margin="0,3,0,0" TextWrapping="Wrap" MaxHeight="60" TextTrimming="CharacterEllipsis"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

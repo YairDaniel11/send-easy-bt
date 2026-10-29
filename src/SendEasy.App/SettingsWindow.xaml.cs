@@ -24,6 +24,8 @@ public partial class SettingsWindow : Wpf.Ui.Controls.FluentWindow
         ModeBox.SelectedIndex = (int)s.ReceiveMode;
         DirBox.Text = s.ReceiveDir;
         (s.ChatStyle == 0 ? ChatWa : ChatGc).IsChecked = true;
+        PopupBox.IsChecked = s.NotifyPopup;
+        SoundBox.IsChecked = s.NotifySound;
         OwnBox.IsChecked = s.ExtractOwnArchives;
         AllBox.IsChecked = s.ExtractAllZips;
         DelBox.IsChecked = s.DeleteZipAfterExtract;
@@ -48,7 +50,7 @@ public partial class SettingsWindow : Wpf.Ui.Controls.FluentWindow
             var prog = new Progress<double>(f => ApkBar.Value = Math.Clamp(f * 1000, 0, 1000));
             var dir = DirBox.Text.Trim().Length > 0 ? DirBox.Text.Trim() : _s.ReceiveDir;
             var (path, ver) = await UpdateChecker.DownloadLatestAndroidAsync(_s.UpdateRepo, dir, prog, default);
-            ApkStatus.Text = $"הורדה הסתיימה (גרסה {TrayApp.Ltr(ver)}): {TrayApp.Ltr(path)}\nהעבר את הקובץ לטלפון (למשל בבלוטוס) והתקן אותו.";
+            ApkStatus.Text = $"הורדה הסתיימה (גרסה {TrayApp.Ltr(ver)}): {TrayApp.Ltr(path)}\nהעבר את האפליקצייה לטלפון באמצעות הבלוטוס או באמצעות כבל, והתקן אותו במכשיר.\n(במכשיר עם גישה לאינטרנט - תוכל לעדכן את האפליקצייה מתוך הגדרות האפליקצייה)";
             System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{path}\"");
         }
         catch (Exception ex) { ApkStatus.Text = "ההורדה נכשלה: " + ex.Message; }
@@ -155,6 +157,8 @@ public partial class SettingsWindow : Wpf.Ui.Controls.FluentWindow
         _s.ReceiveMode = (ReceiveMode)ModeBox.SelectedIndex;
         _s.ReceiveDir = DirBox.Text;
         _s.ChatStyle = ChatWa.IsChecked == true ? 0 : 1;
+        _s.NotifyPopup = PopupBox.IsChecked == true;
+        _s.NotifySound = SoundBox.IsChecked == true;
         _s.ExtractOwnArchives = OwnBox.IsChecked == true;
         _s.ExtractAllZips = AllBox.IsChecked == true;
         _s.DeleteZipAfterExtract = DelBox.IsChecked == true;

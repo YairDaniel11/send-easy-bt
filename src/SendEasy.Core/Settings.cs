@@ -38,6 +38,11 @@ public sealed class Settings
     public bool ClipboardHotkeyEnabled { get; set; } = true;
     public string ClipboardHotkey { get; set; } = "Ctrl+Alt+V";
     /// <summary>בדיקת עדכונים: מאגר GitHub בפורמט owner/repo. ריק = כבוי.</summary>
+    /// <summary>חלון קטן בפינה בכל הודעה חדשה (כשחלון הצ'אט לא פתוח בחזית).</summary>
+    public bool NotifyPopup { get; set; } = true;
+    /// <summary>צליל בעת קבלת הודעה.</summary>
+    public bool NotifySound { get; set; } = true;
+
     public const string DefaultUpdateRepo = "YairDaniel11/send-easy-bt";
     public string UpdateRepo { get; set; } = DefaultUpdateRepo;
     public long MaxReceiveBytes { get; set; } = 4L * 1024 * 1024 * 1024;
