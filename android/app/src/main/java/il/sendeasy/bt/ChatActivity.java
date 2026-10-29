@@ -186,7 +186,12 @@ public class ChatActivity extends Activity implements Events.Listener {
             }
         });
         list.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) { adapter.notifyDataSetChanged(); }
+            @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
+                // בלי notifyDataSetChanged: בניית כל השורות מחדש (תמונות גבוהות) מקפיצה את הגלילה ומשבשת את ניווט המקשים
+                applySel(selView, false);
+                selView = v;
+                applySel(v, true);
+            }
             @Override public void onNothingSelected(AdapterView<?> p) { }
         });
 
@@ -1182,6 +1187,21 @@ public class ChatActivity extends Activity implements Events.Listener {
         return sb;
     }
 
+    private View selView;
+
+    /** מסמן/מבטל סימון שורה נבחרת בלי לבנות את הרשימה מחדש. */
+    private void applySel(View row, boolean sel) {
+        if (row == null || !(row.getTag() instanceof ChatStore.Msg)) return;
+        ChatStore.Msg m = (ChatStore.Msg) row.getTag();
+        if (style == 0) {
+            View b = ((ViewGroup) row).getChildAt(0);
+            int color = m.out ? cMine : cTheirs;
+            b.setBackgroundDrawable(sel ? UiKit.rect(this, color, 14, cAccent, 3) : UiKit.rect(this, color, 14));
+        } else {
+            row.setBackgroundDrawable(sel ? UiKit.rect(this, 0x00000000, 12, cAccent, 3) : null);
+        }
+    }
+
     private View waRow(ChatStore.Msg m, boolean sel) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.VERTICAL);
@@ -1201,6 +1221,7 @@ public class ChatActivity extends Activity implements Events.Listener {
         LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         bl.gravity = m.out ? Gravity.START : Gravity.END;
         row.addView(bubble, bl);
+        row.setTag(m);
         return row;
     }
 
@@ -1249,6 +1270,7 @@ public class ChatActivity extends Activity implements Events.Listener {
         }
         row.addView(col, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         if (sel) row.setBackgroundDrawable(UiKit.rect(this, 0x00000000, 12, cAccent, 3));
+        row.setTag(m);
         return row;
     }
 
