@@ -704,7 +704,7 @@ public class ChatActivity extends Activity implements Events.Listener {
                 FileInputStream in = new FileInputStream(f);
                 int r;
                 try {
-                    r = s.sendFile(in, f.getName(), f.length(), progress, cancel);
+                    r = s.sendFile(in, f.getName(), f.length(), progress, cancel, true);
                 } finally {
                     try { in.close(); } catch (IOException ignored) { }
                 }

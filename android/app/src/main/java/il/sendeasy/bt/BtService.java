@@ -28,6 +28,7 @@ public class BtService extends Service {
     static final String CHANNEL_SERVICE = "se_service";
     static final String CHANNEL_SERVICE_MIN = "se_service_min";
     static final String CHANNEL_EVENTS = "se_events";
+    static final String CHANNEL_EVENTS_SILENT = "se_events_silent";
     private static final int ID_FOREGROUND = 1;
     private static final int ID_PROGRESS = 2;
     private static final int ID_EVENT_BASE = 100;
@@ -340,6 +341,10 @@ public class BtService extends Service {
             NotificationChannel ev = new NotificationChannel(CHANNEL_EVENTS, getString(R.string.channel_events), NotificationManager.IMPORTANCE_DEFAULT);
             ev.enableVibration(true);
             nm.createNotificationChannel(ev);
+            NotificationChannel quiet = new NotificationChannel(CHANNEL_EVENTS_SILENT, getString(R.string.channel_events_silent), NotificationManager.IMPORTANCE_DEFAULT);
+            quiet.setSound(null, null);
+            quiet.enableVibration(false);
+            nm.createNotificationChannel(quiet);
         }
     }
 
@@ -392,14 +397,15 @@ public class BtService extends Service {
     @SuppressWarnings("deprecation")
     private void notifyEvent(String title, String text, String chatAddress) {
         NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        if (nm == null) return;
-        Notification n = builder(CHANNEL_EVENTS)
+        if (nm == null || !Prefs.notifyEvents(this)) return;
+        boolean sound = Prefs.notifySound(this);
+        Notification n = builder(sound ? CHANNEL_EVENTS : CHANNEL_EVENTS_SILENT)
                 .setContentTitle(title)
                 .setContentText(text)
                 .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
                 .setContentIntent(openMain(chatAddress))
                 .setAutoCancel(true)
-                .setDefaults(Notification.DEFAULT_ALL) // צליל ורטט ל-API פחות מ-26 (מ-26 הערוץ קובע)
+                .setDefaults(sound ? Notification.DEFAULT_ALL : Notification.DEFAULT_LIGHTS) // צליל ורטט ל-API פחות מ-26 (מ-26 הערוץ קובע)
                 .build();
         try { nm.notify(ID_EVENT_BASE + (eventCounter++ % 50), n); } catch (RuntimeException ignored) { }
     }

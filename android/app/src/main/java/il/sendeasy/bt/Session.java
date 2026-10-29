@@ -41,6 +41,8 @@ final class Session {
         long size;
         String name;
         long got;
+        /** הצד השולח סימן שהקובץ נשלח מתוך הצ'אט (דגל אופציונלי אחרי השם, ביט 0). */
+        boolean fromChat;
         File temp;
         FileOutputStream out;
         MessageDigest md;
@@ -314,6 +316,7 @@ final class Session {
         f.id = id;
         f.size = size;
         f.name = name;
+        if (p.length > 18 + nl) f.fromChat = (p[18 + nl] & 1) != 0;
         int r = listener.onFileOffer(this, f);
         if (r != 0) {
             send(Protocol.T_FILE_REJECT, concat(longBytes(id), new byte[]{(byte) r}), null, 0, 0);
@@ -482,16 +485,23 @@ final class Session {
      */
     int sendFile(InputStream src, String name, long size, SendProgress progress, AtomicBoolean cancel)
             throws IOException, InterruptedException {
+        return sendFile(src, name, size, progress, cancel, false);
+    }
+
+    /** כמו sendFile; fromChat=true מוסיף בית דגלים (1) אחרי השם: נשלח מתוך הצ'אט. */
+    int sendFile(InputStream src, String name, long size, SendProgress progress, AtomicBoolean cancel, boolean fromChat)
+            throws IOException, InterruptedException {
         synchronized (sendLock) {
             byte[] nb = utf8Limit(name, Protocol.MAX_NAME_BYTES);
             long id = newId();
             xferEvents.clear();
-            byte[] head = new byte[8 + 8 + 2 + nb.length];
+            byte[] head = new byte[8 + 8 + 2 + nb.length + (fromChat ? 1 : 0)];
             System.arraycopy(longBytes(id), 0, head, 0, 8);
             System.arraycopy(longBytes(size), 0, head, 8, 8);
             head[16] = (byte) (nb.length >> 8);
             head[17] = (byte) nb.length;
             System.arraycopy(nb, 0, head, 18, nb.length);
+            if (fromChat) head[18 + nb.length] = 1;
             send(Protocol.T_FILE_OFFER, head, null, 0, 0);
 
             long[] ev = waitEvent(id, 60000, cancel);

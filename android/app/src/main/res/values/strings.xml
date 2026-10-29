@@ -137,4 +137,9 @@
     <string name="chat_delete_short">מחק שיחה</string>
     <string name="chat_delete_btn">מחק</string>
     <string name="chat_delete_confirm">למחוק את כל ההודעות עם %1$s? הקבצים שנשמרו בתיקיית ההורדות לא יימחקו.</string>
+    <string name="menu_notify_shown">התראה בעת קבלת הודעה: מוצגת</string>
+    <string name="menu_notify_hidden">התראה בעת קבלת הודעה: מוסתרת</string>
+    <string name="menu_sound_on">צליל בעת קבלת הודעה: פעיל</string>
+    <string name="menu_sound_off">צליל בעת קבלת הודעה: כבוי</string>
+    <string name="channel_events_silent">התראות ללא צליל</string>
 </resources>

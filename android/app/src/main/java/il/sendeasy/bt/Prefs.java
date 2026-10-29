@@ -49,6 +49,24 @@ final class Prefs {
         sp(c).edit().putBoolean("showSvcNotif", on).apply();
     }
 
+    /** הצגת התראה בעת קבלת הודעה/קובץ (ברירת מחדל כן). */
+    static boolean notifyEvents(Context c) {
+        return sp(c).getBoolean("notifyEvents", true);
+    }
+
+    static void setNotifyEvents(Context c, boolean on) {
+        sp(c).edit().putBoolean("notifyEvents", on).apply();
+    }
+
+    /** צליל בעת קבלת הודעה (ברירת מחדל כן). */
+    static boolean notifySound(Context c) {
+        return sp(c).getBoolean("notifySound", true);
+    }
+
+    static void setNotifySound(Context c, boolean on) {
+        sp(c).edit().putBoolean("notifySound", on).apply();
+    }
+
     /** 0 = לפי המערכת, 1 = בהיר, 2 = כהה */
     static int theme(Context c) {
         return sp(c).getInt(K_THEME, 0);

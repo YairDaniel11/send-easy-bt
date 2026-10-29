@@ -588,6 +588,8 @@ public class MainActivity extends Activity implements Events.Listener {
                 getString(Prefs.showServiceNotification(this) ? R.string.menu_svc_notif_shown : R.string.menu_svc_notif_hidden),
                 getString(R.string.menu_receive_dir),
                 getString(R.string.menu_save_dir),
+                getString(Prefs.notifyEvents(this) ? R.string.menu_notify_shown : R.string.menu_notify_hidden),
+                getString(Prefs.notifySound(this) ? R.string.menu_sound_on : R.string.menu_sound_off),
                 getString(R.string.menu_chat_style),
                 getString(R.string.menu_check_update),
                 getString(R.string.menu_about)};
@@ -610,12 +612,16 @@ public class MainActivity extends Activity implements Events.Listener {
                         } else if (which == 3) {
                             showSaveDirDialog();
                         } else if (which == 4) {
+                            Prefs.setNotifyEvents(MainActivity.this, !Prefs.notifyEvents(MainActivity.this));
+                        } else if (which == 5) {
+                            Prefs.setNotifySound(MainActivity.this, !Prefs.notifySound(MainActivity.this));
+                        } else if (which == 6) {
                             new AlertDialog.Builder(MainActivity.this)
                                     .setTitle(R.string.menu_chat_style)
                                     .setSingleChoiceItems(new String[]{getString(R.string.style_wa), getString(R.string.style_gc)}, Prefs.chatStyle(MainActivity.this), new DialogInterface.OnClickListener() {
                                         @Override public void onClick(DialogInterface d, int w) { Prefs.setChatStyle(MainActivity.this, w); d.dismiss(); }
                                     }).show();
-                        } else if (which == 5) {
+                        } else if (which == 7) {
                             checkUpdate(true);
                         } else {
                             new AlertDialog.Builder(MainActivity.this)
