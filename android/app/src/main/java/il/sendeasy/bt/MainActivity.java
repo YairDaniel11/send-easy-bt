@@ -29,9 +29,6 @@ import java.util.Set;
 
 /** מסך ראשי: רשימת מכשירים מצומדים. אישור = פעולות, תפריט = אפשרויות. */
 public class MainActivity extends Activity implements Events.Listener {
-    private static final int REQ_PICK = 11;
-    private static final int REQ_BROWSE = 12;
-
     private ListView list;
     private TextView status;
     private TextView empty;
@@ -225,54 +222,22 @@ public class MainActivity extends Activity implements Events.Listener {
         startActivity(i);
     }
 
-    private boolean hasTouch() {
-        return getPackageManager().hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN);
-    }
-
     private void pickFiles(String address) {
         pickAddress = address;
-        if (hasTouch() && Build.VERSION.SDK_INT >= 19) {
-            Intent i = new Intent(Intent.ACTION_GET_CONTENT);
-            i.setType("*/*");
-            i.addCategory(Intent.CATEGORY_OPENABLE);
-            i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
-            try {
-                startActivityForResult(Intent.createChooser(i, getString(R.string.act_send_file)), REQ_PICK);
-                return;
-            } catch (RuntimeException ignored) { }
-        }
-        startActivityForResult(new Intent(this, FileBrowserActivity.class), REQ_BROWSE);
+        FilePicker.pick(this);
     }
 
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
         if (res != RESULT_OK || data == null || pickAddress == null) return;
-        ArrayList<Uri> uris = new ArrayList<Uri>();
-        if (req == REQ_PICK) {
-            ClipData cd = data.getClipData();
-            if (cd != null) {
-                for (int i = 0; i < cd.getItemCount(); i++) uris.add(cd.getItemAt(i).getUri());
-            } else if (data.getData() != null) {
-                uris.add(data.getData());
-            }
-        } else if (req == REQ_BROWSE) {
-            ArrayList<String> paths = data.getStringArrayListExtra(FileBrowserActivity.EXTRA_PATHS);
-            if (paths != null) for (String p : paths) uris.add(Uri.fromFile(new java.io.File(p)));
-        }
-        if (!uris.isEmpty()) startSend(pickAddress, uris);
+        ArrayList<Uri> uris = FilePicker.result(req, data);
+        if (!uris.isEmpty()) FilePicker.startSend(this, pickAddress, uris);
     }
 
     private void startSend(String address, List<Uri> uris) {
-        Intent i = new Intent(this, SendActivity.class);
-        i.putExtra(SendActivity.EXTRA_ADDRESS, address);
-        ClipData cd = ClipData.newRawUri("files", uris.get(0));
-        for (int k = 1; k < uris.size(); k++) cd.addItem(new ClipData.Item(uris.get(k)));
-        i.setClipData(cd);
-        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        startActivity(i);
+        FilePicker.startSend(this, address, uris);
     }
-
     private void showMenu() {
         final String[] items = {
                 getString(R.string.menu_toggle_receive),

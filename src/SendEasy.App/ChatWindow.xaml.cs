@@ -1,6 +1,7 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -12,13 +13,14 @@ using SendEasy.Core;
 namespace SendEasy.App;
 
 enum MsgKind { Text, Voice, File }
-enum MsgStatus { Sent, Delivered, Read }
+enum MsgStatus { Sent, Delivered, Read, Failed }
 
 sealed record Msg(bool Mine, string Sender, DateTime Time, MsgKind Kind, string Text = "", int Seconds = 0,
     long Size = 0, MsgStatus Status = MsgStatus.Read);
 
 sealed class Conv
 {
+    public ulong Address { get; init; }
     public required string Name { get; init; }
     public required string Kind { get; init; }
     public bool Online { get; init; }
@@ -26,7 +28,7 @@ sealed class Conv
     public List<Msg> Messages { get; } = new();
 }
 
-/// <summary>חלון הצ'אט. כרגע הדגמת עיצוב בלבד (ללא חיבור בלוטוס): שני סגנונות, ווטסאפ וגוגל צ'אט.</summary>
+/// <summary>חלון הצ'אט: הודעות וקבצים מול האפליקציה בטלפון, בשני סגנונות (ווטסאפ וגוגל צ'אט).</summary>
 public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
 {
     sealed record Palette(string ChatBg, string Header, string Side, string Mine, string Theirs, string Text,
@@ -38,65 +40,116 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
     static readonly Palette GcDark = new("#1F1F1F", "#1F1F1F", "#282A2C", "#1F1F1F", "#1F1F1F", "#E3E3E3", "#9AA0A6", "#A8C7FA", "#2D2F31", "#1F1F1F", "#3C4043");
 
     readonly Settings _settings;
+    readonly VoiceCapture _voice = new();
+    readonly DispatcherTimer _recTimer = new() { Interval = TimeSpan.FromSeconds(1) };
+    bool _recording;
+    readonly System.Windows.Media.MediaPlayer _player = new();
+    string? _playingPath;
     readonly List<Conv> _convs = new();
     Conv _cur = null!;
     bool _wa = true;
     Palette _p = WaLight;
-    bool _loading = true;
-
-    // הקלטה (הדגמה)
-    bool _recording;
-    int _recSeconds;
-    readonly DispatcherTimer _recTimer = new() { Interval = TimeSpan.FromSeconds(1) };
 
     public ChatWindow(Settings settings)
     {
         _settings = settings;
         InitializeComponent();
-        BuildDemoData();
+        LoadConversations();
         _wa = _settings.ChatStyle == 0;
-        (_wa ? StyleWa : StyleGc).IsChecked = true;
-        _recTimer.Tick += (_, _) => { _recSeconds++; RecordLabel.Text = $"● מקליט  {Fmt(_recSeconds)}"; };
-        _loading = false;
+        ActionBtn.Content = "🎤";
+        ActionBtn.ToolTip = "הקלטת הודעה קולית";
+        _recTimer.Tick += (_, _) => RecordLabel.Text = $"● מקליט  {Fmt(_voice.ElapsedSeconds)}   (לחץ ➤ לשליחה)";
         ConvList.ItemContainerStyle = ConvItemStyle();
         ApplyStyle();
-        ConvList.SelectedIndex = 0;
+        if (_convs.Count > 0) ConvList.SelectedIndex = 0;
+        else HeaderName.Text = "אין שיחות עדיין. הודעה מהטלפון או מכשיר מועדף יפתחו שיחה.";
     }
+
+    /// <summary>שם מכשיר לטיני (כמו Qin 1s+) נעטף כך שלא יתהפך בתוך ממשק עברי.</summary>
+    static string Disp(string name) => System.Text.RegularExpressions.Regex.IsMatch(name, @"[\u0590-\u05FF]") ? name : TrayApp.Ltr(name);
 
     static string Fmt(int s) => $"{s / 60}:{s % 60:00}";
     static SolidColorBrush B(string hex) => new((Color)ColorConverter.ConvertFromString(hex));
     static bool IsDark() => Wpf.Ui.Appearance.ApplicationThemeManager.GetAppTheme() == Wpf.Ui.Appearance.ApplicationTheme.Dark;
 
-    // ---- נתוני הדגמה ----
+    // ---- שיחות אמיתיות (מהיסטוריית הצ'אט) ----
 
-    void BuildDemoData()
+    static Color ColorFor(ulong address)
     {
-        var now = DateTime.Today.AddHours(9);
-        var a = new Conv { Name = "Qin 1s+", Kind = "טלפון", Online = true, Color = Color.FromRgb(0x00, 0x96, 0x88) };
-        a.Messages.AddRange(new[]
+        Color[] pal =
         {
-            new Msg(false, "Qin 1s+", now.AddMinutes(12), MsgKind.Text, "בוקר טוב! שלחתי לך את התמונות מאתמול"),
-            new Msg(true, "אני", now.AddMinutes(14), MsgKind.Text, "קיבלתי, תודה. הגיעו כולן?"),
-            new Msg(false, "Qin 1s+", now.AddMinutes(15), MsgKind.File, "חתונה-תמונות.zip", Size: 48_300_000),
-            new Msg(false, "Qin 1s+", now.AddMinutes(17), MsgKind.Voice, Seconds: 14),
-            new Msg(true, "אני", now.AddMinutes(20), MsgKind.Text, "מעולה, אני מסדר אותן ואשלח לך חזרה את הנבחרות", Status: MsgStatus.Read),
-            new Msg(true, "אני", now.AddMinutes(21), MsgKind.Voice, Seconds: 7, Status: MsgStatus.Delivered),
-        });
-        var b = new Conv { Name = "ה- S22 Ultra של יהודה", Kind = "טלפון", Online = false, Color = Color.FromRgb(0x5E, 0x35, 0xB1) };
-        b.Messages.Add(new Msg(false, "יהודה", now.AddHours(-20), MsgKind.Text, "תזכיר לי לשלוח לך את המסמך"));
-        var c = new Conv { Name = "LAPTOP-R9KQ5DGB", Kind = "מחשב", Online = false, Color = Color.FromRgb(0xE6, 0x51, 0x00) };
-        c.Messages.Add(new Msg(true, "אני", now.AddDays(-2), MsgKind.Text, "נבדוק שוב מחר", Status: MsgStatus.Sent));
-        _convs.AddRange(new[] { a, b, c });
+            Color.FromRgb(0x00, 0x96, 0x88), Color.FromRgb(0x5E, 0x35, 0xB1), Color.FromRgb(0xE6, 0x51, 0x00),
+            Color.FromRgb(0x0B, 0x57, 0xD0), Color.FromRgb(0xC2, 0x18, 0x5B), Color.FromRgb(0x2E, 0x7D, 0x32),
+        };
+        return pal[(int)(address % (ulong)pal.Length)];
     }
 
+    static Msg ToMsg(ChatEntry e) => e.Kind == "voice"
+        ? new Msg(e.Mine, e.Mine ? "אני" : e.Device, e.Time, MsgKind.Voice, e.Path ?? "", ChatLog.VoiceSeconds(e.Text), 0,
+            e.Status == "failed" ? MsgStatus.Failed : e.Status == "delivered" ? MsgStatus.Delivered : MsgStatus.Sent)
+        : new(e.Mine, e.Mine ? "אני" : e.Device, e.Time,
+        e.Kind == "file" ? MsgKind.File : MsgKind.Text, e.Text, 0, e.Size,
+        e.Status == "failed" ? MsgStatus.Failed : e.Status == "delivered" ? MsgStatus.Delivered : MsgStatus.Sent);
+
+    Conv MakeConv(ulong address, string name)
+    {
+        var c = new Conv
+        {
+            Address = address, Kind = "",
+            Name = string.IsNullOrWhiteSpace(name) ? "מכשיר " + address.ToString("X12") : name,
+            Color = ColorFor(address),
+        };
+        c.Messages.AddRange(ChatLog.Load(address).Select(ToMsg));
+        return c;
+    }
+
+    void LoadConversations()
+    {
+        var map = new Dictionary<ulong, Conv>();
+        foreach (var (addr, name, _) in ChatLog.Conversations()) map[addr] = MakeConv(addr, name);
+        foreach (var f in _settings.Favorites)
+            if (f.Address != 0 && !map.ContainsKey(f.Address)) map[f.Address] = MakeConv(f.Address, f.Name);
+        _convs.Clear();
+        _convs.AddRange(map.Values.OrderByDescending(c => c.Messages.LastOrDefault()?.Time ?? DateTime.MinValue));
+    }
+
+    Conv Ensure(ulong address, string name)
+    {
+        var c = _convs.FirstOrDefault(x => x.Address == address);
+        if (c == null) { c = MakeConv(address, name); _convs.Insert(0, c); }
+        return c;
+    }
+
+    void Reload(Conv c)
+    {
+        c.Messages.Clear();
+        c.Messages.AddRange(ChatLog.Load(c.Address).Select(ToMsg));
+    }
+
+    /// <summary>הודעה או קובץ חדש הגיעו: רענון השיחה.</summary>
+    public void Refresh(ulong address, string name)
+    {
+        var c = Ensure(address, name);
+        Reload(c);
+        RebuildConvList();
+        if (_cur?.Address == address) RenderMessages();
+        else if (_cur == null) Open(address, name);
+    }
+
+    /// <summary>פותח את השיחה עם מכשיר (ויוצר אותה אם אין).</summary>
+    public void Open(ulong address, string name)
+    {
+        var c = Ensure(address, name);
+        RebuildConvList();
+        var idx = _convs.IndexOf(c);
+        if (idx >= 0) ConvList.SelectedIndex = idx;
+    }
     // ---- עיצוב ----
 
-    void Style_Checked(object s, RoutedEventArgs e)
+    /// <summary>הסגנון (ווטסאפ או גוגל צ'אט) נבחר בהגדרות. נקרא אחרי שמירת ההגדרות.</summary>
+    public void ReloadStyle()
     {
-        if (_loading) return;
-        _wa = StyleWa.IsChecked == true;
-        _settings.ChatStyle = _wa ? 0 : 1;
-        try { _settings.Save(); } catch { }
+        _wa = _settings.ChatStyle == 0;
         ApplyStyle();
     }
 
@@ -117,7 +170,6 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         foreach (var t in new TextBlock[] { HeaderName, SideTitle }) t.Foreground = B(_p.Text);
         HeaderStatus.Foreground = B(_p.Sub);
         Input.Foreground = B(_p.Text);
-        StyleWa.Foreground = StyleGc.Foreground = B(_p.Text);
         ActionBtn.Background = B(_p.Accent);
         ActionBtn.Foreground = Brushes.White;
         ActionBtn.Template = RoundButton();
@@ -196,7 +248,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
             var top = new Grid();
             top.ColumnDefinitions.Add(new ColumnDefinition());
             top.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            top.Children.Add(new TextBlock { Text = c.Name, FontWeight = FontWeights.SemiBold, Foreground = B(_p.Text), TextTrimming = TextTrimming.CharacterEllipsis });
+            top.Children.Add(new TextBlock { Text = Disp(c.Name), FontWeight = FontWeights.SemiBold, Foreground = B(_p.Text), TextTrimming = TextTrimming.CharacterEllipsis });
             var tm = new TextBlock { Text = last == null ? "" : last.Time.ToString("HH:mm"), FontSize = 11, Foreground = B(_p.Sub) };
             Grid.SetColumn(tm, 1); top.Children.Add(tm);
             sp.Children.Add(top);
@@ -225,8 +277,8 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
 
     void ShowHeader()
     {
-        HeaderName.Text = _cur.Name;
-        HeaderStatus.Text = (_cur.Online ? "מחובר בבלוטוס" : "לא בטווח") + "  ·  הדגמת עיצוב: ההודעות עדיין לא נשלחות";
+        HeaderName.Text = Disp(_cur.Name);
+        HeaderStatus.Text = PeerConnections.IsConnected(_cur.Address) ? "מחובר בבלוטוס" : "ההודעות נשלחות דרך האפליקציה בטלפון";
         HeaderInitial.Text = _cur.Name.TrimStart('ה', '-', ' ').Substring(0, 1).ToUpperInvariant();
         HeaderAvatar.Background = new SolidColorBrush(_cur.Color);
     }
@@ -257,8 +309,8 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         };
     }
 
-    string Ticks(Msg m) => m.Status == MsgStatus.Sent ? "✓" : "✓✓";
-    Brush TickBrush(Msg m) => m.Status == MsgStatus.Read ? B("#53BDEB") : B(_p.Sub);
+    string Ticks(Msg m) => m.Status == MsgStatus.Failed ? "⚠ לא נשלח" : m.Status == MsgStatus.Sent ? "✓" : "✓✓";
+    Brush TickBrush(Msg m) => m.Status == MsgStatus.Failed ? B("#D64545") : m.Status == MsgStatus.Read ? B("#53BDEB") : B(_p.Sub);
 
     // סגנון ווטסאפ: בועות
     FrameworkElement WaMessage(Msg m)
@@ -367,27 +419,40 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         var dur = new TextBlock { Text = Fmt(m.Seconds), FontSize = 12, Foreground = B(_p.Sub), VerticalAlignment = VerticalAlignment.Center };
         line.Children.Add(play); line.Children.Add(wave); line.Children.Add(dur);
 
-        // הדגמת ניגון: הצבעת העמודות לאורך זמן
+        // ניגון אמיתי של הקובץ; העמודות נצבעות לפי מיקום הניגון
         DispatcherTimer? t = null;
-        play.MouseLeftButtonUp += (_, _) =>
-        {
-            if (t != null) { t.Stop(); t = null; Reset(); return; }
-            ((TextBlock)play.Child).Text = "⏸";
-            int i = 0;
-            t = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(Math.Max(60, m.Seconds * 1000 / bars.Count)) };
-            t.Tick += (_, _) =>
-            {
-                if (i < bars.Count) { bars[i].Fill = B(_p.Accent); bars[i].Opacity = 1; i++; }
-                else { t!.Stop(); t = null; Reset(); }
-            };
-            t.Start();
-        };
         void Reset()
         {
+            t?.Stop(); t = null;
             ((TextBlock)play.Child).Text = "▶";
             foreach (var b in bars) { b.Fill = B(_p.Sub); b.Opacity = 0.55; }
         }
-        if (style == 1)
+        play.MouseLeftButtonUp += (_, _) =>
+        {
+            bool same = _playingPath == m.Text && t != null;
+            StopPlayback();
+            Reset();
+            if (same) return;
+            if (string.IsNullOrEmpty(m.Text) || !System.IO.File.Exists(m.Text)) { ShowError("קובץ ההקלטה לא נמצא"); return; }
+            _playingPath = m.Text;
+            _player.Open(new Uri(m.Text));
+            _player.Play();
+            ((TextBlock)play.Child).Text = "■";
+            double total = Math.Max(1, m.Seconds);
+            t = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
+            t.Tick += (_, _) =>
+            {
+                int filled = (int)Math.Min(bars.Count, _player.Position.TotalSeconds / total * bars.Count);
+                for (int i = 0; i < bars.Count; i++)
+                {
+                    bool on = i < filled;
+                    bars[i].Fill = on ? B(_p.Accent) : B(_p.Sub);
+                    bars[i].Opacity = on ? 1 : 0.55;
+                }
+                if (_playingPath != m.Text || _player.Position.TotalSeconds >= total + 0.4) { Reset(); if (_playingPath == m.Text) StopPlayback(); }
+            };
+            t.Start();
+        };        if (style == 1)
             return new Border
             {
                 Background = B(_p.Input), CornerRadius = new CornerRadius(22), Padding = new Thickness(8), Margin = new Thickness(0, 4, 0, 0),
@@ -396,13 +461,14 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         return line;
     }
 
-    // ---- שליחה (הדגמה) ----
+    // ---- שליחה ----
 
     void Input_TextChanged(object s, TextChangedEventArgs e)
     {
         if (_recording) return;
-        ActionBtn.Content = string.IsNullOrWhiteSpace(Input.Text) ? "🎤" : "➤";
-        ActionBtn.ToolTip = string.IsNullOrWhiteSpace(Input.Text) ? "הקלטת הודעה קולית" : "שלח";
+        bool empty = string.IsNullOrWhiteSpace(Input.Text);
+        ActionBtn.Content = empty ? "🎤" : "➤";
+        ActionBtn.ToolTip = empty ? "הקלטת הודעה קולית" : "שלח";
     }
 
     void Input_PreviewKeyDown(object s, KeyEventArgs e)
@@ -414,63 +480,142 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         }
     }
 
-    void SendText()
+    void Update(Conv c)
     {
+        RebuildConvList();
+        if (c == _cur) { RenderMessages(); ShowHeader(); }
+    }
+
+    void ShowError(string text) => HeaderStatus.Text = "⚠ " + text;
+
+    async void SendText()
+    {
+        var conv = _cur;
+        if (conv == null) return;
         var text = Input.Text.Trim();
         if (text.Length == 0) return;
-        AddMine(new Msg(true, "אני", DateTime.Now, MsgKind.Text, text, Status: MsgStatus.Sent));
         Input.Clear();
+        var entry = new ChatEntry { Mine = true, Kind = "text", Text = text, Device = conv.Name };
+        conv.Messages.Add(new Msg(true, "אני", entry.Time, MsgKind.Text, text, Status: MsgStatus.Sent));
+        Update(conv);
+
+        bool ok = false; string err = "";
+        try
+        {
+            var s = await PeerConnections.GetAsync(conv.Address);
+            if (s == null) err = "האפליקציה לא פתוחה בטלפון";
+            else ok = await s.SendTextAsync(text);
+            if (!ok && err.Length == 0) err = "לא התקבל אישור מהטלפון";
+        }
+        catch (Exception ex) { err = ex.Message; }
+
+        entry.Status = ok ? "delivered" : "failed";
+        ChatLog.Add(conv.Address, entry);
+        Reload(conv);
+        Update(conv);
+        if (!ok) ShowError(err);
     }
 
-    void AddMine(Msg m)
+    async void Attach_Click(object s, RoutedEventArgs e)
     {
-        _cur.Messages.Add(m);
-        RenderMessages();
-        RebuildConvList();
-        // הדגמת אישורי קבלה
-        var idx = _cur.Messages.Count - 1;
+        if (_recording) { await EndRecordingAsync(send: false); return; }
         var conv = _cur;
-        var t = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(900) };
-        t.Tick += (_, _) =>
+        if (conv == null) return;
+        var d = new Microsoft.Win32.OpenFileDialog { Title = "בחר קבצים לשליחה", Multiselect = true };
+        if (d.ShowDialog(this) != true) return;
+        foreach (var path in d.FileNames)
         {
-            t.Stop();
-            if (idx < conv.Messages.Count) { conv.Messages[idx] = conv.Messages[idx] with { Status = MsgStatus.Delivered }; if (conv == _cur) RenderMessages(); }
-        };
-        t.Start();
-    }
-
-    void Action_Click(object s, RoutedEventArgs e)
-    {
-        if (_recording) { StopRecording(send: true); return; }
-        if (!string.IsNullOrWhiteSpace(Input.Text)) { SendText(); return; }
-        _recording = true; _recSeconds = 0;
-        Input.Visibility = Visibility.Hidden;
-        RecordLabel.Visibility = Visibility.Visible;
-        RecordLabel.Text = "● מקליט  0:00";
-        AttachBtn.Content = "🗑"; ActionBtn.Content = "➤";
-        _recTimer.Start();
-    }
-
-    void Attach_Click(object s, RoutedEventArgs e)
-    {
-        if (_recording) { StopRecording(send: false); return; }
-        var d = new Microsoft.Win32.OpenFileDialog { Title = "בחר קובץ לשליחה" };
-        if (d.ShowDialog(this) == true)
-        {
+            var name = System.IO.Path.GetFileName(path);
             long size = 0;
-            try { size = new System.IO.FileInfo(d.FileName).Length; } catch { }
-            AddMine(new Msg(true, "אני", DateTime.Now, MsgKind.File, System.IO.Path.GetFileName(d.FileName), Size: size, Status: MsgStatus.Sent));
+            try { size = new System.IO.FileInfo(path).Length; } catch { }
+            var entry = new ChatEntry { Mine = true, Kind = "file", Text = name, Size = size, Path = path, Device = conv.Name };
+            conv.Messages.Add(new Msg(true, "אני", entry.Time, MsgKind.File, name, Size: size, Status: MsgStatus.Sent));
+            Update(conv);
+            HeaderStatus.Text = "שולח " + name + "...";
+            bool ok = false; string err = "";
+            try
+            {
+                var peer = await PeerConnections.GetAsync(conv.Address);
+                if (peer == null) err = "האפליקציה לא פתוחה בטלפון";
+                else
+                {
+                    await using var fs = new System.IO.FileStream(path, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, 64 * 1024, true);
+                    var r = await peer.SendFileAsync(fs, name, size, null, System.Threading.CancellationToken.None);
+                    ok = r == PeerSendResult.Ok;
+                    if (!ok) err = r == PeerSendResult.Rejected ? "הטלפון סירב לקבל את הקובץ" : "השליחה נכשלה";
+                }
+            }
+            catch (Exception ex) { err = ex.Message; }
+            entry.Status = ok ? "delivered" : "failed";
+            ChatLog.Add(conv.Address, entry);
+            Reload(conv);
+            Update(conv);
+            if (!ok) { ShowError(err); break; }
         }
     }
 
-    void StopRecording(bool send)
+    async void Action_Click(object s, RoutedEventArgs e)
     {
+        if (_recording) { await EndRecordingAsync(send: true); return; }
+        if (!string.IsNullOrWhiteSpace(Input.Text)) { SendText(); return; }
+        await StartRecordingAsync();
+    }
+
+    // ---- הודעות קוליות ----
+
+    async Task StartRecordingAsync()
+    {
+        if (_cur == null) return;
+        StopPlayback();
+        var err = await _voice.StartAsync();
+        if (err != null) { ShowError(err); return; }
+        _recording = true;
+        Input.Visibility = Visibility.Hidden;
+        RecordLabel.Visibility = Visibility.Visible;
+        RecordLabel.Text = "● מקליט  0:00   (לחץ ➤ לשליחה)";
+        AttachBtn.Content = "🗑"; ActionBtn.Content = "➤"; ActionBtn.ToolTip = "שלח הודעה קולית";
+        _recTimer.Start();
+    }
+
+    async Task EndRecordingAsync(bool send)
+    {
+        var conv = _cur;
         _recTimer.Stop(); _recording = false;
         RecordLabel.Visibility = Visibility.Collapsed;
         Input.Visibility = Visibility.Visible;
         AttachBtn.Content = "📎";
         Input_TextChanged(this, null!);
-        if (send && _recSeconds > 0)
-            AddMine(new Msg(true, "אני", DateTime.Now, MsgKind.Voice, Seconds: _recSeconds, Status: MsgStatus.Sent));
+        if (!send || conv == null) { await _voice.CancelAsync(); return; }
+        var path = await _voice.StopAsync();
+        if (path == null) { ShowError("ההקלטה קצרה מדי"); return; }
+        var name = System.IO.Path.GetFileName(path);
+        long size = new System.IO.FileInfo(path).Length;
+        var entry = new ChatEntry { Mine = true, Kind = "voice", Text = name, Size = size, Path = path, Device = conv.Name };
+        conv.Messages.Add(ToMsg(entry));
+        Update(conv);
+        bool ok = false; string err = "";
+        try
+        {
+            var peer = await PeerConnections.GetAsync(conv.Address);
+            if (peer == null) err = "האפליקציה לא פתוחה בטלפון";
+            else
+            {
+                await using var fs = new System.IO.FileStream(path, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, 64 * 1024, true);
+                var r = await peer.SendFileAsync(fs, name, size, null, System.Threading.CancellationToken.None);
+                ok = r == PeerSendResult.Ok;
+                if (!ok) err = "השליחה נכשלה";
+            }
+        }
+        catch (Exception ex) { err = ex.Message; }
+        entry.Status = ok ? "delivered" : "failed";
+        ChatLog.Add(conv.Address, entry);
+        Reload(conv);
+        Update(conv);
+        if (!ok) ShowError(err);
+    }
+
+    void StopPlayback()
+    {
+        _player.Stop(); _playingPath = null;
     }
 }

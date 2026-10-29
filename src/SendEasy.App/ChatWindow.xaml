@@ -56,11 +56,6 @@
                             <TextBlock x:Name="HeaderName" FontSize="16" FontWeight="SemiBold"/>
                             <TextBlock x:Name="HeaderStatus" FontSize="12" Opacity="0.7"/>
                         </StackPanel>
-                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Text="עיצוב:" VerticalAlignment="Center" Margin="0,0,8,0" Opacity="0.7"/>
-                            <RadioButton x:Name="StyleWa" Content="ווטסאפ" GroupName="style" Checked="Style_Checked" Margin="0,0,10,0"/>
-                            <RadioButton x:Name="StyleGc" Content="גוגל צ'אט" GroupName="style" Checked="Style_Checked"/>
-                        </StackPanel>
                     </Grid>
                 </Border>
 

@@ -57,5 +57,14 @@
     <string name="rx_text">הודעה מ-%1$s</string>
     <string name="rx_progress">מקבל %1$s…</string>
 
+    <string name="voice_record">הקלט הודעה קולית</string>
+    <string name="voice_recording">● מקליט  %1$s   אישור = שלח   חזרה = ביטול</string>
+    <string name="voice_label">הודעה קולית %1$s</string>
+    <string name="voice_no_mic">אי אפשר להקליט: אין הרשאת מיקרופון או שהמיקרופון תפוס.</string>
+    <string name="voice_too_short">ההקלטה קצרה מדי</string>
+    <string name="voice_play_failed">אי אפשר להשמיע את ההודעה</string>
+    <string name="chat_menu_file">שלח קובץ</string>
+    <string name="rx_voice">הודעה קולית מ-%1$s</string>
+
     <string name="perm_needed">נדרשת הרשאת בלוטוס כדי לעבוד.</string>
 </resources>

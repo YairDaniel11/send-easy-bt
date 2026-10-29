@@ -5,12 +5,16 @@
     <!-- חובה למכשיר מקשים בלי מסך מגע -->
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.hardware.bluetooth" android:required="true" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
     <!-- בלוטוס: עד אנדרואיד 11 הרשאות התקנה, מאנדרואיד 12 הרשאת ריצה לחיבור.
          אין גילוי מכשירים (רק מכשירים מצומדים), ולכן אין צורך במיקום או ב-BLUETOOTH_SCAN -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <!-- הודעות קוליות -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <!-- שירות קבלה ברקע -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />

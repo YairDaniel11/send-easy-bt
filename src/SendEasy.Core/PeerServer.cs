@@ -18,6 +18,8 @@ public sealed class PeerServer : IDisposable
     public Func<IncomingFile, Task<bool>> Decide { get; set; } = _ => Task.FromResult(true);
     public event Action<IncomingFile, long>? Progress;
     public event Action<IncomingFile, string>? Received;
+    /// <summary>כמו Received, עם כתובת המכשיר השולח (לצ'אט).</summary>
+    public event Action<ulong, IncomingFile, string>? ReceivedFrom;
     public event Action<IncomingFile>? Aborted;
     /// <summary>הודעת טקסט שהתקבלה: (שם המכשיר, כתובת, טקסט).</summary>
     public event Action<string, ulong, string>? TextReceived;
@@ -79,10 +81,20 @@ public sealed class PeerServer : IDisposable
                 try
                 {
                     var c = _settings();
+                    if (ChatLog.IsVoiceName(f.Name))
+                    {
+                        // הודעה קולית: נשמרת בתיקיית הקול ומופיעה רק בצ'אט
+                        Directory.CreateDirectory(ChatLog.VoiceDir);
+                        var v = FileNames.UniquePath(ChatLog.VoiceDir, f.Name);
+                        File.Move(temp, v);
+                        ReceivedFrom?.Invoke(addr, f, v);
+                        return v;
+                    }
                     Directory.CreateDirectory(c.ReceiveDir);
                     var dest = FileNames.UniquePath(c.ReceiveDir, f.Name);
                     File.Move(temp, dest);
                     ObexServer.MarkFromInternet(dest);
+                    ReceivedFrom?.Invoke(addr, f, dest);
                     Received?.Invoke(f, dest);
                     return dest;
                 }

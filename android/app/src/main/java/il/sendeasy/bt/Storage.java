@@ -131,6 +131,37 @@ final class Storage {
         return "Download/" + DIR_NAME + "/" + name;
     }
 
+    // ---- הודעות קוליות: קובץ voice-yyyyMMdd-HHmmss-d{שניות}.m4a, נשמר בתיקייה פנימית ולא בהורדות ----
+
+    static boolean isVoiceName(String name) {
+        return name != null && name.startsWith("voice-") && name.endsWith(".m4a");
+    }
+
+    static int voiceSeconds(String name) {
+        try {
+            int d = name.lastIndexOf("-d");
+            int dot = name.lastIndexOf('.');
+            if (d >= 0 && dot > d + 2) return Integer.parseInt(name.substring(d + 2, dot));
+        } catch (NumberFormatException ignored) { }
+        return 0;
+    }
+
+    static File voiceDir(Context c) {
+        File d = new File(c.getFilesDir(), "voice");
+        d.mkdirs();
+        return d;
+    }
+
+    /** מעתיק הודעה קולית שהתקבלה לתיקייה הפנימית. מחזיר את שם הקובץ הסופי או null. */
+    static String storeVoice(Context c, File temp, String name) {
+        try {
+            File dest = uniqueFile(voiceDir(c), sanitize(name));
+            copy(new FileInputStream(temp), new FileOutputStream(dest));
+            return dest.getName();
+        } catch (Exception e) {
+            return null;
+        }
+    }
     static File uniqueFile(File dir, String name) {
         File f = new File(dir, name);
         if (!f.exists()) return f;

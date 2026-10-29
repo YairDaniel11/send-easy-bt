@@ -46,6 +46,10 @@
                 <TextBlock x:Name="FavEmpty" Opacity="0.6" TextWrapping="Wrap" FontSize="12"
                            Text="אין מועדפים. בחלון השליחה לחץ על הכוכב ☆ ליד מכשיר כדי להוסיף אותו."/>
 
+                <TextBlock Text="עיצוב הצ&apos;אט" FontWeight="SemiBold" Margin="0,18,0,6"/>
+                <RadioButton x:Name="ChatWa" GroupName="chatstyle" Content="ווטסאפ"/>
+                <RadioButton x:Name="ChatGc" GroupName="chatstyle" Content="גוגל צ&apos;אט"/>
+
                 <TextBlock Text="ארכיונים (ZIP)" FontWeight="SemiBold" Margin="0,18,0,6"/>
                 <CheckBox x:Name="OwnBox" Content="חלץ אוטומטית ארכיונים שנשלחו על ידי התוכנה (תיקיות)"/>
                 <CheckBox x:Name="AllBox" Content="חלץ כל קובץ ZIP שמתקבל, גם אם לא נשלח על ידי התוכנה"/>

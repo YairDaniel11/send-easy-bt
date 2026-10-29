@@ -224,8 +224,20 @@ public class BtService extends Service {
         @Override
         public boolean onFileReceived(Session s, Session.IncomingFile f, File temp) {
             cancelProgress();
+            if (Storage.isVoiceName(f.name)) {
+                // הודעה קולית: נשמרת בתיקייה פנימית ומופיעה בצ'אט, לא בתיקיית ההורדות
+                String stored = Storage.storeVoice(BtService.this, temp, f.name);
+                if (stored == null) return false;
+                ChatStore.add(BtService.this, address, new ChatStore.Msg(System.currentTimeMillis(), false, ChatStore.T_VOICE, stored));
+                Events.post(Events.CHAT, address);
+                int secs = Storage.voiceSeconds(stored);
+                notifyEvent(getString(R.string.rx_voice, name), getString(R.string.voice_label, (secs / 60) + ":" + (secs % 60 < 10 ? "0" : "") + (secs % 60)), address);
+                return true;
+            }
             String where = Storage.publish(BtService.this, temp, f.name);
             if (where == null) return false;
+            ChatStore.add(BtService.this, address, new ChatStore.Msg(System.currentTimeMillis(), false, ChatStore.T_FILE, f.name));
+            Events.post(Events.CHAT, address);
             Events.post(Events.RECEIVED, f.name);
             notifyEvent(getString(R.string.rx_file, f.name), where, null);
             return true;

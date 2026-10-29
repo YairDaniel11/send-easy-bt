@@ -142,7 +142,11 @@ public class SendActivity extends Activity {
                     final String name = it.name;
                     post(new Runnable() { @Override public void run() { statusT.setText(label.trim()); nameT.setText(name); bar.setProgress(0); infoT.setText(""); } });
                     int r = sendOne(s, it);
-                    if (r == Session.R_OK) continue;
+                    if (r == Session.R_OK) {
+                        ChatStore.add(getApplicationContext(), address, new ChatStore.Msg(System.currentTimeMillis(), true, ChatStore.T_FILE, it.name));
+                        Events.post(Events.CHAT, address);
+                        continue;
+                    }
                     if (r == Session.R_CANCELLED) { result = getString(R.string.send_cancelled); break; }
                     if (r == Session.R_REJECTED) { result = getString(R.string.send_rejected); break; }
                     result = getString(R.string.send_failed, r == Session.R_HASH ? "הקובץ הגיע פגום" : "שגיאה בצד המקבל");

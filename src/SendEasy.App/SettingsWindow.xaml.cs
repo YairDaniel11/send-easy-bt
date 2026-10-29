@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -23,6 +23,7 @@ public partial class SettingsWindow : Wpf.Ui.Controls.FluentWindow
         InitializeComponent();
         ModeBox.SelectedIndex = (int)s.ReceiveMode;
         DirBox.Text = s.ReceiveDir;
+        (s.ChatStyle == 0 ? ChatWa : ChatGc).IsChecked = true;
         OwnBox.IsChecked = s.ExtractOwnArchives;
         AllBox.IsChecked = s.ExtractAllZips;
         DelBox.IsChecked = s.DeleteZipAfterExtract;
@@ -121,6 +122,7 @@ public partial class SettingsWindow : Wpf.Ui.Controls.FluentWindow
 
         _s.ReceiveMode = (ReceiveMode)ModeBox.SelectedIndex;
         _s.ReceiveDir = DirBox.Text;
+        _s.ChatStyle = ChatWa.IsChecked == true ? 0 : 1;
         _s.ExtractOwnArchives = OwnBox.IsChecked == true;
         _s.ExtractAllZips = AllBox.IsChecked == true;
         _s.DeleteZipAfterExtract = DelBox.IsChecked == true;

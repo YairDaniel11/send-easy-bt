@@ -13,15 +13,23 @@ import java.io.Writer;
 import java.util.ArrayList;
 import java.util.List;
 
-/** היסטוריית צ'אט בקבצים (לא ב-SharedPreferences): קובץ אחד לכל מכשיר, שורה לכל הודעה. */
+/**
+ * היסטוריית צ'אט בקבצים (לא ב-SharedPreferences): קובץ אחד לכל מכשיר, שורה לכל הודעה.
+ * פורמט שורה: זמן|i או o|סוג (t טקסט, v קול, f קובץ)|תוכן.
+ * קול: שם הקובץ בתיקיית voice. קובץ: שם הקובץ שהתקבל או נשלח.
+ */
 final class ChatStore {
     private ChatStore() {}
+
+    static final String T_TEXT = "t", T_VOICE = "v", T_FILE = "f";
 
     static final class Msg {
         final long time;
         final boolean out;
+        final String kind;
         final String text;
-        Msg(long time, boolean out, String text) { this.time = time; this.out = out; this.text = text; }
+        Msg(long time, boolean out, String kind, String text) { this.time = time; this.out = out; this.kind = kind; this.text = text; }
+        boolean isVoice() { return T_VOICE.equals(kind); }
     }
 
     private static final int MAX_KEEP = 500;
@@ -50,15 +58,19 @@ final class ChatStore {
         return sb.toString();
     }
 
-    static synchronized void append(Context c, String address, boolean out, String text, long time) {
+    private static String line(Msg m) {
+        return m.time + "|" + (m.out ? "o" : "i") + "|" + m.kind + "|" + esc(m.text) + "\n";
+    }
+
+    static void append(Context c, String address, boolean out, String text, long time) {
+        add(c, address, new Msg(time, out, T_TEXT, text));
+    }
+
+    static synchronized void add(Context c, String address, Msg m) {
         File f = file(c, address);
         try {
             Writer w = new OutputStreamWriter(new FileOutputStream(f, true), "UTF-8");
-            try {
-                w.write(time + "|" + (out ? "o" : "i") + "|" + esc(text) + "\n");
-            } finally {
-                w.close();
-            }
+            try { w.write(line(m)); } finally { w.close(); }
         } catch (IOException ignored) {
             return;
         }
@@ -67,14 +79,7 @@ final class ChatStore {
             int from = Math.max(0, all.size() - MAX_KEEP);
             try {
                 Writer w = new OutputStreamWriter(new FileOutputStream(f, false), "UTF-8");
-                try {
-                    for (int i = from; i < all.size(); i++) {
-                        Msg m = all.get(i);
-                        w.write(m.time + "|" + (m.out ? "o" : "i") + "|" + esc(m.text) + "\n");
-                    }
-                } finally {
-                    w.close();
-                }
+                try { for (int i = from; i < all.size(); i++) w.write(line(all.get(i))); } finally { w.close(); }
             } catch (IOException ignored) { }
         }
     }
@@ -86,12 +91,15 @@ final class ChatStore {
         try {
             BufferedReader r = new BufferedReader(new InputStreamReader(new FileInputStream(f), "UTF-8"));
             try {
-                String line;
-                while ((line = r.readLine()) != null) {
-                    String[] p = line.split("\\|", 3);
-                    if (p.length < 3) continue;
+                String ln;
+                while ((ln = r.readLine()) != null) {
+                    String[] p = ln.split("\\|", 4);
                     try {
-                        list.add(new Msg(Long.parseLong(p[0]), "o".equals(p[1]), unesc(p[2])));
+                        if (p.length == 4 && (T_TEXT.equals(p[2]) || T_VOICE.equals(p[2]) || T_FILE.equals(p[2]))) {
+                            list.add(new Msg(Long.parseLong(p[0]), "o".equals(p[1]), p[2], unesc(p[3])));
+                        } else if (p.length == 3) { // פורמט ישן: בלי סוג
+                            list.add(new Msg(Long.parseLong(p[0]), "o".equals(p[1]), T_TEXT, unesc(p[2])));
+                        }
                     } catch (NumberFormatException ignored) { }
                 }
             } finally {

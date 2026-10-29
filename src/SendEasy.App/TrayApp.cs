@@ -49,7 +49,8 @@ sealed class TrayApp : IDisposable
         _peer.Received += OnReceived;
         _peer.Progress += (f, got) => _ui.BeginInvoke(() => OnProgress(f, got));
         _peer.Aborted += f => _ui.BeginInvoke(() => OnAborted(f));
-        _peer.TextReceived += (from, addr, text) => _ui.BeginInvoke(() => OnTextReceived(from, text));
+        _peer.TextReceived += (from, addr, text) => _ui.BeginInvoke(() => OnTextReceived(from, addr, text));
+        _peer.ReceivedFrom += (addr, f, path) => _ui.BeginInvoke(() => OnFileInChat(addr, f, path));
         _peer.Error += msg => Debug.WriteLine("peer error: " + msg);
         _ = StartServerAsync();
 
@@ -89,11 +90,17 @@ sealed class TrayApp : IDisposable
         });
     }
 
-    public void OpenChat()
+    public void OpenChat() => OpenChat(0, "");
+
+    /// <summary>פותח את חלון הצ'אט, ואם ניתנה כתובת: את השיחה עם אותו מכשיר.</summary>
+    public void OpenChat(ulong address, string name)
     {
-        if (_chat is { IsLoaded: true }) { WindowFront.Bring(_chat); return; }
-        _chat = new ChatWindow(_settings);
-        _chat.Show();
+        if (_chat is not { IsLoaded: true })
+        {
+            _chat = new ChatWindow(_settings);
+            _chat.Show();
+        }
+        if (address != 0) _chat.Open(address, name);
         WindowFront.Bring(_chat);
     }
 
@@ -108,7 +115,7 @@ sealed class TrayApp : IDisposable
     public void ShowSettings()
     {
         var w = new SettingsWindow(_settings);
-        if (w.ShowDialog() == true) { _settings.Save(); ApplyHotkeys(); }
+        if (w.ShowDialog() == true) { _settings.Save(); ApplyHotkeys(); _chat?.ReloadStyle(); }
     }
 
     // ---- קיצורי מקשים ----
@@ -181,12 +188,30 @@ sealed class TrayApp : IDisposable
         catch (Exception ex) { Debug.WriteLine("peer start failed: " + ex.Message); }
     }
 
-    void OnTextReceived(string from, string text)
+    ulong _chatBalloonAddr;
+    string _chatBalloonName = "";
+
+    void OnTextReceived(string from, ulong addr, string text)
     {
+        ChatLog.Add(addr, new ChatEntry { Mine = false, Kind = "text", Text = text, Device = from, Status = "delivered" });
+        if (_chat is { IsLoaded: true }) _chat.Refresh(addr, from);
+        if (_chat is { IsActive: true }) return; // החלון פתוח ובחזית: ההודעה כבר מוצגת
+        _chatBalloonAddr = addr; _chatBalloonName = from;
         var shown = text.Length > 200 ? text[..200] + "…" : text;
         _tray.ShowBalloonTip(6000, "הודעה מ-" + from, shown, ToolTipIcon.Info);
     }
 
+    void OnFileInChat(ulong addr, IncomingFile f, string path)
+    {
+        bool voice = ChatLog.IsVoiceName(f.Name);
+        ChatLog.Add(addr, new ChatEntry { Mine = false, Kind = voice ? "voice" : "file", Text = f.Name, Size = f.Size, Path = path, Device = f.FromName, Status = "delivered" });
+        if (_chat is { IsLoaded: true }) _chat.Refresh(addr, f.FromName);
+        if (voice && _chat is not { IsActive: true })
+        {
+            _chatBalloonAddr = addr; _chatBalloonName = f.FromName;
+            _tray.ShowBalloonTip(6000, "הודעה קולית מ-" + f.FromName, "לחץ כדי לפתוח את הצ'אט", ToolTipIcon.Info);
+        }
+    }
     Task<bool> AskAsync(IncomingFile f)
     {
         var tcs = new TaskCompletionSource<bool>();
@@ -256,6 +281,7 @@ sealed class TrayApp : IDisposable
             catch (Exception ex) { note = "שגיאת חילוץ: " + ex.Message; }
 
             _lastReceivedPath = shown;
+            _chatBalloonAddr = 0;
             if (_toasts.TryGetValue(f, out var t)) t.Finish("התקבל: " + Path.GetFileName(shown));
             else _tray.ShowBalloonTip(5000, "התקבל מ-" + f.FromName, Path.GetFileName(shown), ToolTipIcon.Info);
             History.Add(new HistoryEntry { Sent = false, Device = f.FromName, Name = Path.GetFileName(shown), Size = f.Size, Path = shown, Note = note });
@@ -265,6 +291,7 @@ sealed class TrayApp : IDisposable
     void OnBalloonClicked(object? s, EventArgs e)
     {
         if (_updateUrl != null) { Process.Start(new ProcessStartInfo(_updateUrl) { UseShellExecute = true }); _updateUrl = null; return; }
+        if (_chatBalloonAddr != 0) { var a = _chatBalloonAddr; _chatBalloonAddr = 0; OpenChat(a, _chatBalloonName); return; }
         if (_lastReceivedPath == null) return;
         Process.Start("explorer.exe", $"/select,\"{_lastReceivedPath}\"");
     }
@@ -354,5 +381,5 @@ sealed class TrayApp : IDisposable
         b >= 1 << 20 ? $"{b / (double)(1 << 20):0.0} MB" :
         b >= 1 << 10 ? $"{b / 1024.0:0} KB" : $"{b} B";
 
-    public void Dispose() { _hotkey.Dispose(); _tray.Dispose(); _server.Dispose(); _peer.Dispose(); }
+    public void Dispose() { _hotkey.Dispose(); _tray.Dispose(); _server.Dispose(); _peer.Dispose(); PeerConnections.CloseAll(); }
 }
