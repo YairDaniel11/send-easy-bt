@@ -598,29 +598,45 @@ public class MainActivity extends Activity implements Events.Listener {
         try {
             ver = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
         } catch (Exception ignored) { }
-        int pad = UiKit.dp(this, 20);
+        int pad = UiKit.dp(this, 14);
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(pad, pad, pad, pad);
         TextView t = new TextView(this);
-        t.setPadding(pad, pad, pad, pad / 2);
-        t.setTextSize(16);
+        t.setTextSize(15);
         t.setText(getString(R.string.about_text, getString(R.string.app_name), Fmt.ltr(ver == null ? "" : ver), REPO_URL));
         android.text.util.Linkify.addLinks(t, android.text.util.Linkify.WEB_URLS);
         t.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
-        final AlertDialog d = new AlertDialog.Builder(this)
-                .setView(t)
-                .setPositiveButton(R.string.about_open_repo, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface dlg, int w) {
-                        try {
-                            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(REPO_URL)));
-                        } catch (RuntimeException e) { // כולל ActivityNotFoundException
-                            Toast.makeText(MainActivity.this, R.string.about_no_browser, Toast.LENGTH_LONG).show();
-                        }
-                    }
-                })
-                .setNegativeButton(R.string.savedir_close, null)
-                .create();
+        box.addView(t, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        final android.app.Dialog[] holder = new android.app.Dialog[1];
+        TextView open = UiKit.actionButton(this, getString(R.string.about_open_repo), new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                try {
+                    startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(REPO_URL)));
+                } catch (RuntimeException e) { // כולל ActivityNotFoundException
+                    Toast.makeText(MainActivity.this, R.string.about_no_browser, Toast.LENGTH_LONG).show();
+                }
+            }
+        });
+        TextView close = UiKit.actionButton(this, getString(R.string.savedir_close), new View.OnClickListener() {
+            @Override public void onClick(View v) { if (holder[0] != null) holder[0].dismiss(); }
+        });
+        LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        bl.topMargin = UiKit.dp(this, 10);
+        box.addView(open, bl);
+        box.addView(close, bl);
+        open.setId(View.generateViewId());
+        close.setId(View.generateViewId());
+        open.setNextFocusDownId(close.getId());
+        open.setNextFocusUpId(open.getId());
+        close.setNextFocusUpId(open.getId());
+        close.setNextFocusDownId(close.getId());
+        android.widget.ScrollView sv = new android.widget.ScrollView(this);
+        sv.addView(box);
+        AlertDialog d = new AlertDialog.Builder(this).setView(sv).create();
+        holder[0] = d;
         d.show();
-        Button b = d.getButton(DialogInterface.BUTTON_POSITIVE);
-        if (b != null) b.requestFocus();
+        open.requestFocus();
     }
 
     /** רשימת המכשירים המצומדים לבחירה, ואז דיאלוג שינוי השם. */

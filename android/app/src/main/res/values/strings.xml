@@ -98,11 +98,11 @@
     <string name="act_rename">שנה שם</string>
     <string name="rename_title">שם המכשיר (רק במכשיר הזה)</string>
     <string name="rename_save">שמור</string>
-    <string name="rename_reset">אפס לשם המקורי</string>
+    <string name="rename_reset">איפוס</string>
     <string name="menu_check_update">בדוק עדכון עכשיו</string>
     <string name="upd_new">יש גרסה חדשה %1$s. לפתוח את דף ההורדה?</string>
     <string name="upd_new_auto">יש גרסה חדשה %1$s. להוריד ולהתקין עכשיו?\n\nאם ההתקנה נכשלת, הסר את הגרסה הנוכחית והתקן מחדש.</string>
-    <string name="upd_install">הורדה והתקנה</string>
+    <string name="upd_install">התקן</string>
     <string name="upd_bar">יש גרסה חדשה %1$s — לחץ אישור לעדכון</string>
     <string name="upd_downloading">מוריד עדכון…</string>
     <string name="upd_progress">%1$s מתוך %2$s (%3$d%%)</string>

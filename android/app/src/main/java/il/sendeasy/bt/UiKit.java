@@ -73,6 +73,32 @@ final class UiKit {
         if (lp != null) { lp.width = dp(c, sizeDp); lp.height = dp(c, sizeDp); t.setLayoutParams(lp); }
     }
 
+    /**
+     * כפתור לדיאלוג מותאם: גובה לפי הכיתוב (עד שתי שורות ויותר), לפחות 48dp, ממוקד, וטבעת פוקוס בולטת.
+     * משמש במקום שורת הכפתורים של AlertDialog, שגובהה קבוע ומחתך כיתוב ארוך במסך קטן.
+     */
+    static TextView actionButton(Context c, CharSequence text, View.OnClickListener l) {
+        TextView t = new TextView(c);
+        t.setText(text);
+        t.setTextSize(16);
+        t.setGravity(Gravity.CENTER);
+        t.setMinHeight(dp(c, 48));
+        int p = dp(c, 10);
+        t.setPadding(p, p, p, p);
+        t.setFocusable(true);
+        t.setClickable(true);
+        int accent = attr(c, R.attr.sbAccent);
+        int row = attr(c, R.attr.sbRow);
+        t.setTextColor(attr(c, R.attr.sbText));
+        android.graphics.drawable.StateListDrawable sl = new android.graphics.drawable.StateListDrawable();
+        sl.addState(new int[]{android.R.attr.state_focused}, rect(c, row, 10, accent, 3));
+        sl.addState(new int[]{android.R.attr.state_pressed}, rect(c, row, 10, accent, 3));
+        sl.addState(new int[]{}, rect(c, row, 10));
+        t.setBackgroundDrawable(sl);
+        t.setOnClickListener(l);
+        return t;
+    }
+
     /** צורת גל קול: עמודות בגבהים קבועים לפי זרע, עם התקדמות צבועה. */
     static final class WaveView extends View {
         private final Paint on = new Paint(Paint.ANTI_ALIAS_FLAG);
