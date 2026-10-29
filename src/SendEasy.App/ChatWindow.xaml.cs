@@ -263,11 +263,13 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
             var tm = new TextBlock { Text = last == null ? "" : last.Time.ToString("HH:mm"), FontSize = 11, Foreground = B(_p.Sub) };
             Grid.SetColumn(tm, 1); top.Children.Add(tm);
             sp.Children.Add(top);
-            sp.Children.Add(new TextBlock
+            var prev = new TextBlock
             {
-                Text = last == null ? "" : (last.Mine ? "את/ה: " : "") + Preview(last),
                 FontSize = 12.5, Foreground = B(_p.Sub), TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 2, 0, 0),
-            });
+            };
+            // תצוגה מקדימה: אימוג'י כתמונה צבעונית ולא כתו חד-גוני
+            Emoticons.Fill(prev, last == null ? "" : (last.Mine ? "את/ה: " : "") + (last.Kind == MsgKind.Text ? last.Text : Preview(last)), 12.5);
+            sp.Children.Add(prev);
             g.Children.Add(sp);
             var item = new ListBoxItem { Content = g, Tag = c, HorizontalContentAlignment = HorizontalAlignment.Stretch };
             var del = new MenuItem { Header = "מחק שיחה", Tag = c };

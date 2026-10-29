@@ -145,6 +145,9 @@ public class ChatActivity extends Activity implements Events.Listener {
 
         root = findViewById(R.id.chatRoot);
         header = findViewById(R.id.chatHeader);
+        menuBtn = UiKit.addMenuButton(this, (android.view.ViewGroup) header, 0xFFFFFFFF, new View.OnClickListener() {
+            @Override public void onClick(View v) { showMenu(); }
+        });
         inputRow = findViewById(R.id.chatInputRow);
         titleT = (TextView) findViewById(R.id.chatTitle);
         subT = (TextView) findViewById(R.id.chatSub);
@@ -266,6 +269,7 @@ public class ChatActivity extends Activity implements Events.Listener {
         root.setBackgroundColor(cBg);
         header.setBackgroundColor(cHeader);
         titleT.setTextColor(cHeaderText);
+        if (menuBtn != null) menuBtn.setIconColor(cHeaderText);
         subT.setTextColor(cHeaderSub);
         emptyT.setTextColor(cSub);
         inputRow.setBackgroundColor(style == 0 ? 0x00000000 : cBg);
@@ -1241,6 +1245,7 @@ public class ChatActivity extends Activity implements Events.Listener {
     }
 
     private View selView;
+    private IconView menuBtn;
 
     /** מסמן/מבטל סימון שורה נבחרת בלי לבנות את הרשימה מחדש. */
     private void applySel(View row, boolean sel) {

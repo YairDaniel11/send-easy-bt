@@ -128,4 +128,17 @@ final class UiKit {
             }
         }
     }
+
+    /** כפתור תפריט (שלוש נקודות) בכותרת: במכשיר מגע אין מקש תפריט פיזי. */
+    static IconView addMenuButton(android.app.Activity a, android.view.ViewGroup header, int color, View.OnClickListener l) {
+        IconView m = new IconView(a);
+        m.setIcon(IconView.MENU);
+        m.setIconColor(color);
+        m.setClickable(true);
+        m.setFocusable(true);
+        m.setBackgroundDrawable(UiKit.oval(0x22888888));
+        m.setOnClickListener(l);
+        header.addView(m, new android.widget.LinearLayout.LayoutParams(UiKit.dp(a, 40), UiKit.dp(a, 40)));
+        return m;
+    }
 }

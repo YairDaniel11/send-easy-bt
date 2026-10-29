@@ -37,6 +37,7 @@ static class Emoticons
     public static void Fill(TextBlock tb, string text, double fontSize)
     {
         tb.Inlines.Clear();
+        text = ToCodes(text); // גם אימוג'י רגיל שהוקלד/הגיע מהטלפון מוצג כתמונה אחידה
         int pos = 0;
         foreach (Match m in CodeRx.Matches(text))
         {

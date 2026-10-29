@@ -57,6 +57,9 @@ public class MainActivity extends Activity implements Events.Listener {
         setContentView(R.layout.activity_main);
         ThemeUtil.forceRtl(this);
 
+        UiKit.addMenuButton(this, (android.view.ViewGroup) findViewById(R.id.mainHeader), 0xFFFFFFFF, new View.OnClickListener() {
+            @Override public void onClick(View v) { showMenu(); }
+        });
         list = (ListView) findViewById(R.id.list);
         status = (TextView) findViewById(R.id.status);
         empty = (TextView) findViewById(R.id.empty);
