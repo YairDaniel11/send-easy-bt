@@ -42,6 +42,18 @@ public sealed class Settings
     public long MaxReceiveBytes { get; set; } = 4L * 1024 * 1024 * 1024;
     public long MaxExtractBytes { get; set; } = 8L * 1024 * 1024 * 1024;
     public int MaxExtractFiles { get; set; } = 20000;
+    /// <summary>מזהה קבוע של המחשב (16 בייט, הקסה) בפרוטוקול הפרטי. נוצר בשימוש הראשון.</summary>
+    public string DeviceId { get; set; } = "";
+
+    public byte[] GetOrCreateDeviceId()
+    {
+        if (DeviceId.Length != 32)
+        {
+            DeviceId = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
+            try { Save(); } catch { }
+        }
+        return Convert.FromHexString(DeviceId);
+    }
 
     static string FilePath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "SendEasyBT", "settings.json");

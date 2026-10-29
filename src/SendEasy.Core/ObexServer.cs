@@ -1,4 +1,4 @@
-using Windows.Devices.Bluetooth;
+﻿using Windows.Devices.Bluetooth;
 using Windows.Devices.Bluetooth.Rfcomm;
 using Windows.Networking.Sockets;
 using Windows.Storage.Streams;
@@ -144,7 +144,7 @@ public sealed class ObexServer : IDisposable
     }
 
     /// <summary>סימון Mark of the Web, כדי ש-SmartScreen ידע שהקובץ הגיע מבחוץ.</summary>
-    static void MarkFromInternet(string path)
+    internal static void MarkFromInternet(string path)
     {
         try { File.WriteAllText(path + ":Zone.Identifier", "[ZoneTransfer]\r\nZoneId=3\r\n"); } catch { }
     }

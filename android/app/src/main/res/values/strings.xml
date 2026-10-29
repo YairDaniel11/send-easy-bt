@@ -7,7 +7,7 @@
     <string name="channel_events">קבצים והודעות שהתקבלו</string>
 
     <string name="main_title">שליחה קלה - BT</string>
-    <string name="main_hint_menu">אישור=פעולות  תפריט=אפשרויות  חזרה=יציאה</string>
+    <string name="main_hint_menu">אישור = פעולות   ·   תפריט = אפשרויות   ·   חזרה = יציאה</string>
     <string name="main_pick_device">בחר מכשיר לשליחה</string>
     <string name="main_no_devices">אין מכשירים מצומדים. צמד את המחשב בהגדרות הבלוטוס של הטלפון ופתח את התוכנה בו.</string>
     <string name="main_bt_off">הבלוטוס כבוי. הפעל אותו כדי לשלוח ולקבל.</string>
@@ -37,10 +37,10 @@
     <string name="send_cancelled">השליחה בוטלה</string>
     <string name="send_close">סגור</string>
     <string name="send_cancel">בטל שליחה</string>
-    <string name="send_hint_cancel">חזרה או המקש הימני = ביטול</string>
+    <string name="send_hint_cancel">חזרה או המקש הרך הימני = ביטול</string>
 
     <string name="browser_title">בחר קבצים</string>
-    <string name="browser_hint">אישור=כניסה/סימון  תפריט=שלח  חזרה=למעלה</string>
+    <string name="browser_hint">אישור = כניסה או סימון   ·   תפריט = שלח   ·   חזרה = למעלה</string>
     <string name="browser_up">.. (למעלה)</string>
     <string name="browser_empty">התיקייה ריקה</string>
     <string name="browser_selected">נבחרו %1$d</string>

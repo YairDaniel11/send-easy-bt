@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -20,6 +20,7 @@ sealed class TrayApp : IDisposable
     readonly NotifyIcon _tray;
     readonly System.Windows.Threading.Dispatcher _ui = System.Windows.Application.Current.Dispatcher;
     readonly ObexServer _server;
+    readonly PeerServer _peer;
     readonly HotkeyManager _hotkey = new();
     readonly Dictionary<IncomingFile, ReceiveToast> _toasts = new();
     readonly Settings _settings = Settings.Load();
@@ -43,6 +44,13 @@ sealed class TrayApp : IDisposable
         _server.Progress += (f, got) => _ui.BeginInvoke(() => OnProgress(f, got));
         _server.Aborted += f => _ui.BeginInvoke(() => OnAborted(f));
         _server.Error += msg => Debug.WriteLine("receive error: " + msg);
+        // הפרוטוקול הפרטי: מול האפליקציה שלנו בטלפון (כל סוג קובץ, בדיקת שלמות, הודעות)
+        _peer = new PeerServer(() => _settings) { Decide = AskAsync };
+        _peer.Received += OnReceived;
+        _peer.Progress += (f, got) => _ui.BeginInvoke(() => OnProgress(f, got));
+        _peer.Aborted += f => _ui.BeginInvoke(() => OnAborted(f));
+        _peer.TextReceived += (from, addr, text) => _ui.BeginInvoke(() => OnTextReceived(from, text));
+        _peer.Error += msg => Debug.WriteLine("peer error: " + msg);
         _ = StartServerAsync();
 
         _hotkey.Pressed += OnHotkey;
@@ -169,6 +177,14 @@ sealed class TrayApp : IDisposable
             _tray.ShowBalloonTip(6000, "שליחה קלה - BT",
                 "לא ניתן להפעיל קבלה בבלוטוס: " + ex.Message, ToolTipIcon.Warning);
         }
+        try { await _peer.StartAsync(); }
+        catch (Exception ex) { Debug.WriteLine("peer start failed: " + ex.Message); }
+    }
+
+    void OnTextReceived(string from, string text)
+    {
+        var shown = text.Length > 200 ? text[..200] + "…" : text;
+        _tray.ShowBalloonTip(6000, "הודעה מ-" + from, shown, ToolTipIcon.Info);
     }
 
     Task<bool> AskAsync(IncomingFile f)
@@ -324,6 +340,7 @@ sealed class TrayApp : IDisposable
     {
         _tray.Visible = false;
         _server.Dispose();
+        _peer.Dispose();
         System.Windows.Application.Current.Shutdown();
     }
 
@@ -337,5 +354,5 @@ sealed class TrayApp : IDisposable
         b >= 1 << 20 ? $"{b / (double)(1 << 20):0.0} MB" :
         b >= 1 << 10 ? $"{b / 1024.0:0} KB" : $"{b} B";
 
-    public void Dispose() { _hotkey.Dispose(); _tray.Dispose(); _server.Dispose(); }
+    public void Dispose() { _hotkey.Dispose(); _tray.Dispose(); _server.Dispose(); _peer.Dispose(); }
 }
