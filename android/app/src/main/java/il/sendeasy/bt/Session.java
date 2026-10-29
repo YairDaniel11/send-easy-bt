@@ -469,6 +469,9 @@ final class Session {
     /** נקרא כשהצד השני פותח צ'אט חדש. */
     volatile Runnable newChatHandler;
 
+    /** מזהה ההעברה האחרונה ששלחנו; משמש כמזהה הודעה לאישור קריאה של תמונה/הקלטה. */
+    volatile long lastSentId;
+
     void sendNewChat() throws IOException {
         send(Protocol.T_NEWCHAT, null, null, 0, 0);
     }
@@ -504,6 +507,7 @@ final class Session {
         synchronized (sendLock) {
             byte[] nb = utf8Limit(name, Protocol.MAX_NAME_BYTES);
             long id = newId();
+            lastSentId = id;
             xferEvents.clear();
             byte[] head = new byte[8 + 8 + 2 + nb.length + (fromChat ? 1 : 0)];
             System.arraycopy(longBytes(id), 0, head, 0, 8);

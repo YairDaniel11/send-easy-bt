@@ -561,6 +561,7 @@ public class ChatActivity extends Activity implements Events.Listener {
                             }
                             if (err == null) {
                                 ChatStore.markDelivered(app, address, copy.getName());
+                                ChatStore.setMsgId(app, address, copy.getName(), session == null ? 0 : session.lastSentId);
                             } else {
                                 ChatStore.removeOut(app, address, copy.getName());
                                 copy.delete();
@@ -793,7 +794,7 @@ public class ChatActivity extends Activity implements Events.Listener {
                     }
                 }
                 if (err == null) {
-                    ChatStore.add(app, address, new ChatStore.Msg(System.currentTimeMillis(), true, ChatStore.T_VOICE, f.getName()));
+                    ChatStore.add(app, address, new ChatStore.Msg(System.currentTimeMillis(), true, ChatStore.T_VOICE, f.getName(), session == null ? 0 : session.lastSentId, ChatStore.S_DELIVERED));
                     Events.post(Events.CHAT, address);
                 } else {
                     f.delete();
@@ -1172,11 +1173,14 @@ public class ChatActivity extends Activity implements Events.Listener {
             UiKit.WaveView wave = new UiKit.WaveView(this, m.text.hashCode(), cAccent, (cSub & 0x00FFFFFF) | 0x88000000);
             // במסך צר (240dp) הגל הקבוע דחף את משך ההקלטה החוצה; מצמצמים אותו לפי הרוחב הפנוי
             int waveW = Math.max(UiKit.dp(this, 36), Math.min(UiKit.dp(this, 120), getResources().getDisplayMetrics().widthPixels - UiKit.dp(this, 200)));
-            LinearLayout.LayoutParams wl = new LinearLayout.LayoutParams(waveW, UiKit.dp(this, 30));
+            LinearLayout.LayoutParams wl = new LinearLayout.LayoutParams(0, UiKit.dp(this, 30), 1f);
             wl.leftMargin = UiKit.dp(this, 6); wl.rightMargin = UiKit.dp(this, 6);
             row.addView(wave, wl);
             if (playing) playingWave = wave;
             row.addView(text(mmss(Storage.voiceSeconds(m.text)), cSub, 12));
+            // רוחב כולל מפורש שלא חורג מהמסך (הגל ממלא את השאר), כדי שהבועה לא תיחתך במסך צר
+            int rowW = Math.min(UiKit.dp(this, 36 + 12 + 120 + 36), getResources().getDisplayMetrics().widthPixels - UiKit.dp(this, 100));
+            row.setLayoutParams(new LinearLayout.LayoutParams(rowW, ViewGroup.LayoutParams.WRAP_CONTENT));
             return row;
         }
         if (m.isPic()) return picView(m);

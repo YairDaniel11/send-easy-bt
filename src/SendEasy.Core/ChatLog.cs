@@ -204,7 +204,7 @@ public static class ChatLog
 
     /// <summary>הודעות נכנסות שעוד לא אישרנו קריאה שלהן.</summary>
     public static List<ChatEntry> Unread(ulong address) =>
-        Load(address).Where(e => !e.Mine && e.MsgId != 0 && e.Status != "read" && e.Kind == "text").ToList();
+        Load(address).Where(e => !e.Mine && e.MsgId != 0 && e.Status != "read" && (e.Kind is "text" or "voice" || e.Kind == "file")).ToList();
 
     /// <summary>כל השיחות שיש להן הודעות: כתובת, שם אחרון שידוע, וזמן ההודעה האחרונה.</summary>
     public static List<(ulong Address, string Name, DateTime Last)> Conversations()

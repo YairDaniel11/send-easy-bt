@@ -75,7 +75,7 @@
     <string name="cd_attach">צרף תמונה</string>
     <string name="unread_one">הודעה חדשה</string>
     <string name="unread_n">%1$d חדשות</string>
-    <string name="rx_pic">תמונה מ-%1$s</string>
+    <string name="rx_pic">הודעה מ-%1$s</string>
     <string name="channel_service_min">התראה קבועה (שקטה)</string>
     <string name="menu_svc_notif_shown">התראה קבועה בסטטוס בר: מוצגת</string>
     <string name="menu_svc_notif_hidden">התראה קבועה בסטטוס בר: מוסתרת</string>
@@ -92,7 +92,7 @@
     <string name="voice_too_short">ההקלטה קצרה מדי</string>
     <string name="voice_play_failed">אי אפשר להשמיע את ההודעה</string>
     <string name="chat_menu_file">שלח קובץ</string>
-    <string name="rx_voice">הודעה קולית מ-%1$s</string>
+    <string name="rx_voice">הודעה מ-%1$s</string>
 
     <string name="perm_needed">נדרשת הרשאת בלוטוס כדי לעבוד.</string>
     <string name="act_rename">שנה שם</string>
@@ -185,4 +185,5 @@
     <string name="menu_bt_devices">הוסף / הסר מכשירי בלוטוס</string>
     <string name="bt_settings_failed">לא ניתן לפתוח את הגדרות הבלוטוס</string>
     <string name="chats_no_others">אין צ\'אטים נוספים עם המכשיר</string>
+    <string name="rx_new_message">התקבלה הודעה</string>
 </resources>

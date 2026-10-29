@@ -142,7 +142,7 @@ final class ChatStore {
     }
 
     /** מחליף את הקובץ כולו (קורא את הכל, משנה לפי mode, וכותב רק אם משהו השתנה). מחזיר את מספר ההודעות ששונו. */
-    private static final int M_OUT_READ = 1, M_IN_PENDING = 2, M_IN_SENT = 3, M_OUT_DELIVERED = 4, M_REMOVE = 5;
+    private static final int M_OUT_READ = 1, M_IN_PENDING = 2, M_IN_SENT = 3, M_OUT_DELIVERED = 4, M_REMOVE = 5, M_SET_ID = 6;
     /** READ שהגיע לפני ששמרנו את ההודעה היוצאת (מרוץ קצר): ייושם ב-add. */
     private static final java.util.LinkedHashSet<Long> EARLY = new java.util.LinkedHashSet<Long>();
 
@@ -163,6 +163,8 @@ final class ChatStore {
                 all.set(i, m.withStatus(S_DELIVERED)); changed++;
             } else if (mode == M_REMOVE && m.out && key != null && key.equals(m.text) && S_SENT.equals(m.status)) {
                 all.remove(i--); changed++;
+            } else if (mode == M_SET_ID && m.out && key != null && key.equals(m.text) && m.msgId == 0) {
+                all.set(i, new Msg(m.time, true, m.kind, m.text, id, EARLY.remove(id) ? S_READ : m.status)); changed++;
             } else if (mode == M_IN_SENT && !m.out && id != 0 && m.msgId == id && S_READ_PENDING.equals(m.status)) {
                 all.set(i, m.withStatus(S_READ)); changed++;
             }
@@ -190,6 +192,11 @@ final class ChatStore {
     /** תמונה יוצאת (לפי שם הקובץ) נמסרה: ✓ הופך ל-✓✓. */
     static void markDelivered(Context c, String address, String fileName) {
         rewrite(c, address, M_OUT_DELIVERED, 0, fileName);
+    }
+
+    /** מצמיד לתמונה/הקלטה יוצאת את מזהה ההעברה, כדי שאישור קריאה (READ) יסמן אותה כנקראה. */
+    static synchronized void setMsgId(Context c, String address, String fileName, long msgId) {
+        if (msgId != 0) rewrite(c, address, M_SET_ID, msgId, fileName);
     }
 
     /** מסיר תמונה יוצאת שהשליחה שלה נכשלה או בוטלה. */

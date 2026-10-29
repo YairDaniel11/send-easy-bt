@@ -239,6 +239,9 @@ sealed class TrayApp : IDisposable
     [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
     static extern bool CreateHardLink(string newFile, string existingFile, IntPtr reserved);
 
+    static bool IsImageName(string name) =>
+        System.IO.Path.GetExtension(name).ToLowerInvariant() is ".jpg" or ".jpeg" or ".png" or ".gif" or ".bmp" or ".webp";
+
     void OnFileInChat(ulong addr, IncomingFile f, string path)
     {
         bool voice = ChatLog.IsVoiceName(f.Name);
@@ -255,7 +258,7 @@ sealed class TrayApp : IDisposable
             }
             catch { }
         }
-        ChatLog.Add(addr, new ChatEntry { Mine = false, Kind = voice ? "voice" : "file", Text = f.Name, Size = f.Size, Path = path, Device = f.FromName, Status = "delivered" });
+        ChatLog.Add(addr, new ChatEntry { Mine = false, Kind = voice ? "voice" : "file", Text = f.Name, Size = f.Size, Path = path, Device = f.FromName, Status = "delivered", MsgId = voice || (f.FromChat && IsImageName(f.Name)) ? f.Id : 0 });
         if (_chat is { IsLoaded: true }) _chat.Refresh(addr, f.FromName);
         if (voice && _chat is not { IsActive: true }) NotifyMessage(addr, f.FromName, "🎤 הודעה קולית");
         else if (!voice && f.FromChat && _chat is not { IsActive: true }) NotifyMessage(addr, f.FromName, "📎 " + f.Name);

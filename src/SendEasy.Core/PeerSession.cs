@@ -249,7 +249,7 @@ public sealed class PeerSession : IDisposable
 
         // בית אופציונלי אחרי השם: דגלים. ביט 0 = נשלח מתוך הצ'אט (גרסאות ישנות פשוט לא שולחות אותו)
         bool fromChat = p.Length > 18 + nl && (p[18 + nl] & 1) != 0;
-        var file = new IncomingFile(PeerName, name, size, _paired) { FromChat = fromChat };
+        var file = new IncomingFile(PeerName, name, size, _paired) { FromChat = fromChat, Id = id };
         int r = OfferHandler != null ? await OfferHandler(file) : 0;
         if (r != 0) { await RejectAsync(id, r); return; }
 
@@ -392,6 +392,9 @@ public sealed class PeerSession : IDisposable
     }
 
     /// <summary>שולח קובץ אחד. קובץ אחד בכל רגע: שליחות נוספות ממתינות.</summary>
+    /// <summary>מזהה ההעברה האחרונה ששלחנו (משמש כמזהה הודעה לאישור קריאה של תמונה/הקלטה).</summary>
+    public long LastSentId { get; private set; }
+
     public async Task<PeerSendResult> SendFileAsync(Stream src, string name, long size, IProgress<long>? progress, CancellationToken ct, bool fromChat = false)
     {
         await _sendLock.WaitAsync(ct);
@@ -400,6 +403,7 @@ public sealed class PeerSession : IDisposable
             var nb = Encoding.UTF8.GetBytes(name);
             if (nb.Length > PeerProtocol.MaxNameBytes) nb = nb[..PeerProtocol.MaxNameBytes];
             long id = Random.Shared.NextInt64(1, long.MaxValue);
+            LastSentId = id;
             while (_xfer.Reader.TryRead(out _)) { }
             var head = new byte[8 + 8 + 2 + nb.Length + (fromChat ? 1 : 0)];
             BinaryPrimitives.WriteInt64BigEndian(head, id);

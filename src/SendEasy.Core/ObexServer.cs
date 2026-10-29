@@ -11,6 +11,8 @@ public sealed record IncomingFile(string FromName, string Name, long Size, bool 
     public CancellationTokenSource Cts { get; } = new();
     /// <summary>הקובץ נשלח מתוך הצ'אט (הקלטה או תמונה): אין חלון התקדמות קבלה, הוא מופיע בשיחה.</summary>
     public bool FromChat { get; init; }
+    /// <summary>מזהה ההעברה בפרוטוקול; משמש כמזהה ההודעה לאישור קריאה של מדיה בצ'אט.</summary>
+    public long Id { get; init; }
 }
 
 /// <summary>שרת קבלה OBEX Object Push. נרשם כשירות 0x1105 כך שכל טלפון יכול לשלוח למחשב.</summary>

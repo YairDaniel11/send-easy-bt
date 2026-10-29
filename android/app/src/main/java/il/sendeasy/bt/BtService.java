@@ -309,11 +309,11 @@ public class BtService extends Service {
                 // הודעה קולית: נשמרת בתיקייה פנימית ומופיעה בצ'אט, לא בתיקיית ההורדות
                 String stored = Storage.storeVoice(BtService.this, temp, f.name);
                 if (stored == null) return false;
-                ChatStore.add(BtService.this, address, new ChatStore.Msg(System.currentTimeMillis(), false, ChatStore.T_VOICE, stored, 0, ChatStore.S_UNREAD));
+                ChatStore.add(BtService.this, address, new ChatStore.Msg(System.currentTimeMillis(), false, ChatStore.T_VOICE, stored, f.id, ChatStore.S_UNREAD));
                 Events.post(Events.CHAT, address);
                 Events.post(Events.VOICE, address);
                 int secs = Storage.voiceSeconds(stored);
-                notifyEvent(getString(R.string.rx_voice, name()), getString(R.string.voice_label, (secs / 60) + ":" + (secs % 60 < 10 ? "0" : "") + (secs % 60)), address);
+                notifyEvent(getString(R.string.rx_voice, name()), getString(R.string.rx_new_message), address);
                 return true;
             }
             // רק קובץ שנשלח מתוך הצ'אט מופיע בשיחה. קובץ שנשלח בשליחה רגילה (מסך שליחה במחשב) נשמר בתיקייה
@@ -327,10 +327,10 @@ public class BtService extends Service {
                 return false;
             }
             if (stored != null) {
-                ChatStore.add(BtService.this, address, new ChatStore.Msg(System.currentTimeMillis(), false, ChatStore.T_PIC, stored, 0, ChatStore.S_UNREAD));
+                ChatStore.add(BtService.this, address, new ChatStore.Msg(System.currentTimeMillis(), false, ChatStore.T_PIC, stored, f.id, ChatStore.S_UNREAD));
                 Events.post(Events.CHAT, address);
                 Events.post(Events.RECEIVED, f.name);
-                notifyEvent(getString(R.string.rx_pic, name()), f.name, address);
+                notifyEvent(getString(R.string.rx_pic, name()), getString(R.string.rx_new_message), address);
                 return true;
             }
             if (f.fromChat) {
