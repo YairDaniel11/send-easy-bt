@@ -189,7 +189,8 @@ public static class ChatLog
             lock (Gate)
             {
                 foreach (var e in Load(address, int.MaxValue))
-                    if (e.Kind == "voice" && !string.IsNullOrEmpty(e.Path) && e.Path.StartsWith(VoiceDir, StringComparison.OrdinalIgnoreCase))
+                    if (!string.IsNullOrEmpty(e.Path) && (e.Kind == "voice" && e.Path.StartsWith(VoiceDir, StringComparison.OrdinalIgnoreCase)
+                        || e.Path.StartsWith(ImageDir, StringComparison.OrdinalIgnoreCase)))
                         try { File.Delete(e.Path); } catch { }
                 var f = FileOf(address);
                 if (File.Exists(f)) File.Delete(f);

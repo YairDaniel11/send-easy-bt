@@ -56,6 +56,11 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
     {
         _settings = settings;
         InitializeComponent();
+        // הכפתורים משתמשים בגופן אייקונים; בלי זה הטולטיפ שלהם יורש אותו והעברית מוצגת כריבועים
+        var tip = new Style(typeof(ToolTip));
+        try { tip.BasedOn = TryFindResource(typeof(ToolTip)) as Style; } catch { }
+        tip.Setters.Add(new Setter(Control.FontFamilyProperty, new FontFamily("Segoe UI")));
+        Resources[typeof(ToolTip)] = tip;
         LoadConversations();
         _wa = _settings.ChatStyle == 0;
         ActionBtn.Content = "\uE720";

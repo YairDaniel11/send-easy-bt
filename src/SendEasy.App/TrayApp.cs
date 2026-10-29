@@ -236,6 +236,9 @@ sealed class TrayApp : IDisposable
         _msgToast.Show();
     }
 
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    static extern bool CreateHardLink(string newFile, string existingFile, IntPtr reserved);
+
     void OnFileInChat(ulong addr, IncomingFile f, string path)
     {
         bool voice = ChatLog.IsVoiceName(f.Name);
@@ -246,7 +249,8 @@ sealed class TrayApp : IDisposable
             {
                 System.IO.Directory.CreateDirectory(ChatLog.ImageDir);
                 var copy = FileNames.UniquePath(ChatLog.ImageDir, f.Name);
-                System.IO.File.Copy(path, copy);
+                // קישור קשיח (אותו קובץ בדיסק, בלי מקום נוסף ובלי תלות בשם המקורי); אם לא אפשרי (דיסק אחר) - העתקה
+                if (!CreateHardLink(copy, path, IntPtr.Zero)) System.IO.File.Copy(path, copy);
                 path = copy;
             }
             catch { }
