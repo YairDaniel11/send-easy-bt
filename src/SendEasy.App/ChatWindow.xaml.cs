@@ -291,6 +291,9 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         HeaderStatus.Text = PeerConnections.IsConnected(_cur.Address) ? "מחובר בבלוטוס" : "ההודעות נשלחות דרך האפליקציה בטלפון";
         HeaderInitial.Text = _cur.Name.TrimStart('ה', '-', ' ').Substring(0, 1).ToUpperInvariant();
         HeaderAvatar.Background = new SolidColorBrush(_cur.Color);
+        var hdel = new MenuItem { Header = "מחק שיחה", Tag = _cur };
+        hdel.Click += DeleteConv_Click;
+        HeaderBar.ContextMenu = new ContextMenu { FlowDirection = FlowDirection.RightToLeft, Items = { hdel } };
     }
 
     /// <summary>מחיקת שיחה (קליק ימני על שיחה ברשימה).</summary>

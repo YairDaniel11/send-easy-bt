@@ -176,10 +176,10 @@
     <string name="paste_send">שלח</string>
     <string name="menu_settings">הגדרות</string>
     <string name="menu_new_chat">צ\'אט חדש</string>
-    <string name="chat_new_still_empty">הצ'אט הנוכחי עדיין ריק</string>
-    <string name="menu_other_chats">עבור לצ'אטים אחרים</string>
-    <string name="chats_title">צ'אטים עם %1$s</string>
-    <string name="chats_item">צ'אט %1$d · %2$s</string>
+    <string name="chat_new_still_empty">הצ\'אט הנוכחי עדיין ריק</string>
+    <string name="menu_other_chats">עבור לצ\'אטים אחרים</string>
+    <string name="chats_title">צ\'אטים עם %1$s</string>
+    <string name="chats_item">צ\'אט %1$d · %2$s</string>
     <string name="chats_count">%1$d הודעות</string>
     <string name="chats_empty">ריק</string>
 </resources>
