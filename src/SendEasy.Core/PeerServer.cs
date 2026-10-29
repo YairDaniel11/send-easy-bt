@@ -23,6 +23,8 @@ public sealed class PeerServer : IDisposable
     public event Action<IncomingFile>? Aborted;
     /// <summary>הודעת טקסט שהתקבלה: (שם המכשיר, כתובת, טקסט).</summary>
     public event Action<string, ulong, string>? TextReceived;
+    /// <summary>כמו TextReceived, עם מזהה ההודעה (לאישור קריאה).</summary>
+    public event Action<string, ulong, string, long>? TextReceivedEx;
     public event Action<string>? Error;
 
     public PeerServer(Func<Settings> settings) => _settings = settings;
@@ -104,6 +106,8 @@ public sealed class PeerServer : IDisposable
             session.Progress += (f, got) => Progress?.Invoke(f, got);
             session.Failed += f => Aborted?.Invoke(f);
             session.TextReceived += t => TextReceived?.Invoke(session.PeerName.Length > 0 ? session.PeerName : from, addr, t);
+            session.TextReceivedEx += (t, id) => TextReceivedEx?.Invoke(from, addr, t, id);
+            PeerConnections.Register(addr, session); // אפשר לשלוח עליו הודעות ואישורי קריאה חזרה
             var s = session;
             session.Closed += ex => { lock (_sessions) _sessions.Remove(s); if (ex is not (null or EndOfStreamException or OperationCanceledException)) Error?.Invoke(ex.Message); };
             lock (_sessions) _sessions.Add(session);

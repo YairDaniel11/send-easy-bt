@@ -14,9 +14,30 @@ sealed class VoiceCapture
     MediaCapture? _cap;
     string? _path;
     DateTime _start;
+    DateTime _pausedAt;
+    TimeSpan _pausedTotal;
+    public bool IsPaused { get; private set; }
 
     public bool IsRecording => _cap != null;
-    public int ElapsedSeconds => (int)(DateTime.Now - _start).TotalSeconds;
+    /// <summary>זמן הקלטה בפועל, בלי השהיות.</summary>
+    public int ElapsedSeconds => (int)Elapsed.TotalSeconds;
+    TimeSpan Elapsed => (IsPaused ? _pausedAt : DateTime.Now) - _start - _pausedTotal;
+
+    /// <summary>משהה את ההקלטה (אפשר להמשיך אחר כך לאותה הודעה).</summary>
+    public async Task PauseAsync()
+    {
+        if (_cap == null || IsPaused) return;
+        try { await _cap.PauseRecordAsync(Windows.Media.Devices.MediaCapturePauseBehavior.RetainHardwareResources); } catch { return; }
+        IsPaused = true; _pausedAt = DateTime.Now;
+    }
+
+    public async Task ResumeAsync()
+    {
+        if (_cap == null || !IsPaused) return;
+        try { await _cap.ResumeRecordAsync(); } catch { return; }
+        _pausedTotal += DateTime.Now - _pausedAt;
+        IsPaused = false;
+    }
 
     /// <summary>מתחיל להקליט. בכשל (למשל אין הרשאת מיקרופון) מחזיר הודעת שגיאה, אחרת null.</summary>
     public async Task<string?> StartAsync()
@@ -31,7 +52,7 @@ sealed class VoiceCapture
             _cap = new MediaCapture();
             await _cap.InitializeAsync(new MediaCaptureInitializationSettings { StreamingCaptureMode = StreamingCaptureMode.Audio });
             await _cap.StartRecordToStorageFileAsync(MediaEncodingProfile.CreateM4a(AudioEncodingQuality.Medium), file);
-            _start = DateTime.Now;
+            _start = DateTime.Now; _pausedTotal = TimeSpan.Zero; IsPaused = false;
             return null;
         }
         catch (Exception ex)
@@ -49,10 +70,12 @@ sealed class VoiceCapture
         var cap = _cap; var tmp = _path;
         _cap = null;
         if (cap == null || tmp == null) return null;
-        int secs = Math.Max(1, (int)Math.Round((DateTime.Now - _start).TotalSeconds));
+        if (IsPaused) { _pausedTotal += DateTime.Now - _pausedAt; IsPaused = false; }
+        var elapsed = DateTime.Now - _start - _pausedTotal;
+        int secs = Math.Max(1, (int)Math.Round(elapsed.TotalSeconds));
         try { await cap.StopRecordAsync(); } catch { }
         try { cap.Dispose(); } catch { }
-        if (!File.Exists(tmp) || new FileInfo(tmp).Length == 0 || (DateTime.Now - _start).TotalMilliseconds < 600)
+        if (!File.Exists(tmp) || new FileInfo(tmp).Length == 0 || elapsed.TotalMilliseconds < 600)
         {
             try { File.Delete(tmp); } catch { }
             return null;

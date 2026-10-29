@@ -16,7 +16,7 @@ enum MsgKind { Text, Voice, File }
 enum MsgStatus { Sent, Delivered, Read, Failed }
 
 sealed record Msg(bool Mine, string Sender, DateTime Time, MsgKind Kind, string Text = "", int Seconds = 0,
-    long Size = 0, MsgStatus Status = MsgStatus.Read);
+    long Size = 0, MsgStatus Status = MsgStatus.Read, string Path = "");
 
 sealed class Conv
 {
@@ -56,10 +56,12 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         InitializeComponent();
         LoadConversations();
         _wa = _settings.ChatStyle == 0;
-        HeaderName.MouseLeftButtonUp += HeaderName_Click;
         ActionBtn.Content = "🎤";
         ActionBtn.ToolTip = "הקלטת הודעה קולית";
-        _recTimer.Tick += (_, _) => RecordLabel.Text = $"● מקליט  {Fmt(_voice.ElapsedSeconds)}   (לחץ ➤ לשליחה)";
+        Activated += (_, _) => SendReadReceipts();
+        _recTimer.Tick += (_, _) => RecordLabel.Text = _voice.IsPaused
+            ? $"⏸ מושהה  {Fmt(_voice.ElapsedSeconds)}   (לחץ ▶ להמשך, ➤ לשליחה)"
+            : $"● מקליט  {Fmt(_voice.ElapsedSeconds)}   (⏸ להשהיה, ➤ לשליחה)";
         ConvList.ItemContainerStyle = ConvItemStyle();
         ApplyStyle();
         if (_convs.Count > 0) ConvList.SelectedIndex = 0;
@@ -87,10 +89,10 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
 
     static Msg ToMsg(ChatEntry e) => e.Kind == "voice"
         ? new Msg(e.Mine, e.Mine ? "אני" : e.Device, e.Time, MsgKind.Voice, e.Path ?? "", ChatLog.VoiceSeconds(e.Text), 0,
-            e.Status == "failed" ? MsgStatus.Failed : e.Status == "delivered" ? MsgStatus.Delivered : MsgStatus.Sent)
+            e.Status == "failed" ? MsgStatus.Failed : e.Status == "read" ? MsgStatus.Read : e.Status == "delivered" ? MsgStatus.Delivered : MsgStatus.Sent)
         : new(e.Mine, e.Mine ? "אני" : e.Device, e.Time,
         e.Kind == "file" ? MsgKind.File : MsgKind.Text, e.Text, 0, e.Size,
-        e.Status == "failed" ? MsgStatus.Failed : e.Status == "delivered" ? MsgStatus.Delivered : MsgStatus.Sent);
+        e.Status == "failed" ? MsgStatus.Failed : e.Status == "read" ? MsgStatus.Read : e.Status == "delivered" ? MsgStatus.Delivered : MsgStatus.Sent, e.Path ?? "");
 
     Conv MakeConv(ulong address, string name)
     {
@@ -278,30 +280,10 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
 
     void ShowHeader()
     {
-        HeaderName.Text = Disp(_cur.Name) + "  ✎";
-        HeaderName.Cursor = Cursors.Hand;
-        HeaderName.ToolTip = "לחץ כדי לשנות את שם המכשיר";
+        HeaderName.Text = Disp(_cur.Name);
         HeaderStatus.Text = PeerConnections.IsConnected(_cur.Address) ? "מחובר בבלוטוס" : "ההודעות נשלחות דרך האפליקציה בטלפון";
         HeaderInitial.Text = _cur.Name.TrimStart('ה', '-', ' ').Substring(0, 1).ToUpperInvariant();
         HeaderAvatar.Background = new SolidColorBrush(_cur.Color);
-    }
-
-    /// <summary>שינוי שם (כינוי) למכשיר של השיחה הנוכחית.</summary>
-    void HeaderName_Click(object s, MouseButtonEventArgs e)
-    {
-        var c = _cur;
-        if (c == null) return;
-        var res = ConfirmDialog.Prompt(this, "שינוי שם למכשיר", "השאר ריק כדי לחזור לשם המקורי של המכשיר.", c.Name);
-        if (res == null) return;
-        _settings.SetAlias(c.Address, res.Trim());
-        var fav = _settings.Favorites.FirstOrDefault(f => f.Address == c.Address);
-        var original = ChatLog.Conversations().FirstOrDefault(x => x.Address == c.Address).Name;
-        c.Name = _settings.DisplayName(c.Address, string.IsNullOrWhiteSpace(original) ? (fav?.Name ?? c.Name) : original);
-        if (fav != null) fav.Name = c.Name;
-        try { _settings.Save(); } catch { }
-        RebuildConvList();
-        ShowHeader();
-        RenderMessages();
     }
 
     // ---- הודעות ----
@@ -317,6 +299,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
             prev = m;
         }
         Dispatcher.BeginInvoke(() => Scroller.ScrollToEnd(), DispatcherPriority.Background);
+        SendReadReceipts();
     }
 
     FrameworkElement DateChip(string text)
@@ -331,7 +314,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
     }
 
     string Ticks(Msg m) => m.Status == MsgStatus.Failed ? "⚠ לא נשלח" : m.Status == MsgStatus.Sent ? "✓" : "✓✓";
-    Brush TickBrush(Msg m) => m.Status == MsgStatus.Failed ? B("#D64545") : m.Status == MsgStatus.Read ? B("#53BDEB") : B(_p.Sub);
+    Brush TickBrush(Msg m) => m.Status == MsgStatus.Failed ? B("#D64545") : m.Status == MsgStatus.Read ? B("#1B9E4B") : B(_p.Sub);
 
     // סגנון ווטסאפ: בועות
     FrameworkElement WaMessage(Msg m)
@@ -393,8 +376,32 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         }
     }
 
+    static bool IsImage(string name) => System.IO.Path.GetExtension(name).ToLowerInvariant() is ".jpg" or ".jpeg" or ".png" or ".gif" or ".bmp" or ".webp";
+
+    /// <summary>תמונה ממוזערת בבועה; לחיצה פותחת צפייה מוגדלת.</summary>
+    FrameworkElement? ImageBubble(Msg m)
+    {
+        if (!IsImage(m.Text) || string.IsNullOrEmpty(m.Path) || !System.IO.File.Exists(m.Path)) return null;
+        try
+        {
+            var bmp = new System.Windows.Media.Imaging.BitmapImage();
+            bmp.BeginInit();
+            bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+            bmp.DecodePixelWidth = 360;
+            bmp.UriSource = new Uri(m.Path);
+            bmp.EndInit();
+            var img = new Image { Source = bmp, MaxWidth = 300, MaxHeight = 300, Stretch = Stretch.Uniform, Cursor = Cursors.Hand, ToolTip = "לחץ להגדלה" };
+            img.Clip = new RectangleGeometry(new Rect(0, 0, 300, 300), 8, 8);
+            var path = m.Path;
+            img.MouseLeftButtonUp += (_, _) => new ImageViewWindow(path, this).Show();
+            return img;
+        }
+        catch { return null; }
+    }
+
     FrameworkElement FileBubble(Msg m, int style)
     {
+        if (ImageBubble(m) is { } image) { image.Margin = new Thickness(0, 2, 0, 2); return image; }
         var g = new Grid { Margin = new Thickness(0, 2, 0, 0) };
         g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         g.ColumnDefinitions.Add(new ColumnDefinition());
@@ -501,6 +508,17 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         }
     }
 
+    /// <summary>שולח לטלפון אישור קריאה על הודעות נכנסות שמוצגות עכשיו (הוא יראה וי ירוק).</summary>
+    async void SendReadReceipts()
+    {
+        var c = _cur;
+        if (c == null || !IsActive) return;
+        var unread = ChatLog.Unread(c.Address);
+        if (unread.Count == 0) return;
+        if (await PeerConnections.SendReadAsync(c.Address, unread.Select(u => u.MsgId)))
+            foreach (var u in unread) ChatLog.MarkRead(c.Address, u.MsgId);
+    }
+
     void Update(Conv c)
     {
         RebuildConvList();
@@ -525,7 +543,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         {
             var s = await PeerConnections.GetAsync(conv.Address);
             if (s == null) err = "האפליקציה לא פתוחה בטלפון";
-            else ok = await s.SendTextAsync(text);
+            else { var r = await s.SendTextWithIdAsync(text); ok = r.Ok; entry.MsgId = r.Id; }
             if (!ok && err.Length == 0) err = "לא התקבל אישור מהטלפון";
         }
         catch (Exception ex) { err = ex.Message; }
@@ -550,7 +568,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
             long size = 0;
             try { size = new System.IO.FileInfo(path).Length; } catch { }
             var entry = new ChatEntry { Mine = true, Kind = "file", Text = name, Size = size, Path = path, Device = conv.Name };
-            conv.Messages.Add(new Msg(true, "אני", entry.Time, MsgKind.File, name, Size: size, Status: MsgStatus.Sent));
+            conv.Messages.Add(new Msg(true, "אני", entry.Time, MsgKind.File, name, Size: size, Status: MsgStatus.Sent, Path: path));
             Update(conv);
             HeaderStatus.Text = "שולח " + name + "...";
             bool ok = false; string err = "";
@@ -584,6 +602,13 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
 
     // ---- הודעות קוליות ----
 
+    async void Pause_Click(object s, RoutedEventArgs e)
+    {
+        if (!_recording) return;
+        if (_voice.IsPaused) { await _voice.ResumeAsync(); PauseBtn.Content = "⏸"; PauseBtn.ToolTip = "השהה את ההקלטה"; }
+        else { await _voice.PauseAsync(); PauseBtn.Content = "▶"; PauseBtn.ToolTip = "המשך הקלטה"; }
+    }
+
     async Task StartRecordingAsync()
     {
         if (_cur == null) return;
@@ -593,7 +618,8 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         _recording = true;
         Input.Visibility = Visibility.Hidden;
         RecordLabel.Visibility = Visibility.Visible;
-        RecordLabel.Text = "● מקליט  0:00   (לחץ ➤ לשליחה)";
+        RecordLabel.Text = "● מקליט  0:00   (⏸ להשהיה, ➤ לשליחה)";
+        PauseBtn.Content = "⏸"; PauseBtn.ToolTip = "השהה את ההקלטה"; PauseBtn.Visibility = Visibility.Visible;
         AttachBtn.Content = "🗑"; ActionBtn.Content = "➤"; ActionBtn.ToolTip = "שלח הודעה קולית";
         _recTimer.Start();
     }
@@ -602,6 +628,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
     {
         var conv = _cur;
         _recTimer.Stop(); _recording = false;
+        PauseBtn.Visibility = Visibility.Collapsed;
         RecordLabel.Visibility = Visibility.Collapsed;
         Input.Visibility = Visibility.Visible;
         AttachBtn.Content = "📎";

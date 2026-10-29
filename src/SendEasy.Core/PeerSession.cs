@@ -16,7 +16,7 @@ public static class PeerProtocol
     public const int MaxNameBytes = 255;
     public const long MaxFileSize = 4L * 1024 * 1024 * 1024;
 
-    public const byte Hello = 0x01, Ping = 0x02, Pong = 0x03, Text = 0x10, Ack = 0x11,
+    public const byte Hello = 0x01, Ping = 0x02, Pong = 0x03, Text = 0x10, Ack = 0x11, Read = 0x12,
         FileOffer = 0x20, FileAccept = 0x21, FileReject = 0x22, FileChunk = 0x23, FileEnd = 0x24,
         FileDone = 0x25, Cancel = 0x26, Error = 0xF0;
 
@@ -72,6 +72,11 @@ public sealed class PeerSession : IDisposable
     public event Action<IncomingFile, long>? Progress;
     public event Action<IncomingFile>? Failed;
     public event Action<string>? TextReceived;
+    /// <summary>כמו TextReceived, עם מזהה ההודעה (לאישור קריאה).</summary>
+    public event Action<string, long>? TextReceivedEx;
+    /// <summary>הצד השני קרא הודעה שלנו (מזהה ההודעה).</summary>
+    public event Action<long>? ReadReceived;
+    public ulong RemoteAddress { get; set; }
     public event Action<Exception?>? Closed;
 
     public PeerSession(Stream input, Stream output, IDisposable closer, byte[] myId, string myName, string tmpDir, bool paired)
@@ -170,6 +175,9 @@ public sealed class PeerSession : IDisposable
             case PeerProtocol.Ping: await SendFrameAsync(PeerProtocol.Pong, default, default); break;
             case PeerProtocol.Pong: break;
             case PeerProtocol.Text: await OnTextAsync(p); break;
+            case PeerProtocol.Read:
+                if (p.Length >= 8) ReadReceived?.Invoke(BinaryPrimitives.ReadInt64BigEndian(p));
+                break;
             case PeerProtocol.Ack:
                 if (p.Length >= 8) _acks.Writer.TryWrite(BinaryPrimitives.ReadInt64BigEndian(p));
                 break;
@@ -216,7 +224,9 @@ public sealed class PeerSession : IDisposable
         long id = BinaryPrimitives.ReadInt64BigEndian(p);
         int n = p.Length - 8;
         if (n > PeerProtocol.MaxTextBytes) return;
-        TextReceived?.Invoke(Encoding.UTF8.GetString(p, 8, n));
+        var text = Encoding.UTF8.GetString(p, 8, n);
+        TextReceived?.Invoke(text);
+        TextReceivedEx?.Invoke(text, id);
         await SendFrameAsync(PeerProtocol.Ack, Id8(id), default);
     }
 
@@ -335,7 +345,12 @@ public sealed class PeerSession : IDisposable
 
     // ------------------------------------------------------------ שליחה
 
-    public async Task<bool> SendTextAsync(string text, CancellationToken ct = default)
+    public async Task<bool> SendTextAsync(string text, CancellationToken ct = default) => (await SendTextWithIdAsync(text, ct)).Ok;
+
+    /// <summary>מאשר שקראנו הודעה של הצד השני (וי ירוק אצלו).</summary>
+    public Task SendReadAsync(long msgId) => SendFrameAsync(PeerProtocol.Read, Id8(msgId), default);
+
+    public async Task<(bool Ok, long Id)> SendTextWithIdAsync(string text, CancellationToken ct = default)
     {
         var t = Encoding.UTF8.GetBytes(text);
         if (t.Length > PeerProtocol.MaxTextBytes) throw new IOException("ההודעה ארוכה מדי");
@@ -346,9 +361,9 @@ public sealed class PeerSession : IDisposable
         to.CancelAfter(10000);
         try
         {
-            while (true) if (await _acks.Reader.ReadAsync(to.Token) == id) return true;
+            while (true) if (await _acks.Reader.ReadAsync(to.Token) == id) return (true, id);
         }
-        catch (OperationCanceledException) { return false; }
+        catch (OperationCanceledException) { return (false, id); }
     }
 
     async Task<(byte Type, long Id, int Val)> WaitEventAsync(long id, TimeSpan timeout, CancellationToken ct)

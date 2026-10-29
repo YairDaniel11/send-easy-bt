@@ -74,6 +74,22 @@ public class PeerSessionTests : IDisposable
         Assert.Equal("שלום עולם\nשורה שנייה", got);
     }
 
+    [Fact]
+    public async Task Read_Receipt_RoundTripsMessageId()
+    {
+        var (a, b) = Pair();
+        long seenId = 0, readId = 0;
+        b.TextReceivedEx += (_, id) => seenId = id;
+        a.ReadReceived += id => readId = id;
+        await StartBoth(a, b);
+        var r = await a.SendTextWithIdAsync("שלום");
+        Assert.True(r.Ok);
+        Assert.Equal(r.Id, seenId);
+        await b.SendReadAsync(seenId);
+        for (int i = 0; i < 50 && readId == 0; i++) await Task.Delay(20);
+        Assert.Equal(r.Id, readId);
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(1)]

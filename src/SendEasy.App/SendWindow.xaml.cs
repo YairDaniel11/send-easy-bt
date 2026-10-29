@@ -30,6 +30,8 @@ sealed class Dev
     public string DisplayName => string.IsNullOrWhiteSpace(Alias) ? OriginalName : Alias;
     public string Subtitle => (Major == 1 ? "מחשב" : Major == 2 ? "טלפון" : "מכשיר") + (Connected ? " · מחובר" : "");
     public string Star => IsFavorite ? "★" : "☆";
+    public Visibility PairedVisibility => Paired ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility UnpairedVisibility => Paired ? Visibility.Collapsed : Visibility.Visible;
     public bool Relevant => (Major is 0 or 1 or 2 or 3 or 6) && (Name.Length > 0 || Major is 1 or 2);
 }
 
@@ -135,6 +137,46 @@ public partial class SendWindow : Wpf.Ui.Controls.FluentWindow
         if (_syncing) return;
         if (NearbyList.SelectedItem != null) { _syncing = true; PairedList.SelectedItem = null; _syncing = false; }
         RefreshButtons();
+    }
+
+    // ---- צימוד והסרת צימוד ----
+
+    /// <summary>מצמד מכשיר קרוב שעוד לא מוצמד.</summary>
+    async void Pair_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (((FrameworkElement)sender).Tag is not Dev d || d.Paired || _busy) return;
+        ((FrameworkElement)sender).IsEnabled = false;
+        try { await EnsurePairedAsync(d); }
+        catch (Exception ex) { StatusText.Text = "הצימוד נכשל: " + ex.Message; }
+        finally { ((FrameworkElement)sender).IsEnabled = true; }
+    }
+
+    /// <summary>מסיר את הצימוד של Windows עם המכשיר (גם מרשימת המועדפים). אפשר לצמד שוב בכל רגע.</summary>
+    async void Unpair_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (((FrameworkElement)sender).Tag is not Dev d || !d.Paired || _busy) return;
+        if (!ConfirmDialog.Ask(this, "להסיר את הצימוד?", "המכשיר " + TrayApp.Ltr(d.DisplayName) + " יוסר מהרשימה המוצמדת, ותצטרך לצמד אותו שוב כדי לשלוח אליו.", "הסר צימוד", "ביטול")) return;
+        try
+        {
+            var res = await d.Info.Pairing.UnpairAsync();
+            if (res.Status is DeviceUnpairingResultStatus.Unpaired or DeviceUnpairingResultStatus.AlreadyUnpaired)
+            {
+                d.Paired = false;
+                var fav = _settings.Favorites.FirstOrDefault(f => f.Address == d.Address);
+                if (fav != null)
+                {
+                    _settings.Favorites.Remove(fav);
+                    if (_settings.DefaultDevice == d.Address) _settings.DefaultDevice = _settings.Favorites.FirstOrDefault()?.Address ?? 0;
+                    try { _settings.Save(); } catch { }
+                }
+                StatusText.Text = "הצימוד הוסר: " + d.DisplayName;
+                Rebuild();
+            }
+            else StatusText.Text = "הסרת הצימוד נכשלה: " + res.Status;
+        }
+        catch (Exception ex) { StatusText.Text = "הסרת הצימוד נכשלה: " + ex.Message; }
     }
 
     // ---- שינוי שם ----

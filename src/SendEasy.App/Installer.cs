@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using Microsoft.Win32;
@@ -112,12 +112,29 @@ static class Installer
         {
             if (Environment.OSVersion.Version.Build < 22000) return false; // רק Windows 11 צריך את זה
             if (!File.Exists(MsixPath) || !File.Exists(CerPath)) return false;
-            if (RunPowerShell($"Import-Certificate -FilePath '{CerPath}' -CertStoreLocation Cert:\\LocalMachine\\TrustedPeople | Out-Null", elevated: true) != 0)
+            if (!IsCertTrusted() && RunPowerShell($"Import-Certificate -FilePath '{CerPath}' -CertStoreLocation Cert:\\LocalMachine\\TrustedPeople | Out-Null", elevated: true) != 0)
                 return false;
             return RunPowerShell($"Add-AppxPackage -Path '{MsixPath}' -ExternalLocation '{InstallDir}'", elevated: false) == 0;
         }
         catch { return false; }
     }
+
+    /// <summary>האם התעודה של התוכנה כבר מהימנה במחשב (ואז אין צורך בהרשאת מנהל בעדכון).</summary>
+    public static bool IsCertTrusted()
+    {
+        try
+        {
+            if (!File.Exists(CerPath)) return false;
+            using var cert = new System.Security.Cryptography.X509Certificates.X509Certificate2(CerPath);
+            using var store = new System.Security.Cryptography.X509Certificates.X509Store(System.Security.Cryptography.X509Certificates.StoreName.TrustedPeople, System.Security.Cryptography.X509Certificates.StoreLocation.LocalMachine);
+            store.Open(System.Security.Cryptography.X509Certificates.OpenFlags.ReadOnly);
+            return store.Certificates.Find(System.Security.Cryptography.X509Certificates.X509FindType.FindByThumbprint, cert.Thumbprint, false).Count > 0;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>האם הפריט ברמה העליונה כבר הותקן בעבר (התעודה מהימנה ו-Windows 11).</summary>
+    public static bool ModernMenuWasInstalled => Environment.OSVersion.Version.Build >= 22000 && IsCertTrusted();
 
     public static void RemoveModernMenu()
     {

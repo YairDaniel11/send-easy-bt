@@ -38,6 +38,8 @@ Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion;
 ; הרישום עצמו (קליק ימני, "שלח אל", הפעלה עם Windows) נעשה על ידי התוכנה
 Filename: "{app}\SendEasyBT.exe"; Parameters: "--install --quiet --modern"; Tasks: modern; Flags: waituntilterminated
 Filename: "{app}\SendEasyBT.exe"; Parameters: "--install --quiet"; Tasks: not modern; Flags: waituntilterminated
+; מפעיל את התוכנה מחדש בסוף (גם בעדכון שקט מתוך התוכנה)
+Filename: "{app}\SendEasyBT.exe"; Parameters: "--background"; Flags: nowait runasoriginaluser
 
 [UninstallRun]
 Filename: "{app}\SendEasyBT.exe"; Parameters: "--uninstall --quiet"; RunOnceId: "SendEasyUninstall"; Flags: waituntilterminated skipifdoesntexist

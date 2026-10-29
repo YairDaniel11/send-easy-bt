@@ -20,9 +20,10 @@ android {
         signingConfigs {
             debug {
                 storeFile fixedKeystore
-                storePassword 'android'
-                keyAlias 'androiddebugkey'
-                keyPassword 'android'
+                def ksPass = System.getenv('ANDROID_KEYSTORE_PASSWORD') ?: 'android'
+                storePassword ksPass
+                keyAlias System.getenv('ANDROID_KEY_ALIAS') ?: 'sendeasy'
+                keyPassword ksPass
             }
         }
     }

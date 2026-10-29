@@ -85,11 +85,17 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock Text="{Binding Icon}" FontSize="22" VerticalAlignment="Center"/>
                 <Button Grid.Column="2" Content="{Binding Star}" Tag="{Binding}" Click="Star_Click"
                         Background="Transparent" BorderThickness="0" FontSize="18" Padding="6,0"
                         ToolTip="הוסף/הסר ממועדפים" Cursor="Hand"/>
+                <Button Grid.Column="4" Content="צמד" Tag="{Binding}" Click="Pair_Click" Visibility="{Binding UnpairedVisibility}"
+                        Padding="10,2" Margin="0,0,4,0" ToolTip="צמד את המכשיר" Cursor="Hand"/>
+                <Button Grid.Column="4" Content="✖" Tag="{Binding}" Click="Unpair_Click" Visibility="{Binding PairedVisibility}"
+                        Background="Transparent" BorderThickness="0" FontSize="13" Padding="6,0" Foreground="#C42B1C"
+                        ToolTip="הסר צימוד (המכשיר יוסר מהרשימה המוצמדת)" Cursor="Hand"/>
                 <Button Grid.Column="3" Content="✎" Tag="{Binding}" Click="Rename_Click"
                         Background="Transparent" BorderThickness="0" FontSize="15" Padding="6,0"
                         ToolTip="שנה שם למכשיר" Cursor="Hand"/>

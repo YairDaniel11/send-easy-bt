@@ -49,7 +49,11 @@ sealed class TrayApp : IDisposable
         _peer.Received += OnReceived;
         _peer.Progress += (f, got) => _ui.BeginInvoke(() => OnProgress(f, got));
         _peer.Aborted += f => _ui.BeginInvoke(() => OnAborted(f));
-        _peer.TextReceived += (from, addr, text) => _ui.BeginInvoke(() => OnTextReceived(from, addr, text));
+        _peer.TextReceivedEx += (from, addr, text, id) => _ui.BeginInvoke(() => OnTextReceived(from, addr, text, id));
+        PeerConnections.ReadReceived += (addr, id) => _ui.BeginInvoke(() =>
+        {
+            if (ChatLog.MarkRead(addr, id) && _chat is { IsLoaded: true }) _chat.Refresh(addr, "");
+        });
         _peer.ReceivedFrom += (addr, f, path) => _ui.BeginInvoke(() => OnFileInChat(addr, f, path));
         _peer.Error += msg => Debug.WriteLine("peer error: " + msg);
         _ = StartServerAsync();
@@ -196,9 +200,9 @@ sealed class TrayApp : IDisposable
     ulong _chatBalloonAddr;
     string _chatBalloonName = "";
 
-    void OnTextReceived(string from, ulong addr, string text)
+    void OnTextReceived(string from, ulong addr, string text, long msgId)
     {
-        ChatLog.Add(addr, new ChatEntry { Mine = false, Kind = "text", Text = text, Device = from, Status = "delivered" });
+        ChatLog.Add(addr, new ChatEntry { Mine = false, Kind = "text", Text = text, Device = from, Status = "delivered", MsgId = msgId });
         if (_chat is { IsLoaded: true }) _chat.Refresh(addr, from);
         if (_chat is { IsActive: true }) return; // החלון פתוח ובחזית: ההודעה כבר מוצגת
         _chatBalloonAddr = addr; _chatBalloonName = from;
@@ -295,7 +299,7 @@ sealed class TrayApp : IDisposable
 
     void OnBalloonClicked(object? s, EventArgs e)
     {
-        if (_updateUrl != null) { Process.Start(new ProcessStartInfo(_updateUrl) { UseShellExecute = true }); _updateUrl = null; return; }
+        if (_updateUrl != null) { _updateUrl = null; OpenUpdate(); return; }
         if (_chatBalloonAddr != 0) { var a = _chatBalloonAddr; _chatBalloonAddr = 0; OpenChat(a, _chatBalloonName); return; }
         if (_lastReceivedPath == null) return;
         Process.Start("explorer.exe", $"/select,\"{_lastReceivedPath}\"");
@@ -363,14 +367,32 @@ sealed class TrayApp : IDisposable
     async Task CheckUpdateAsync()
     {
         var cur = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0);
-        var r = await UpdateChecker.CheckAsync(_settings.UpdateRepo, cur);
-        if (r == null || r.Value.Version == _notifiedVersion) return;
-        _notifiedVersion = r.Value.Version;
-        _updateUrl = r.Value.Url;
-        _ui.BeginInvoke(() => _tray.ShowBalloonTip(8000, "יש גרסה חדשה של שליחה קלה - BT",
-            $"גרסה {r.Value.Version}. לחץ כאן כדי להוריד.", ToolTipIcon.Info));
+        var r = await UpdateChecker.CheckDetailedAsync(_settings.UpdateRepo, cur);
+        if (r == null) return;
+        _ui.BeginInvoke(() =>
+        {
+            UpdateState.Set(r);
+            if (r.Version == _notifiedVersion) return; // התראה פעם אחת לכל גרסה, אבל הבאנר בחלונות נשאר
+            _notifiedVersion = r.Version;
+            _updateUrl = r.PageUrl;
+            _tray.ShowBalloonTip(8000, "יש גרסה חדשה של שליחה קלה - BT",
+                $"גרסה {r.Version.ToString(3)}. לחץ כאן כדי להוריד ולהתקין.", ToolTipIcon.Info);
+        });
     }
 
+    /// <summary>פותח את חלון העדכון (הורדה והתקנה בתוך התוכנה).</summary>
+    public void OpenUpdate()
+    {
+        if (!_ui.CheckAccess()) { _ui.BeginInvoke(OpenUpdate); return; }
+        var info = UpdateState.Available;
+        if (info == null) return;
+        if (_updateWindow is { IsLoaded: true }) { WindowFront.Bring(_updateWindow); return; }
+        _updateWindow = new UpdateWindow(info, ExitApp);
+        _updateWindow.Show();
+        WindowFront.Bring(_updateWindow);
+    }
+
+    UpdateWindow? _updateWindow;
     void ExitApp()
     {
         _tray.Visible = false;

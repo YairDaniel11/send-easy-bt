@@ -11,7 +11,9 @@ public sealed class ChatEntry
     public string Kind { get; set; } = "text";
     public string Text { get; set; } = "";
     public long Size { get; set; }
-    /// <summary>"sent" / "delivered" / "failed"</summary>
+    /// <summary>מזהה ההודעה בפרוטוקול (0 = אין), לאישורי קריאה.</summary>
+    public long MsgId { get; set; }
+    /// <summary>"sent" / "delivered" / "read" / "failed"</summary>
     public string Status { get; set; } = "sent";
     public string? Path { get; set; }
     /// <summary>שם המכשיר מהצד השני (לתצוגת רשימת השיחות)</summary>
@@ -82,6 +84,31 @@ public static class ChatLog
         catch { }
         return list.Count > max ? list.GetRange(list.Count - max, max) : list;
     }
+
+    /// <summary>מסמן הודעה (לפי מזהה) כנקראה. מחזיר true אם נמצאה והשתנתה.</summary>
+    public static bool MarkRead(ulong address, long msgId)
+    {
+        if (msgId == 0) return false;
+        try
+        {
+            lock (Gate)
+            {
+                var f = FileOf(address);
+                if (!File.Exists(f)) return false;
+                var all = Load(address, int.MaxValue);
+                bool changed = false;
+                foreach (var e in all)
+                    if (e.MsgId == msgId && e.Status != "read") { e.Status = "read"; changed = true; }
+                if (changed) File.WriteAllLines(f, all.Select(x => JsonSerializer.Serialize(x, Json)), new System.Text.UTF8Encoding(false));
+                return changed;
+            }
+        }
+        catch { return false; }
+    }
+
+    /// <summary>הודעות נכנסות שעוד לא אישרנו קריאה שלהן.</summary>
+    public static List<ChatEntry> Unread(ulong address) =>
+        Load(address).Where(e => !e.Mine && e.MsgId != 0 && e.Status != "read" && e.Kind == "text").ToList();
 
     /// <summary>כל השיחות שיש להן הודעות: כתובת, שם אחרון שידוע, וזמן ההודעה האחרונה.</summary>
     public static List<(ulong Address, string Name, DateTime Last)> Conversations()

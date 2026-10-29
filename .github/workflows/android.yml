@@ -34,7 +34,7 @@ jobs:
         env:
           KS: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
         run: |
-          if [ -n "$KS" ]; then echo "$KS" | base64 -d > app/debug.keystore; fi
+          if [ -n "$KS" ]; then echo "$KS" | base64 -d > app/debug.keystore; echo "ANDROID_KEYSTORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> $GITHUB_ENV; fi
 
       - name: מספר גרסה
         run: |

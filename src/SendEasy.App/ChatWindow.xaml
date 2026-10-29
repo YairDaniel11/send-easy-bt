@@ -47,6 +47,7 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <Border x:Name="HeaderAvatar" Width="42" Height="42" CornerRadius="21">
                             <TextBlock x:Name="HeaderInitial" HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -69,6 +70,7 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <Button Grid.Column="0" x:Name="AttachBtn" Content="📎" FontSize="18" Width="42" Height="42"
                                 Background="Transparent" BorderThickness="0" Click="Attach_Click" ToolTip="צרף קובץ"/>
@@ -80,7 +82,9 @@
                                 <TextBlock x:Name="RecordLabel" Visibility="Collapsed" VerticalAlignment="Center" Foreground="#E53935"/>
                             </Grid>
                         </Border>
-                        <Button Grid.Column="2" x:Name="ActionBtn" Width="44" Height="44" FontSize="18"
+                        <Button Grid.Column="2" x:Name="PauseBtn" Width="44" Height="44" FontSize="16" Margin="0,0,4,0"
+                                BorderThickness="0" Click="Pause_Click" Content="⏸" ToolTip="השהה את ההקלטה" Visibility="Collapsed"/>
+                        <Button Grid.Column="3" x:Name="ActionBtn" Width="44" Height="44" FontSize="18"
                                 BorderThickness="0" Click="Action_Click" Content="🎤" ToolTip="הקלטת הודעה קולית"/>
                     </Grid>
                 </Border>
