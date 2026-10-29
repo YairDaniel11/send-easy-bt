@@ -1,4 +1,4 @@
-using System.IO.Pipes;
+﻿using System.IO.Pipes;
 using System.Security.Cryptography;
 using SendEasy.Core;
 using Xunit;
@@ -45,6 +45,13 @@ public class PeerSessionTests : IDisposable
     }
 
     static byte[] RandomBytes(int n) => RandomNumberGenerator.GetBytes(n);
+
+    sealed class SyncProgress : IProgress<long>
+    {
+        readonly Action<long> _a;
+        public SyncProgress(Action<long> a) => _a = a;
+        public void Report(long v) => _a(v);
+    }
 
     [Fact]
     public async Task Hello_ExchangesNamesAndIds()
@@ -127,7 +134,8 @@ public class PeerSessionTests : IDisposable
 
         using var cts = new CancellationTokenSource();
         var data = RandomBytes(5 * 1024 * 1024);
-        var progress = new Progress<long>(sent => { if (sent > 64 * 1024) cts.Cancel(); });
+        // התקדמות סינכרונית: Progress<T> מדווח אסינכרונית, והשליחה כבר הייתה מסתיימת לפני הביטול
+        var progress = new SyncProgress(sent => { if (sent > 64 * 1024) cts.Cancel(); });
         var r = await a.SendFileAsync(new MemoryStream(data), "big.bin", data.Length, progress, cts.Token);
         Assert.Equal(PeerSendResult.Cancelled, r);
         await Task.Delay(500);
@@ -140,7 +148,8 @@ public class PeerSessionTests : IDisposable
     public async Task File_CancelFromReceiver_StopsSender()
     {
         var (a, b) = Pair();
-        b.OfferHandler = f => { _ = Task.Run(async () => { await Task.Delay(50); f.Cts.Cancel(); }); return Task.FromResult(0); };
+        // המקבל מבטל מיד עם הקבלה: דטרמיניסטי, בלי תלות במהירות המכונה
+        b.OfferHandler = f => { f.Cts.Cancel(); return Task.FromResult(0); };
         await StartBoth(a, b);
         var data = RandomBytes(8 * 1024 * 1024);
         var r = await a.SendFileAsync(new MemoryStream(data), "big.bin", data.Length, null, CancellationToken.None);
