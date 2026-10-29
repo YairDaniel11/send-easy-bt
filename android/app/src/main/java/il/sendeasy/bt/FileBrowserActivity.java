@@ -70,12 +70,15 @@ public class FileBrowserActivity extends Activity {
         dir = root;
         if (pickDir) {
             setTitle(R.string.browser_dir_title);
-            ((TextView) findViewById(R.id.browserHint)).setText(R.string.browser_dir_hint);
-            String start = Prefs.saveDir(this);
-            if (start != null) {
-                File sf = new File(start);
-                if (sf.isDirectory() && sf.getPath().startsWith(root.getPath())) dir = sf;
-            }
+            TextView hint = (TextView) findViewById(R.id.browserHint);
+            if (hint != null) hint.setText(R.string.browser_dir_hint);
+            try {
+                String start = Prefs.saveDir(this);
+                if (start != null) {
+                    File sf = new File(start);
+                    if (sf.isDirectory() && sf.getPath().startsWith(root.getPath())) dir = sf;
+                }
+            } catch (RuntimeException ignored) { }
         }
         if (!Perms.hasReadStorage(this)) {
             Toast.makeText(this, R.string.browser_no_perm, Toast.LENGTH_LONG).show();
@@ -92,7 +95,8 @@ public class FileBrowserActivity extends Activity {
 
     private void load() {
         entries.clear();
-        File[] kids = dir.listFiles();
+        File[] kids = null;
+        try { kids = dir.listFiles(); } catch (RuntimeException ignored) { }
         if (kids != null) {
             Arrays.sort(kids, new Comparator<File>() {
                 @Override public int compare(File a, File c) {

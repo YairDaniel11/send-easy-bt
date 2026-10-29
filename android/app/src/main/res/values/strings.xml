@@ -175,4 +175,5 @@
     <string name="paste_title">לשלוח את התמונה?</string>
     <string name="paste_send">שלח</string>
     <string name="menu_settings">הגדרות</string>
+    <string name="menu_new_chat">צ\'אט חדש</string>
 </resources>

@@ -72,7 +72,7 @@ final class Storage {
         return s;
     }
 
-    private static String mimeOf(String name) {
+    static String mimeOf(String name) {
         int dot = name.lastIndexOf('.');
         if (dot >= 0 && dot < name.length() - 1) {
             String ext = name.substring(dot + 1).toLowerCase(Locale.US);
@@ -115,24 +115,11 @@ final class Storage {
     /** תיאור התיקייה המותאמת (null אם אין או אם אין גישה אליה). */
     private static String customLabel(Context c) {
         if (!hasCustom(c) || !customUsable(c)) return null;
-        if (Build.VERSION.SDK_INT >= 21 && Prefs.saveTree(c) != null) return treeLabel(Uri.parse(Prefs.saveTree(c)));
+        if (Build.VERSION.SDK_INT >= 21 && Prefs.saveTree(c) != null) return SafHelper.treeLabel(Uri.parse(Prefs.saveTree(c)));
         return Prefs.saveDir(c);
     }
 
-    @TargetApi(21)
-    static String treeLabel(Uri tree) {
-        try {
-            String id = DocumentsContract.getTreeDocumentId(tree);
-            if (id.startsWith("primary:")) id = id.substring(8);
-            else id = id.replace(':', '/');
-            return id.length() == 0 ? "/" : id;
-        } catch (RuntimeException e) {
-            return tree.toString();
-        }
-    }
-
-    @TargetApi(21)
-    private static boolean hasTreePermission(Context c, Uri tree) {
+    static boolean hasTreePermission(Context c, Uri tree) {
         try {
             List<UriPermission> l = c.getContentResolver().getPersistedUriPermissions();
             for (UriPermission p : l) {
@@ -153,7 +140,7 @@ final class Storage {
 
     /** שמירה בתיקייה המותאמת. זורק חריגה בכשל (והקובץ הזמני נשאר שלם). */
     private static String publishCustom(Context c, File temp, String name) throws IOException {
-        if (Build.VERSION.SDK_INT >= 21 && Prefs.saveTree(c) != null) return publishTree(c, temp, name);
+        if (Build.VERSION.SDK_INT >= 21 && Prefs.saveTree(c) != null) return SafHelper.publishTree(c, temp, name);
         if (!canWritePublic(c)) throw new IOException("אין הרשאת כתיבה");
         File dir = new File(Prefs.saveDir(c));
         if (!dir.isDirectory() && !dir.mkdirs()) throw new IOException("אי אפשר ליצור תיקייה");
@@ -161,61 +148,6 @@ final class Storage {
         if (!temp.renameTo(dest)) copyToFile(temp, dest);
         MediaScannerConnection.scanFile(c, new String[]{dest.getAbsolutePath()}, null, null);
         return dest.getAbsolutePath();
-    }
-
-    @TargetApi(21)
-    private static String publishTree(Context c, File temp, String name) throws IOException {
-        Uri tree = Uri.parse(Prefs.saveTree(c));
-        if (!hasTreePermission(c, tree)) throw new IOException("ההרשאה לתיקייה פקעה");
-        ContentResolver cr = c.getContentResolver();
-        String parentId = DocumentsContract.getTreeDocumentId(tree);
-        Uri parent = DocumentsContract.buildDocumentUriUsingTree(tree, parentId);
-        String finalName = uniqueDocName(cr, tree, parentId, name);
-        Uri doc = DocumentsContract.createDocument(cr, parent, mimeOf(finalName), finalName);
-        if (doc == null) throw new IOException("יצירת הקובץ נכשלה");
-        try {
-            OutputStream os = cr.openOutputStream(doc);
-            if (os == null) throw new IOException("אין פלט");
-            InputStream is;
-            try {
-                is = new FileInputStream(temp);
-            } catch (IOException e) {
-                try { os.close(); } catch (IOException ignored) { }
-                throw e;
-            }
-            copy(is, os);
-        } catch (IOException e) {
-            try { DocumentsContract.deleteDocument(cr, doc); } catch (Exception ignored) { }
-            throw e;
-        } catch (RuntimeException e) {
-            try { DocumentsContract.deleteDocument(cr, doc); } catch (Exception ignored) { }
-            throw e;
-        }
-        return treeLabel(tree) + "/" + finalName;
-    }
-
-    /** שם שלא קיים עדיין בתיקייה (name, name (1), ...), כדי לא לדרוס. */
-    @TargetApi(21)
-    private static String uniqueDocName(ContentResolver cr, Uri tree, String parentId, String name) {
-        HashSet<String> existing = new HashSet<String>();
-        Cursor cur = null;
-        try {
-            Uri kids = DocumentsContract.buildChildDocumentsUriUsingTree(tree, parentId);
-            cur = cr.query(kids, new String[]{DocumentsContract.Document.COLUMN_DISPLAY_NAME}, null, null, null);
-            if (cur != null) while (cur.moveToNext()) existing.add(cur.getString(0));
-        } catch (RuntimeException ignored) {
-        } finally {
-            if (cur != null) cur.close();
-        }
-        if (!existing.contains(name)) return name;
-        int dot = name.lastIndexOf('.');
-        String stem = dot > 0 ? name.substring(0, dot) : name;
-        String ext = dot > 0 ? name.substring(dot) : "";
-        for (int i = 1; i < 10000; i++) {
-            String n = stem + " (" + i + ")" + ext;
-            if (!existing.contains(n)) return n;
-        }
-        return stem + "-" + System.currentTimeMillis() + ext;
     }
 
     private static boolean canWritePublic(Context c) {
@@ -443,7 +375,7 @@ final class Storage {
         return freeBytes(dest) >= need;
     }
 
-    private static void copy(InputStream in, OutputStream out) throws IOException {
+    static void copy(InputStream in, OutputStream out) throws IOException {
         try {
             byte[] buf = new byte[64 * 1024];
             int n;
