@@ -13,7 +13,7 @@ import android.view.View;
  * ממורכז ובגודל יחסי ל-View. הרקע (עיגול צבעוני וטבעת פוקוס) נקבע מבחוץ.
  */
 public class IconView extends View {
-    static final int SEND = 0, MIC = 1, ATTACH = 2, PAUSE = 3, PLAY = 4, TRASH = 5, CLOSE = 6, STOP = 7;
+    static final int SEND = 0, MIC = 1, ATTACH = 2, PAUSE = 3, PLAY = 4, TRASH = 5, CLOSE = 6, STOP = 7, SMILEY = 8;
 
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint line = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -120,6 +120,14 @@ public class IconView extends View {
                 line.setStrokeWidth(2.6f);
                 c.drawLine(6f, 6f, 18f, 18f, line);
                 c.drawLine(18f, 6f, 6f, 18f, line);
+                break;
+            case SMILEY:
+                line.setStrokeWidth(1.8f);
+                c.drawCircle(12f, 12f, 9f, line);
+                c.drawCircle(8.8f, 9.8f, 1.3f, fill);
+                c.drawCircle(15.2f, 9.8f, 1.3f, fill);
+                rf.set(7f, 7.5f, 17f, 17f);
+                c.drawArc(rf, 30f, 120f, false, line);
                 break;
             case STOP:
                 rf.set(6f, 6f, 18f, 18f);

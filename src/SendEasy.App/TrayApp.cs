@@ -216,7 +216,7 @@ sealed class TrayApp : IDisposable
         ChatLog.Add(addr, new ChatEntry { Mine = false, Kind = "text", Text = text, Device = from, Status = "delivered", MsgId = msgId });
         if (_chat is { IsLoaded: true }) _chat.Refresh(addr, from);
         if (_chat is { IsActive: true }) return; // החלון פתוח ובחזית: ההודעה כבר מוצגת
-        var shown = text.Length > 200 ? text[..200] + "…" : text;
+        var shown = Emoticons.ToGlyphs(text.Length > 200 ? text[..200] + "…" : text);
         NotifyMessage(addr, from, shown);
     }
 
@@ -313,7 +313,7 @@ sealed class TrayApp : IDisposable
             _lastReceivedPath = shown;
             _chatBalloonAddr = 0;
             if (_toasts.TryGetValue(f, out var t)) t.Finish("התקבל: " + Path.GetFileName(shown));
-            else _tray.ShowBalloonTip(5000, "התקבל מ-" + f.FromName, Path.GetFileName(shown), ToolTipIcon.Info);
+            else if (!f.FromChat) _tray.ShowBalloonTip(5000, "התקבל מ-" + f.FromName, Path.GetFileName(shown), ToolTipIcon.Info); // תמונה מהצ'אט: ההודעה מוצגת רק כהודעת צ'אט
             History.Add(new HistoryEntry { Sent = false, Device = f.FromName, Name = Path.GetFileName(shown), Size = f.Size, Path = shown, Note = note });
         });
     }

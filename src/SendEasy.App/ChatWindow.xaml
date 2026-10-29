@@ -48,6 +48,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <Border x:Name="HeaderAvatar" Width="42" Height="42" CornerRadius="21">
                             <TextBlock x:Name="HeaderInitial" HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -67,10 +68,20 @@
                 </ScrollViewer>
 
                 <Border x:Name="Composer" Grid.Row="2" Padding="12,10">
+                    <StackPanel>
+                    <Border x:Name="PendingPanel" Visibility="Collapsed" Margin="0,0,0,8" Padding="6" CornerRadius="10" HorizontalAlignment="Right"
+                            Background="#22808080">
+                        <StackPanel Orientation="Horizontal">
+                            <Image x:Name="PendingImg" MaxHeight="110" MaxWidth="220" Stretch="Uniform"/>
+                            <Button Content="✖" Click="RemovePending_Click" VerticalAlignment="Top" Margin="6,0,0,0" Padding="6,2"
+                                    Background="Transparent" BorderThickness="0" ToolTip="הסר את התמונה"/>
+                        </StackPanel>
+                    </Border>
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
@@ -78,17 +89,24 @@
                                 Background="Transparent" BorderThickness="0" Click="Attach_Click" ToolTip="צרף קובץ"/>
                         <Border Grid.Column="1" x:Name="InputBox" CornerRadius="22" Padding="14,4" Margin="4,0">
                             <Grid>
-                                <TextBox x:Name="Input" BorderThickness="0" Background="Transparent" AcceptsReturn="True"
-                                         TextWrapping="Wrap" MaxHeight="110" VerticalContentAlignment="Center"
-                                         PreviewKeyDown="Input_PreviewKeyDown" TextChanged="Input_TextChanged"/>
+                                <RichTextBox x:Name="Input" BorderThickness="0" Background="Transparent" AcceptsReturn="True" Padding="0"
+                                         MaxHeight="110" VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Center"
+                                         PreviewKeyDown="Input_PreviewKeyDown" TextChanged="Input_TextChanged">
+                                    <RichTextBox.Resources>
+                                        <Style TargetType="Paragraph"><Setter Property="Margin" Value="0"/></Style>
+                                    </RichTextBox.Resources>
+                                </RichTextBox>
                                 <TextBlock x:Name="RecordLabel" Visibility="Collapsed" VerticalAlignment="Center" Foreground="#E53935"/>
                             </Grid>
                         </Border>
-                        <Button Grid.Column="2" x:Name="PauseBtn" Width="44" Height="44" FontSize="16" Margin="0,0,4,0"
+                        <Button Grid.Column="2" x:Name="EmojiBtn" Width="42" Height="42" FontSize="20" Margin="0,0,4,0"
+                                FontFamily="Segoe UI Emoji" Background="Transparent" BorderThickness="0" Click="Emoji_Click" Content="🙂" ToolTip="הוסף אייקון"/>
+                        <Button Grid.Column="3" x:Name="PauseBtn" Width="44" Height="44" FontSize="16" Margin="0,0,4,0"
                                 BorderThickness="0" Click="Pause_Click" Content="⏸" ToolTip="השהה את ההקלטה" Visibility="Collapsed"/>
-                        <Button Grid.Column="3" x:Name="ActionBtn" Width="44" Height="44" FontSize="18"
+                        <Button Grid.Column="4" x:Name="ActionBtn" Width="44" Height="44" FontSize="18"
                                 BorderThickness="0" Click="Action_Click" Content="🎤" ToolTip="הקלטת הודעה קולית"/>
                     </Grid>
+                    </StackPanel>
                 </Border>
             </Grid>
         </Grid>

@@ -692,7 +692,25 @@ public class MainActivity extends Activity implements Events.Listener {
                 .show();
     }
 
+    /** התפריט הראשי: הגדרות, בדיקת עדכון, אודות. */
     private void showMenu() {
+        final String[] items = {
+                getString(R.string.menu_settings),
+                getString(R.string.menu_check_update),
+                getString(R.string.menu_about)};
+        new AlertDialog.Builder(this)
+                .setItems(items, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface dlg, int which) {
+                        if (which == 0) showSettings();
+                        else if (which == 1) checkUpdate(true);
+                        else showAbout();
+                    }
+                })
+                .show();
+    }
+
+    /** כל ההגדרות בחלונית אחת (רשימה נגישה ב-D-pad), עם מצב בטקסט של כל פריט. */
+    private void showSettings() {
         final String[] items = {
                 getString(R.string.menu_toggle_receive),
                 getString(Prefs.showServiceNotification(this) ? R.string.menu_svc_notif_shown : R.string.menu_svc_notif_hidden),
@@ -702,10 +720,9 @@ public class MainActivity extends Activity implements Events.Listener {
                 getString(R.string.menu_notify_alerts),
                 getString(R.string.menu_chat_style),
                 getString(R.string.menu_rename_device),
-                getString(R.string.menu_delete_chats),
-                getString(R.string.menu_check_update),
-                getString(R.string.menu_about)};
+                getString(R.string.menu_delete_chats)};
         new AlertDialog.Builder(this)
+                .setTitle(R.string.menu_settings)
                 .setItems(items, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface dlg, int which) {
                         if (which == 0) {
@@ -735,12 +752,8 @@ public class MainActivity extends Activity implements Events.Listener {
                                     }).show();
                         } else if (which == 7) {
                             showRenameDevice();
-                        } else if (which == 8) {
-                            showDeleteChats();
-                        } else if (which == 9) {
-                            checkUpdate(true);
                         } else {
-                            showAbout();
+                            showDeleteChats();
                         }
                     }
                 })

@@ -66,10 +66,10 @@ public class ChatActivity extends Activity implements Events.Listener {
     private String realName;
     private ListView list;
     private TextView emptyT, recT, recHintT, titleT, subT, avatarT, sendProgressT;
-    private IconView micBtn, sendBtn, attachBtn;
+    private IconView micBtn, sendBtn, attachBtn, emoBtn;
     private IconView recPauseBtn, recSendBtn, recCancelBtn;
     private View recBar;
-    private EditText input;
+    private PasteEditText input;
     private View root, header, inputRow;
     private final List<ChatStore.Msg> msgs = new ArrayList<ChatStore.Msg>();
     private Adapter adapter;
@@ -155,13 +155,20 @@ public class ChatActivity extends Activity implements Events.Listener {
         recSendBtn = (IconView) findViewById(R.id.chatRecSend);
         recCancelBtn = (IconView) findViewById(R.id.chatRecCancel);
         attachBtn = (IconView) findViewById(R.id.chatAttach);
+        emoBtn = (IconView) findViewById(R.id.chatEmo);
+        emoBtn.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { showEmoticons(); }
+        });
         sendProgressT = (TextView) findViewById(R.id.chatSendProgress);
         touch = getPackageManager().hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN);
         if (!touch) {
             recHintT.setText(R.string.voice_rec_hint);
             recHintT.setVisibility(View.VISIBLE);
         }
-        input = (EditText) findViewById(R.id.chatInput);
+        input = (PasteEditText) findViewById(R.id.chatInput);
+        input.setImageListener(new PasteEditText.Listener() {
+            @Override public void onImagePasted(Uri uri) { ChatActivity.this.onImagePasted(uri); }
+        });
         sendBtn = (IconView) findViewById(R.id.chatSend);
         micBtn = (IconView) findViewById(R.id.chatMic);
 
@@ -215,7 +222,7 @@ public class ChatActivity extends Activity implements Events.Listener {
         input.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) { }
             @Override public void onTextChanged(CharSequence s, int a, int b, int c) { updateActionButtons(); }
-            @Override public void afterTextChanged(Editable s) { }
+            @Override public void afterTextChanged(Editable s) { Emoticons.applyToEditable(ChatActivity.this, s, input.getTextSize()); }
         });
         applyStyle();
         reload();
@@ -261,6 +268,9 @@ public class ChatActivity extends Activity implements Events.Listener {
         micBtn.setIcon(IconView.MIC);
         sendBtn.setIcon(IconView.SEND);
         attachBtn.setIcon(IconView.ATTACH);
+        emoBtn.setIcon(IconView.SMILEY);
+        emoBtn.setIconColor(fg);
+        emoBtn.setBackgroundDrawable(focusCircle());
         micBtn.setIconColor(fg);
         sendBtn.setIconColor(fg);
         attachBtn.setIconColor(fg);
@@ -314,7 +324,7 @@ public class ChatActivity extends Activity implements Events.Listener {
         sendBtn.setVisibility(has ? View.VISIBLE : View.GONE);
         micBtn.setVisibility(has ? View.GONE : View.VISIBLE);
         // סדר פיזי מימין לשמאל: צרף, שדה, שליחה (עם טקסט) או מיקרופון (בלי טקסט)
-        input.setNextFocusLeftId(has ? R.id.chatSend : R.id.chatMic);
+        emoBtn.setNextFocusLeftId(has ? R.id.chatSend : R.id.chatMic);
         if (has && micBtn.hasFocus()) input.requestFocus();
         if (!has && sendBtn.hasFocus()) input.requestFocus();
     }
@@ -580,11 +590,16 @@ public class ChatActivity extends Activity implements Events.Listener {
     private Session ensureSession() throws IOException, InterruptedException {
         if (session == null || session.isClosed()) {
             BluetoothDevice dev = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(address);
-            Session s = Connector.connect(getApplicationContext(), dev, new Connector.QuietListener() {
-                @Override public void onRead(Session sess, long msgId) {
-                    if (ChatStore.markRead(getApplicationContext(), address, msgId)) Events.post(Events.CHAT, address);
-                }
-            }, null);
+            Session s;
+            try {
+                s = Connector.connect(getApplicationContext(), dev, new Connector.QuietListener() {
+                    @Override public void onRead(Session sess, long msgId) {
+                        if (ChatStore.markRead(getApplicationContext(), address, msgId)) Events.post(Events.CHAT, address);
+                    }
+                }, null);
+            } catch (IOException e) {
+                throw new IOException(getString(R.string.chat_connect_failed));
+            }
             if (destroyed) { // ה-Activity נסגר בזמן ההתחברות: לא משאירים חיבור יתום
                 s.close();
                 throw new InterruptedException();
@@ -845,20 +860,144 @@ public class ChatActivity extends Activity implements Events.Listener {
     // ------------------------------------------------------------ מקשים ותפריט
 
     private void showMenu() {
-        final String[] items = {getString(R.string.voice_record), getString(R.string.chat_menu_file), getString(R.string.chat_menu_style), getString(R.string.chat_delete)};
+        final String[] items = {getString(R.string.voice_record), getString(R.string.chat_menu_style), getString(R.string.chat_menu_emoticon), getString(R.string.chat_menu_paste), getString(R.string.chat_delete)};
         new AlertDialog.Builder(this)
                 .setItems(items, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int which) {
-                        if (which == 3) {
+                        if (which == 2) {
+                            showEmoticons();
+                        } else if (which == 3) {
+                            Uri pu = PasteEditText.clipImage(ChatActivity.this);
+                            if (pu == null) Toast.makeText(ChatActivity.this, R.string.paste_none, Toast.LENGTH_SHORT).show();
+                            else onImagePasted(pu);
+                        } else if (which == 4) {
                             ChatStore.confirmDelete(ChatActivity.this, address, deviceName, new Runnable() {
                                 @Override public void run() { stopPlay(); finish(); }
                             });
                         } else if (which == 0) toggleRecording();
-                        else if (which == 1) FilePicker.pick(ChatActivity.this);
-                        else if (which == 2) chooseStyle();
+                        else if (which == 1) chooseStyle();
                     }
                 })
                 .show();
+    }
+
+    private static final long PASTE_MAX_BYTES = 25L * 1024 * 1024;
+
+    /** תמונה שהודבקה: העתקה לקובץ זמני ברקע (עם הגבלת גודל), תצוגה מקדימה ואישור, ואז שליחה כתמונה רגילה מהצ'אט. */
+    private void onImagePasted(final Uri uri) {
+        final String name = imageNameOf(uri);
+        if (name == null) { Toast.makeText(this, R.string.paste_failed, Toast.LENGTH_LONG).show(); return; }
+        if (picSending) { Toast.makeText(this, R.string.sending_pics_busy, Toast.LENGTH_SHORT).show(); return; }
+        final File dir = new File(getCacheDir(), "paste");
+        dir.mkdirs();
+        File[] old = dir.listFiles();
+        if (old != null) for (File o : old) o.delete();
+        final File dest = new File(dir, Storage.sanitize(name));
+        try {
+            io.execute(new Runnable() {
+                @Override public void run() {
+                    boolean ok = false;
+                    java.io.InputStream in = null;
+                    java.io.OutputStream out = null;
+                    try {
+                        in = getContentResolver().openInputStream(uri);
+                        if (in != null) {
+                            out = new java.io.FileOutputStream(dest);
+                            byte[] buf = new byte[32 * 1024];
+                            long total = 0;
+                            int n;
+                            ok = true;
+                            while ((n = in.read(buf)) > 0) {
+                                total += n;
+                                if (total > PASTE_MAX_BYTES) { ok = false; break; }
+                                out.write(buf, 0, n);
+                            }
+                        }
+                    } catch (IOException e) {
+                        ok = false;
+                    } catch (RuntimeException e) { // כולל SecurityException
+                        ok = false;
+                    } finally {
+                        try { if (in != null) in.close(); } catch (IOException ignored) { }
+                        try { if (out != null) out.close(); } catch (IOException ignored) { }
+                    }
+                    if (!ok) dest.delete();
+                    final Bitmap bm = ok ? Thumbs.decode(dest, 400, 600) : null;
+                    final boolean fin = ok && bm != null;
+                    ui.post(new Runnable() {
+                        @Override public void run() {
+                            if (destroyed) return;
+                            if (!fin) {
+                                dest.delete();
+                                Toast.makeText(ChatActivity.this, R.string.paste_failed, Toast.LENGTH_LONG).show();
+                                return;
+                            }
+                            showPastePreview(dest, bm);
+                        }
+                    });
+                }
+            });
+        } catch (RuntimeException e) {
+            Toast.makeText(this, R.string.paste_failed, Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void showPastePreview(final File f, Bitmap bm) {
+        int pad = UiKit.dp(this, 12);
+        ImageView iv = new ImageView(this);
+        iv.setImageBitmap(bm);
+        iv.setAdjustViewBounds(true);
+        iv.setMaxHeight(UiKit.dp(this, 300));
+        iv.setPadding(pad, pad, pad, pad);
+        AlertDialog d = new AlertDialog.Builder(this)
+                .setTitle(R.string.paste_title)
+                .setView(iv)
+                .setPositiveButton(R.string.paste_send, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface x, int w) {
+                        sendImages(java.util.Collections.singletonList(Uri.fromFile(f)));
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface x, int w) { f.delete(); }
+                })
+                .setOnCancelListener(new DialogInterface.OnCancelListener() {
+                    @Override public void onCancel(DialogInterface x) { f.delete(); }
+                })
+                .create();
+        d.show();
+        android.widget.Button b = d.getButton(DialogInterface.BUTTON_POSITIVE);
+        if (b != null) b.requestFocus();
+    }
+
+    /** דיאלוג בחירת אייקון רגש: חמש שורות (ציור ושם); בחירה מכניסה את הקוד בסמן. */
+    private void showEmoticons() {
+        final String[] names = {getString(R.string.emo_happy), getString(R.string.emo_sad), getString(R.string.emo_like),
+                getString(R.string.emo_dislike), getString(R.string.emo_pray)};
+        final int sz = UiKit.dp(this, 34);
+        android.widget.ArrayAdapter<String> ad = new android.widget.ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, names) {
+            @Override public View getView(int pos, View convert, ViewGroup parent) {
+                TextView tv = (TextView) super.getView(pos, convert, parent);
+                tv.setTextSize(18);
+                tv.setCompoundDrawables(null, null, Emoticons.icon(ChatActivity.this, pos, sz), null);
+                tv.setCompoundDrawablePadding(UiKit.dp(ChatActivity.this, 12));
+                return tv;
+            }
+        };
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.chat_menu_emoticon)
+                .setAdapter(ad, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int which) { insertEmoticon(Emoticons.CODES[which]); }
+                })
+                .show();
+    }
+
+    private void insertEmoticon(String code) {
+        Editable e = input.getText();
+        int a = Math.max(0, input.getSelectionStart());
+        int b = Math.max(0, input.getSelectionEnd());
+        e.replace(Math.min(a, b), Math.max(a, b), code);
+        input.setSelection(Math.min(a, b) + code.length());
+        input.requestFocus();
     }
 
     private void chooseStyle() {
@@ -880,9 +1019,15 @@ public class ChatActivity extends Activity implements Events.Listener {
         super.onActivityResult(req, res, data);
         if (res != RESULT_OK || data == null) return;
         ArrayList<Uri> imgs = FilePicker.imageResult(req, data);
-        if (!imgs.isEmpty()) { sendImages(imgs); return; }
-        ArrayList<Uri> uris = FilePicker.result(req, data);
-        if (!uris.isEmpty()) FilePicker.startSend(this, address, uris);
+        if (imgs.isEmpty()) return;
+        // בצ'אט נשלחות רק תמונות: בודקים לפי סיומת/MIME לפני כל חיבור
+        ArrayList<Uri> ok = new ArrayList<Uri>();
+        boolean rejected = false;
+        for (Uri u : imgs) {
+            if (imageNameOf(u) != null) ok.add(u); else rejected = true;
+        }
+        if (rejected) Toast.makeText(this, R.string.chat_images_only, Toast.LENGTH_LONG).show();
+        if (!ok.isEmpty()) sendImages(ok);
     }
 
     @Override
@@ -915,6 +1060,10 @@ public class ChatActivity extends Activity implements Events.Listener {
             if (e.getAction() == KeyEvent.ACTION_DOWN && e.getRepeatCount() == 0) cancelTransfer();
             return true;
         }
+        // מחיקה (backspace) ליד קוד אייקון: מוחקת את הקוד כולו
+        if (code == KeyEvent.KEYCODE_DEL && input != null && input.hasFocus() && input.getSelectionStart() == input.getSelectionEnd()) {
+            if (e.getAction() == KeyEvent.ACTION_DOWN && Emoticons.deleteEndingAt(input.getText(), input.getSelectionStart())) return true;
+        }
         // בשדה הקלט עם טקסט: אישור/Enter שולח (במקלדת מקשים תמיד אפשר לשלוח)
         if (Keys.isSelect(code) && input != null && input.hasFocus() && input.getText().toString().trim().length() > 0) {
             if (e.getAction() == KeyEvent.ACTION_DOWN && e.getRepeatCount() == 0) send();
@@ -934,7 +1083,7 @@ public class ChatActivity extends Activity implements Events.Listener {
         // במקלדת T9 אין מקש מחיקה: חזרה/CLEAR בשדה עם טקסט מוחקת תו אחרון, ורק בשדה ריק יוצאים
         if ((code == KeyEvent.KEYCODE_BACK || code == KeyEvent.KEYCODE_CLEAR) && input != null && input.hasFocus() && input.getText().length() > 0) {
             int len = input.getText().length();
-            input.getText().delete(len - 1, len);
+            if (!Emoticons.deleteEndingAt(input.getText(), len)) input.getText().delete(len - 1, len);
             return true;
         }
         if (Keys.isBackAlt(code)) { finish(); return true; }
@@ -973,6 +1122,7 @@ public class ChatActivity extends Activity implements Events.Listener {
         }
         if (m.isPic()) return picView(m);
         TextView t = text(ChatStore.T_FILE.equals(m.kind) ? "[קובץ] " + m.text : m.text, cText, 16);
+        if (ChatStore.T_TEXT.equals(m.kind)) t.setText(Emoticons.render(this, m.text, t.getTextSize()));
         t.setMaxWidth(UiKit.dp(this, 270));
         return t;
     }

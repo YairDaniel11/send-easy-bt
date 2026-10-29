@@ -34,6 +34,10 @@ public static class ChatLog
     public static string VoiceDir => System.IO.Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "SendEasyBT", "voice");
 
+    /// <summary>תמונות שהודבקו מהלוח לצ'אט (נשמרות כדי שיוצגו גם אחרי השליחה).</summary>
+    public static string ImageDir => System.IO.Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "SendEasyBT", "images");
+
     public static bool IsVoiceName(string name) => name.StartsWith("voice-", StringComparison.Ordinal) && name.EndsWith(".m4a", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>משך ההקלטה בשניות, מתוך השם (voice-...-d12.m4a).</summary>

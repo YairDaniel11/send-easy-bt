@@ -21,5 +21,6 @@
   </ItemGroup>
   <ItemGroup>
     <Resource Include="Assets\app.ico" />
+    <Resource Include="Assets\emoji\*.png" />
   </ItemGroup>
 </Project>

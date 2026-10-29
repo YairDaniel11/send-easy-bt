@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
@@ -60,6 +61,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         ActionBtn.Content = "🎤";
         ActionBtn.ToolTip = "הקלטת הודעה קולית";
         Activated += (_, _) => SendReadReceipts();
+        HookPaste();
         _recTimer.Tick += (_, _) => RecordLabel.Text = _voice.IsPaused
             ? $"⏸ מושהה  {Fmt(_voice.ElapsedSeconds)}   (לחץ ▶ להמשך, ➤ לשליחה)"
             : $"● מקליט  {Fmt(_voice.ElapsedSeconds)}   (⏸ להשהיה, ➤ לשליחה)";
@@ -275,7 +277,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
     {
         MsgKind.Voice => "🎤 הודעה קולית " + Fmt(m.Seconds),
         MsgKind.File => "📄 " + m.Text,
-        _ => m.Text,
+        _ => Emoticons.ToGlyphs(m.Text),
     };
 
     void ConvList_SelectionChanged(object s, SelectionChangedEventArgs e)
@@ -389,11 +391,13 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
             case MsgKind.Voice: return VoiceBubble(m, style);
             case MsgKind.File: return FileBubble(m, style);
             default:
-                return new TextBlock
+                var tb = new TextBlock
                 {
-                    Text = m.Text, TextWrapping = TextWrapping.Wrap, FontSize = 14.5, Foreground = B(_p.Text),
+                    TextWrapping = TextWrapping.Wrap, FontSize = 14.5, Foreground = B(_p.Text),
                     Margin = new Thickness(0, style == 1 ? 2 : 0, 0, 0),
                 };
+                Emoticons.Fill(tb, m.Text, 14.5);
+                return tb;
         }
     }
 
@@ -512,10 +516,85 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
 
     // ---- שליחה ----
 
+    bool _converting;
+
+    // ---- תיבת הקלדה עשירה: אימוג'י כתמונות ----
+
+    static void Collect(InlineCollection inlines, System.Text.StringBuilder sb)
+    {
+        foreach (var inl in inlines)
+            switch (inl)
+            {
+                case Run r: sb.Append(r.Text); break;
+                case InlineUIContainer c when c.Tag is string code: sb.Append(code); break;
+                case LineBreak: sb.Append('\n'); break;
+                case Span sp: Collect(sp.Inlines, sb); break;
+            }
+    }
+
+    /// <summary>הטקסט שבתיבה, כשכל אייקון מוחלף בקוד שלו (כך הוא נשלח ונשמר).</summary>
+    string GetInputCodes()
+    {
+        var sb = new System.Text.StringBuilder();
+        bool first = true;
+        foreach (var block in Input.Document.Blocks.OfType<Paragraph>())
+        {
+            if (!first) sb.Append('\n');
+            first = false;
+            Collect(block.Inlines, sb);
+        }
+        return sb.ToString();
+    }
+
+    bool InputIsEmpty => string.IsNullOrWhiteSpace(GetInputCodes());
+
+    void ClearInput()
+    {
+        Input.Document.Blocks.Clear();
+        Input.Document.Blocks.Add(new Paragraph());
+    }
+
+    InlineUIContainer MakeEmoticon(Emoticons.Item item, TextPointer? pos = null) =>
+        new(Emoticons.Icon(item.Kind, 22), pos) { Tag = item.Code, BaselineAlignment = BaselineAlignment.Center };
+
+    void InsertEmoticon(Emoticons.Item item)
+    {
+        var pos = Input.CaretPosition.GetInsertionPosition(LogicalDirection.Forward);
+        var c = MakeEmoticon(item, pos);
+        Input.CaretPosition = c.ElementEnd;
+    }
+
+    /// <summary>מחליף קודים שהוקלדו (:) :( :+1: :-1: :pray:) באייקון.</summary>
+    void ConvertCodesInInput()
+    {
+        foreach (var para in Input.Document.Blocks.OfType<Paragraph>().ToList())
+            foreach (var run in para.Inlines.OfType<Run>().ToList())
+            {
+                if (!Emoticons.HasCode(run.Text)) continue;
+                var parts = Emoticons.Split(run.Text);
+                if (!parts.Any(p => p.Item != null)) continue;
+                Inline? last = null;
+                foreach (var (text, item) in parts)
+                {
+                    Inline inl = item == null ? new Run(text) : MakeEmoticon(item);
+                    para.Inlines.InsertBefore(run, inl);
+                    last = inl;
+                }
+                para.Inlines.Remove(run);
+                if (last != null) Input.CaretPosition = last.ElementEnd;
+            }
+    }
+
     void Input_TextChanged(object s, TextChangedEventArgs e)
     {
+        if (!_converting)
+        {
+            // :( וכו' שהוקלדו הופכים מיד לאייקון (נשמרים כקוד בעת השליחה)
+            _converting = true;
+            try { ConvertCodesInInput(); } finally { _converting = false; }
+        }
         if (_recording) return;
-        bool empty = string.IsNullOrWhiteSpace(Input.Text);
+        bool empty = InputIsEmpty && _pastedImage == null;
         ActionBtn.Content = empty ? "🎤" : "➤";
         ActionBtn.ToolTip = empty ? "הקלטת הודעה קולית" : "שלח";
     }
@@ -547,6 +626,18 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
             foreach (var u in unread) ChatLog.MarkRead(c.Address, u.MsgId);
     }
 
+    void Emoji_Click(object s, RoutedEventArgs e)
+    {
+        var menu = Emoticons.BuildMenu(item =>
+        {
+            InsertEmoticon(item);
+            Input.Focus();
+        });
+        menu.PlacementTarget = EmojiBtn;
+        menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Top;
+        menu.IsOpen = true;
+    }
+
     void Update(Conv c)
     {
         RebuildConvList();
@@ -559,9 +650,16 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
     {
         var conv = _cur;
         if (conv == null) return;
-        var text = Input.Text.Trim();
-        if (text.Length == 0) return;
-        Input.Clear();
+        var text = Emoticons.ToCodes(GetInputCodes()).Trim();
+        var pending = _pastedImage;
+        if (text.Length == 0 && pending == null) return;
+        if (pending != null)
+        {
+            ClearPending();
+            if (!await SendChatFileAsync(conv, pending)) return;
+            if (text.Length == 0) return;
+        }
+        ClearInput();
         var entry = new ChatEntry { Mine = true, Kind = "text", Text = text, Device = conv.Name };
         conv.Messages.Add(new Msg(true, "אני", entry.Time, MsgKind.Text, text, Status: MsgStatus.Sent));
         Update(conv);
@@ -588,63 +686,138 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         if (_recording) { await EndRecordingAsync(send: false); return; }
         var conv = _cur;
         if (conv == null) return;
-        var d = new Microsoft.Win32.OpenFileDialog { Title = "בחר קבצים לשליחה", Multiselect = true };
+        var d = new Microsoft.Win32.OpenFileDialog { Title = "בחר תמונות לשליחה", Multiselect = true,
+            Filter = "תמונות|*.jpg;*.jpeg;*.png;*.gif;*.bmp;*.webp|כל הקבצים|*.*" };
         if (d.ShowDialog(this) != true) return;
-        foreach (var path in d.FileNames)
-        {
-            var name = System.IO.Path.GetFileName(path);
-            long size = 0;
-            try { size = new System.IO.FileInfo(path).Length; } catch { }
-            var entry = new ChatEntry { Mine = true, Kind = "file", Text = name, Size = size, Path = path, Device = conv.Name };
-            conv.Messages.Add(new Msg(true, "אני", entry.Time, MsgKind.File, name, Size: size, Status: MsgStatus.Sent, Path: path));
-            Update(conv);
-            // התקדמות וביטול: קובץ כבד אפשר לעצור באמצע
-            var cts = _sendCts = new System.Threading.CancellationTokenSource();
-            CancelSendBtn.Visibility = Visibility.Visible;
-            var started = DateTime.Now;
-            var prog = new Progress<long>(b =>
-            {
-                int pct = size > 0 ? (int)(b * 100 / size) : 0;
-                double secs = Math.Max((DateTime.Now - started).TotalSeconds, 0.5);
-                HeaderStatus.Text = $"שולח {TrayApp.Ltr(name)}... {pct}%  ·  {TrayApp.Ltr(TrayApp.FormatSize((long)(b / secs)) + "/s")}";
-            });
-            bool ok = false, cancelled = false; string err = "";
-            try
-            {
-                var peer = await PeerConnections.GetAsync(conv.Address, cts.Token);
-                if (peer == null) err = "האפליקציה לא פתוחה בטלפון";
-                else
-                {
-                    await using var fs = new System.IO.FileStream(path, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, 64 * 1024, true);
-                    var r = await peer.SendFileAsync(fs, name, size, prog, cts.Token, fromChat: true);
-                    ok = r == PeerSendResult.Ok;
-                    cancelled = r == PeerSendResult.Cancelled;
-                    if (!ok && !cancelled) err = r == PeerSendResult.Rejected ? "הטלפון סירב לקבל את הקובץ" : "השליחה נכשלה";
-                }
-            }
-            catch (OperationCanceledException) { cancelled = true; }
-            catch (Exception ex) { err = ex.Message; }
-            _sendCts = null;
-            CancelSendBtn.Visibility = Visibility.Collapsed;
-            if (cancelled)
-            {
-                // שליחה שבוטלה לא נשמרת בשיחה
-                Reload(conv);
-                Update(conv);
-                HeaderStatus.Text = "השליחה בוטלה";
-                break;
-            }
-            entry.Status = ok ? "delivered" : "failed";
-            ChatLog.Add(conv.Address, entry);
-            Reload(conv);
-            Update(conv);            if (!ok) { ShowError(err); break; }
-        }
+        var rejected = d.FileNames.Where(f => !IsImage(f)).ToList();
+        if (rejected.Count > 0)
+            ConfirmDialog.Tell(this, "לא ניתן לשלוח קבצים מסוג זה", "לא ניתן לשלוח קבצים מסוג זה דרך הצ'אט - רק קבצי תמונה.", warning: true);
+        foreach (var path in d.FileNames.Where(IsImage))
+            if (!await SendChatFileAsync(conv, path)) break;
     }
 
+    /// <summary>שולח תמונה אחת מהצ'אט, עם התקדמות וביטול. מחזיר false אם צריך לעצור (כשל או ביטול).</summary>
+    async Task<bool> SendChatFileAsync(Conv conv, string path)
+    {
+        var name = System.IO.Path.GetFileName(path);
+        long size = 0;
+        try { size = new System.IO.FileInfo(path).Length; } catch { }
+        var entry = new ChatEntry { Mine = true, Kind = "file", Text = name, Size = size, Path = path, Device = conv.Name };
+        conv.Messages.Add(new Msg(true, "אני", entry.Time, MsgKind.File, name, Size: size, Status: MsgStatus.Sent, Path: path));
+        Update(conv);
+        // התקדמות וביטול: קובץ כבד אפשר לעצור באמצע
+        var cts = _sendCts = new System.Threading.CancellationTokenSource();
+        CancelSendBtn.Visibility = Visibility.Visible;
+        var started = DateTime.Now;
+        var prog = new Progress<long>(b =>
+        {
+            int pct = size > 0 ? (int)(b * 100 / size) : 0;
+            double secs = Math.Max((DateTime.Now - started).TotalSeconds, 0.5);
+            HeaderStatus.Text = $"שולח {TrayApp.Ltr(name)}... {pct}%  ·  {TrayApp.Ltr(TrayApp.FormatSize((long)(b / secs)) + "/s")}";
+        });
+        bool ok = false, cancelled = false; string err = "";
+        try
+        {
+            var peer = await PeerConnections.GetAsync(conv.Address, cts.Token);
+            if (peer == null) err = "האפליקציה לא פתוחה בטלפון";
+            else
+            {
+                await using var fs = new System.IO.FileStream(path, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, 64 * 1024, true);
+                var r = await peer.SendFileAsync(fs, name, size, prog, cts.Token, fromChat: true);
+                ok = r == PeerSendResult.Ok;
+                cancelled = r == PeerSendResult.Cancelled;
+                if (!ok && !cancelled) err = r == PeerSendResult.Rejected ? "הטלפון סירב לקבל את הקובץ" : "השליחה נכשלה";
+            }
+        }
+        catch (OperationCanceledException) { cancelled = true; }
+        catch (Exception ex) { err = ex.Message; }
+        _sendCts = null;
+        CancelSendBtn.Visibility = Visibility.Collapsed;
+        if (cancelled)
+        {
+            // שליחה שבוטלה לא נשמרת בשיחה
+            Reload(conv);
+            Update(conv);
+            HeaderStatus.Text = "השליחה בוטלה";
+            return false;
+        }
+        entry.Status = ok ? "delivered" : "failed";
+        ChatLog.Add(conv.Address, entry);
+        Reload(conv);
+        Update(conv);
+        if (!ok) { ShowError(err); return false; }
+        return true;
+    }
+
+    // ---- הדבקת תמונה (Ctrl+V) ----
+
+    string? _pastedImage;
+
+    /// <summary>מחבר טיפול בהדבקה לתיבת ההקלדה: תמונה מהלוח (או קובץ תמונה שהועתק) הופכת לתמונה ממתינה לשליחה.</summary>
+    void HookPaste()
+    {
+        DataObject.AddPastingHandler(Input, (s, e) =>
+        {
+            var data = e.DataObject;
+            string? path = null;
+            if (data.GetDataPresent(DataFormats.FileDrop) && data.GetData(DataFormats.FileDrop) is string[] files)
+                path = files.FirstOrDefault(IsImage);
+            else if (data.GetDataPresent(DataFormats.Bitmap) || Clipboard.ContainsImage())
+                path = SaveClipboardImage();
+            if (path == null) { e.FormatToApply = DataFormats.UnicodeText; return; } // טקסט רגיל: הדבקה בלי עיצוב
+            e.CancelCommand();
+            SetPendingImage(path);
+        });
+    }
+
+    string? SaveClipboardImage()
+    {
+        try
+        {
+            var img = Clipboard.GetImage();
+            if (img == null) return null;
+            System.IO.Directory.CreateDirectory(ChatLog.ImageDir);
+            var path = System.IO.Path.Combine(ChatLog.ImageDir, $"pasted-{DateTime.Now:yyyyMMdd-HHmmss}.png");
+            var enc = new System.Windows.Media.Imaging.PngBitmapEncoder();
+            enc.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(img));
+            using (var fs = System.IO.File.Create(path)) enc.Save(fs);
+            return path;
+        }
+        catch { return null; }
+    }
+
+    void SetPendingImage(string path)
+    {
+        _pastedImage = path;
+        try
+        {
+            var bmp = new System.Windows.Media.Imaging.BitmapImage();
+            bmp.BeginInit();
+            bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+            bmp.DecodePixelHeight = 180;
+            bmp.UriSource = new Uri(path);
+            bmp.EndInit();
+            PendingImg.Source = bmp;
+        }
+        catch { }
+        PendingPanel.Visibility = Visibility.Visible;
+        Input_TextChanged(this, null!);
+        Input.Focus();
+    }
+
+    void ClearPending()
+    {
+        _pastedImage = null;
+        PendingImg.Source = null;
+        PendingPanel.Visibility = Visibility.Collapsed;
+        Input_TextChanged(this, null!);
+    }
+
+    void RemovePending_Click(object s, RoutedEventArgs e) => ClearPending();
     async void Action_Click(object s, RoutedEventArgs e)
     {
         if (_recording) { await EndRecordingAsync(send: true); return; }
-        if (!string.IsNullOrWhiteSpace(Input.Text)) { SendText(); return; }
+        if (!InputIsEmpty || _pastedImage != null) { SendText(); return; }
         await StartRecordingAsync();
     }
 

@@ -178,7 +178,7 @@
             android:nextFocusRight="@+id/chatAttach"
             android:nextFocusUp="@+id/chatList" />
 
-        <EditText
+        <il.sendeasy.bt.PasteEditText
             android:id="@+id/chatInput"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -188,12 +188,24 @@
             android:inputType="textCapSentences|textMultiLine"
             android:maxLines="3"
             android:minHeight="44dp"
-            android:nextFocusLeft="@+id/chatMic"
+            android:nextFocusLeft="@+id/chatEmo"
             android:nextFocusRight="@+id/chatAttach"
             android:nextFocusUp="@+id/chatList"
             android:paddingLeft="16dp"
             android:paddingRight="16dp"
             android:textSize="17sp" />
+
+        <il.sendeasy.bt.IconView
+            android:id="@+id/chatEmo"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:layout_marginRight="8dp"
+            android:contentDescription="@string/cd_emoticons"
+            android:focusable="true"
+            android:nextFocusDown="@+id/chatEmo"
+            android:nextFocusLeft="@+id/chatMic"
+            android:nextFocusRight="@+id/chatInput"
+            android:nextFocusUp="@+id/chatList" />
 
         <il.sendeasy.bt.IconView
             android:id="@+id/chatSend"
@@ -204,7 +216,7 @@
             android:focusable="true"
             android:nextFocusDown="@+id/chatSend"
             android:nextFocusLeft="@+id/chatSend"
-            android:nextFocusRight="@+id/chatInput"
+            android:nextFocusRight="@+id/chatEmo"
             android:nextFocusUp="@+id/chatList" />
 
         <il.sendeasy.bt.IconView
@@ -216,7 +228,7 @@
             android:focusable="true"
             android:nextFocusDown="@+id/chatMic"
             android:nextFocusLeft="@+id/chatMic"
-            android:nextFocusRight="@+id/chatInput"
+            android:nextFocusRight="@+id/chatEmo"
             android:nextFocusUp="@+id/chatList" />
     </LinearLayout>
 </LinearLayout>
