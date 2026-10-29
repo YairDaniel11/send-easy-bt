@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="header_black">#FF000000</color>
+    <color name="header_black">#FF0B5CAD</color>
     <color name="accent_blue">#FF0078D7</color>
     <color name="accent_blue_light">#FF6CB8FF</color>
 
-    <color name="bg_light">#FFFAFAFA</color>
+    <color name="bg_light">#FFF3F6FA</color>
     <color name="row_light">#FFFFFFFF</color>
     <color name="text_dark">#FF212121</color>
     <color name="text_dark_secondary">#FF5A5A5A</color>
     <color name="bubble_in_light">#FFE8EEF7</color>
     <color name="bubble_out_light">#FFD6EAFB</color>
 
-    <color name="bg_night">#FF212121</color>
-    <color name="header_night">#FF000000</color>
-    <color name="row_night">#FF2B2B2B</color>
+    <color name="bg_night">#FF11161C</color>
+    <color name="header_night">#FF14202B</color>
+    <color name="row_night">#FF1C242D</color>
     <color name="text_night">#FFEEEEEE</color>
     <color name="text_night_secondary">#FFBDBDBD</color>
     <color name="bubble_in_night">#FF333A45</color>

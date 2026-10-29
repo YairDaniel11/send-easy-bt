@@ -1,21 +1,48 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/chatRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?attr/sbBg"
     android:orientation="vertical">
 
-    <TextView
-        android:id="@+id/chatTitle"
+    <LinearLayout
+        android:id="@+id/chatHeader"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="?attr/sbHeader"
-        android:ellipsize="end"
-        android:padding="12dp"
-        android:singleLine="true"
-        android:textColor="@color/header_text"
-        android:textSize="19sp"
-        android:textStyle="bold" />
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="10dp">
+
+        <TextView
+            android:id="@+id/chatAvatar"
+            android:layout_width="40dp"
+            android:layout_height="40dp" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="12dp"
+            android:layout_marginRight="12dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/chatTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:singleLine="true"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/chatSub"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:singleLine="true"
+                android:textSize="12sp" />
+        </LinearLayout>
+    </LinearLayout>
 
     <FrameLayout
         android:layout_width="match_parent"
@@ -26,11 +53,13 @@
             android:id="@+id/chatList"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:clipToPadding="false"
             android:divider="@android:color/transparent"
             android:dividerHeight="0dp"
-            android:drawSelectorOnTop="true"
-            android:listSelector="@drawable/list_selector"
+            android:listSelector="@android:color/transparent"
             android:nextFocusDown="@+id/chatInput"
+            android:paddingBottom="6dp"
+            android:paddingTop="6dp"
             android:stackFromBottom="true"
             android:transcriptMode="alwaysScroll" />
 
@@ -42,7 +71,6 @@
             android:gravity="center"
             android:padding="24dp"
             android:text="@string/chat_empty"
-            android:textColor="?attr/sbTextSecondary"
             android:textSize="16sp" />
     </FrameLayout>
 
@@ -61,9 +89,9 @@
         android:id="@+id/chatInputRow"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="?attr/sbRow"
+        android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:padding="6dp">
+        android:padding="8dp">
 
         <EditText
             android:id="@+id/chatInput"
@@ -74,36 +102,38 @@
             android:imeOptions="actionSend"
             android:inputType="textCapSentences|textMultiLine"
             android:maxLines="3"
+            android:minHeight="44dp"
             android:nextFocusRight="@+id/chatMic"
             android:nextFocusUp="@id/chatList"
-            android:textColor="?attr/sbText"
-            android:textSize="18sp" />
+            android:paddingLeft="16dp"
+            android:paddingRight="16dp"
+            android:textSize="17sp" />
 
-        <Button
+        <TextView
             android:id="@+id/chatMic"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginLeft="6dp"
-            android:background="@drawable/btn_primary"
-            android:minHeight="48dp"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
+            android:layout_marginLeft="8dp"
+            android:focusable="true"
+            android:gravity="center"
             android:nextFocusLeft="@id/chatInput"
             android:nextFocusRight="@+id/chatSend"
             android:nextFocusUp="@id/chatList"
-            android:padding="10dp"
             android:text="🎤"
-            android:textColor="#FFFFFFFF" />
+            android:textColor="#FFFFFFFF"
+            android:textSize="19sp" />
 
-        <Button
+        <TextView
             android:id="@+id/chatSend"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginLeft="6dp"
-            android:background="@drawable/btn_primary"
-            android:minHeight="48dp"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
+            android:layout_marginLeft="8dp"
+            android:focusable="true"
+            android:gravity="center"
             android:nextFocusLeft="@id/chatMic"
             android:nextFocusUp="@id/chatList"
-            android:padding="10dp"
-            android:text="@string/chat_send"
-            android:textColor="#FFFFFFFF" />
+            android:text="➤"
+            android:textColor="#FFFFFFFF"
+            android:textSize="19sp" />
     </LinearLayout>
 </LinearLayout>

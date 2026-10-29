@@ -13,6 +13,7 @@ final class Prefs {
     private static final String K_DEVICE_ID = "deviceId";
     private static final String K_RECEIVE = "receive";
     private static final String K_THEME = "theme";
+    private static final String K_CHAT_STYLE = "chatStyle";
 
     private static SharedPreferences sp(Context c) {
         return c.getApplicationContext().getSharedPreferences(NAME, Context.MODE_PRIVATE);
@@ -46,6 +47,15 @@ final class Prefs {
 
     static void setTheme(Context c, int t) {
         sp(c).edit().putInt(K_THEME, t).apply();
+    }
+
+    /** 0 = ווטסאפ, 1 = גוגל צ'אט */
+    static int chatStyle(Context c) {
+        return sp(c).getInt(K_CHAT_STYLE, 0);
+    }
+
+    static void setChatStyle(Context c, int s) {
+        sp(c).edit().putInt(K_CHAT_STYLE, s).apply();
     }
 
     static String toHex(byte[] b) {

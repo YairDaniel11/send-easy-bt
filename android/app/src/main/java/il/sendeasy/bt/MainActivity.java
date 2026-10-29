@@ -55,6 +55,16 @@ public class MainActivity extends Activity implements Events.Listener {
         adapter = new DeviceAdapter();
         list.setAdapter(adapter);
         list.setItemsCanFocus(false);
+        list.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) { adapter.notifyDataSetChanged(); }
+            @Override public void onNothingSelected(AdapterView<?> p) { adapter.notifyDataSetChanged(); }
+        });
+        list.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+            @Override public void onFocusChange(View v, boolean has) { adapter.notifyDataSetChanged(); }
+        });
+        UiKit.avatar((TextView) findViewById(R.id.logo), "BT", 44);
+        ((TextView) findViewById(R.id.logo)).setText("BT");
+        ((TextView) findViewById(R.id.logo)).setBackgroundDrawable(UiKit.rect(this, 0x33FFFFFF, 14));
         list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override public void onItemClick(AdapterView<?> p, View v, int pos, long id) { onDevice(devices.get(pos)); }
         });
@@ -119,6 +129,7 @@ public class MainActivity extends Activity implements Events.Listener {
             if (l != null) uris.addAll(l);
         }
         if (!uris.isEmpty()) pendingShare = uris;
+        pickHint.setBackgroundDrawable(UiKit.rect(this, UiKit.attr(this, R.attr.sbAccent), 14));
         pickHint.setVisibility(pendingShare == null ? View.GONE : View.VISIBLE);
     }
 
@@ -190,8 +201,17 @@ public class MainActivity extends Activity implements Events.Listener {
         @Override public View getView(int pos, View convert, ViewGroup parent) {
             View v = convert != null ? convert : LayoutInflater.from(MainActivity.this).inflate(R.layout.row_item, parent, false);
             BluetoothDevice d = devices.get(pos);
-            ((TextView) v.findViewById(R.id.rowTitle)).setText(nameOf(d));
+            String name = nameOf(d);
+            ((TextView) v.findViewById(R.id.rowTitle)).setText(name);
             ((TextView) v.findViewById(R.id.rowSub)).setText(Fmt.ltr(d.getAddress()) + (isComputer(d) ? "  ·  מחשב" : ""));
+            UiKit.avatar((TextView) v.findViewById(R.id.avatar), name, 48);
+            // כרטיס עגול; בניווט במקשים מסגרת בולטת סביב הפריט הנבחר
+            boolean focused = list.hasFocus() && list.getSelectedItemPosition() == pos;
+            int accent = UiKit.attr(MainActivity.this, R.attr.sbAccent);
+            View card = v.findViewById(R.id.card);
+            card.setBackgroundDrawable(focused
+                    ? UiKit.rect(MainActivity.this, UiKit.attr(MainActivity.this, R.attr.sbRow), 16, accent, 3)
+                    : UiKit.rect(MainActivity.this, UiKit.attr(MainActivity.this, R.attr.sbRow), 16));
             return v;
         }
     }
@@ -242,6 +262,7 @@ public class MainActivity extends Activity implements Events.Listener {
         final String[] items = {
                 getString(R.string.menu_toggle_receive),
                 getString(R.string.menu_receive_dir),
+                getString(R.string.menu_chat_style),
                 getString(R.string.menu_about)};
         new AlertDialog.Builder(this)
                 .setItems(items, new DialogInterface.OnClickListener() {
@@ -255,6 +276,12 @@ public class MainActivity extends Activity implements Events.Listener {
                             new AlertDialog.Builder(MainActivity.this)
                                     .setMessage(getString(R.string.main_receive_dir, Fmt.ltr(Storage.receiveDirLabel(MainActivity.this))))
                                     .setPositiveButton(android.R.string.ok, null).show();
+                        } else if (which == 2) {
+                            new AlertDialog.Builder(MainActivity.this)
+                                    .setTitle(R.string.menu_chat_style)
+                                    .setSingleChoiceItems(new String[]{getString(R.string.style_wa), getString(R.string.style_gc)}, Prefs.chatStyle(MainActivity.this), new DialogInterface.OnClickListener() {
+                                        @Override public void onClick(DialogInterface d, int w) { Prefs.setChatStyle(MainActivity.this, w); d.dismiss(); }
+                                    }).show();
                         } else {
                             new AlertDialog.Builder(MainActivity.this)
                                     .setMessage(R.string.about_text)

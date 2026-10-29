@@ -9,21 +9,21 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.StateListDrawable;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.util.TypedValue;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.KeyEvent;
-import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
 import android.widget.AdapterView;
 import android.widget.BaseAdapter;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ListView;
@@ -43,8 +43,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * צ'אט עם מכשיר מצומד: טקסט, הודעות קוליות וקבצים. החיבור נשמר פתוח כל עוד המסך פתוח.
- * מקשים: אישור = פעולה, תפריט = הקלטה/קובץ, בזמן הקלטה: אישור = שלח, חזרה = בטל.
+ * צ'אט עם מכשיר מצומד: טקסט, הודעות קוליות וקבצים, בשני סגנונות (ווטסאפ או גוגל צ'אט).
+ * מקשים: אישור = פעולה, תפריט = הקלטה/קובץ/עיצוב, בזמן הקלטה: אישור = שלח, חזרה = בטל.
  */
 public class ChatActivity extends Activity implements Events.Listener {
     static final String EXTRA_ADDRESS = "address";
@@ -54,15 +54,19 @@ public class ChatActivity extends Activity implements Events.Listener {
     private String address;
     private String deviceName;
     private ListView list;
-    private TextView emptyT, recT;
+    private TextView emptyT, recT, titleT, subT, avatarT, micBtn, sendBtn;
     private EditText input;
-    private Button sendBtn, micBtn;
+    private View root, header, inputRow;
     private final List<ChatStore.Msg> msgs = new ArrayList<ChatStore.Msg>();
     private Adapter adapter;
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private Session session; // רק מהשרשור של io
     private final SimpleDateFormat fmt = new SimpleDateFormat("HH:mm", Locale.US);
     private final Handler ui = new Handler(Looper.getMainLooper());
+
+    // פלטת הצבעים של הסגנון הנוכחי
+    private int style;
+    private int cBg, cHeader, cHeaderText, cHeaderSub, cText, cSub, cMine, cTheirs, cAccent, cInput;
 
     private final VoiceRecorder recorder = new VoiceRecorder();
     private final Runnable recTick = new Runnable() {
@@ -77,6 +81,18 @@ public class ChatActivity extends Activity implements Events.Listener {
 
     private MediaPlayer player;
     private String playingFile;
+    private UiKit.WaveView playingWave;
+    private final Runnable playTick = new Runnable() {
+        @Override public void run() {
+            MediaPlayer p = player;
+            if (p == null) return;
+            try {
+                int d = p.getDuration();
+                if (playingWave != null && d > 0) playingWave.setProgress(p.getCurrentPosition() / (float) d);
+            } catch (RuntimeException ignored) { }
+            ui.postDelayed(this, 150);
+        }
+    };
 
     @Override
     protected void onCreate(Bundle b) {
@@ -92,14 +108,24 @@ public class ChatActivity extends Activity implements Events.Listener {
         if (bt != null) {
             try { deviceName = MainActivity.nameOf(bt.getRemoteDevice(address)); } catch (RuntimeException ignored) { }
         }
-        ((TextView) findViewById(R.id.chatTitle)).setText(getString(R.string.chat_title, Fmt.ltr(deviceName)));
 
+        root = findViewById(R.id.chatRoot);
+        header = findViewById(R.id.chatHeader);
+        inputRow = findViewById(R.id.chatInputRow);
+        titleT = (TextView) findViewById(R.id.chatTitle);
+        subT = (TextView) findViewById(R.id.chatSub);
+        avatarT = (TextView) findViewById(R.id.chatAvatar);
         list = (ListView) findViewById(R.id.chatList);
         emptyT = (TextView) findViewById(R.id.chatEmpty);
         recT = (TextView) findViewById(R.id.chatRec);
         input = (EditText) findViewById(R.id.chatInput);
-        sendBtn = (Button) findViewById(R.id.chatSend);
-        micBtn = (Button) findViewById(R.id.chatMic);
+        sendBtn = (TextView) findViewById(R.id.chatSend);
+        micBtn = (TextView) findViewById(R.id.chatMic);
+
+        titleT.setText(Fmt.ltr(deviceName));
+        subT.setText(R.string.chat_sub);
+        UiKit.avatar(avatarT, deviceName, 40);
+
         adapter = new Adapter();
         list.setAdapter(adapter);
         list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
@@ -107,6 +133,10 @@ public class ChatActivity extends Activity implements Events.Listener {
                 ChatStore.Msg m = msgs.get(pos);
                 if (m.isVoice()) togglePlay(m);
             }
+        });
+        list.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) { adapter.notifyDataSetChanged(); }
+            @Override public void onNothingSelected(AdapterView<?> p) { }
         });
 
         sendBtn.setOnClickListener(new View.OnClickListener() {
@@ -123,9 +153,80 @@ public class ChatActivity extends Activity implements Events.Listener {
                 return false;
             }
         });
+        input.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) { }
+            @Override public void onTextChanged(CharSequence s, int a, int b, int c) { updateActionButtons(); }
+            @Override public void afterTextChanged(Editable s) { }
+        });
+        applyStyle();
         reload();
         input.requestFocus();
     }
+
+    // ------------------------------------------------------------ עיצוב
+
+    private void applyStyle() {
+        style = Prefs.chatStyle(this);
+        boolean dark = ThemeUtil.isDark(this);
+        if (style == 0) { // ווטסאפ
+            cBg = dark ? 0xFF0B141A : 0xFFEFE7DE;
+            cHeader = dark ? 0xFF1F2C34 : 0xFF008069;
+            cHeaderText = 0xFFFFFFFF; cHeaderSub = 0xCCFFFFFF;
+            cText = dark ? 0xFFE9EDEF : 0xFF111B21;
+            cSub = dark ? 0xFF8696A0 : 0xFF667781;
+            cMine = dark ? 0xFF005C4B : 0xFFD9FDD3;
+            cTheirs = dark ? 0xFF202C33 : 0xFFFFFFFF;
+            cAccent = 0xFF00A884;
+            cInput = dark ? 0xFF2A3942 : 0xFFFFFFFF;
+        } else { // גוגל צ'אט
+            cBg = dark ? 0xFF1F1F1F : 0xFFFFFFFF;
+            cHeader = dark ? 0xFF1F1F1F : 0xFFFFFFFF;
+            cHeaderText = dark ? 0xFFE3E3E3 : 0xFF1F1F1F; cHeaderSub = dark ? 0xFF9AA0A6 : 0xFF5F6368;
+            cText = dark ? 0xFFE3E3E3 : 0xFF1F1F1F;
+            cSub = dark ? 0xFF9AA0A6 : 0xFF5F6368;
+            cMine = dark ? 0xFF2D2F31 : 0xFFE9EEF6;
+            cTheirs = dark ? 0xFF2D2F31 : 0xFFF0F4F9;
+            cAccent = dark ? 0xFFA8C7FA : 0xFF0B57D0;
+            cInput = dark ? 0xFF2D2F31 : 0xFFF0F4F9;
+        }
+        root.setBackgroundColor(cBg);
+        header.setBackgroundColor(cHeader);
+        titleT.setTextColor(cHeaderText);
+        subT.setTextColor(cHeaderSub);
+        emptyT.setTextColor(cSub);
+        inputRow.setBackgroundColor(style == 0 ? 0x00000000 : cBg);
+        input.setBackgroundDrawable(UiKit.rect(this, cInput, 24));
+        input.setTextColor(cText);
+        input.setHintTextColor(cSub);
+        int fg = style == 1 && ThemeUtil.isDark(this) ? 0xFF1F1F1F : 0xFFFFFFFF;
+        micBtn.setTextColor(fg);
+        sendBtn.setTextColor(fg);
+        micBtn.setBackgroundDrawable(focusCircle());
+        sendBtn.setBackgroundDrawable(focusCircle());
+        updateActionButtons();
+        if (adapter != null) adapter.notifyDataSetChanged();
+    }
+
+    /** עיגול צבעוני; בפוקוס (ניווט מקשים) נוספת טבעת בולטת. */
+    private StateListDrawable focusCircle() {
+        StateListDrawable sl = new StateListDrawable();
+        GradientDrawable focused = UiKit.oval(cAccent);
+        focused.setStroke(UiKit.dp(this, 3), style == 0 ? 0xFFFFFFFF : cText);
+        sl.addState(new int[]{android.R.attr.state_focused}, focused);
+        sl.addState(new int[]{android.R.attr.state_pressed}, focused);
+        sl.addState(new int[]{}, UiKit.oval(cAccent));
+        return sl;
+    }
+
+    /** כשיש טקסט: כפתור שליחה; כשאין: מיקרופון. */
+    private void updateActionButtons() {
+        boolean has = input.getText().length() > 0;
+        sendBtn.setVisibility(has ? View.VISIBLE : View.GONE);
+        micBtn.setVisibility(has ? View.GONE : View.VISIBLE);
+        input.setNextFocusRightId(has ? R.id.chatSend : R.id.chatMic);
+    }
+
+    // ------------------------------------------------------------ מחזור חיים
 
     @Override
     protected void onResume() {
@@ -344,6 +445,8 @@ public class ChatActivity extends Activity implements Events.Listener {
         MediaPlayer p = player;
         player = null;
         playingFile = null;
+        playingWave = null;
+        ui.removeCallbacks(playTick);
         if (p != null) {
             try { p.stop(); } catch (RuntimeException ignored) { }
             try { p.release(); } catch (RuntimeException ignored) { }
@@ -378,16 +481,33 @@ public class ChatActivity extends Activity implements Events.Listener {
         player = mp;
         playingFile = m.text;
         adapter.notifyDataSetChanged();
+        ui.postDelayed(playTick, 150);
     }
 
-    // ------------------------------------------------------------ מקשים
+    // ------------------------------------------------------------ מקשים ותפריט
 
     private void showMenu() {
-        final String[] items = {getString(R.string.voice_record), getString(R.string.chat_menu_file)};
+        final String[] items = {getString(R.string.voice_record), getString(R.string.chat_menu_file), getString(R.string.chat_menu_style)};
         new AlertDialog.Builder(this)
                 .setItems(items, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int which) {
-                        if (which == 0) toggleRecording(); else FilePicker.pick(ChatActivity.this);
+                        if (which == 0) toggleRecording();
+                        else if (which == 1) FilePicker.pick(ChatActivity.this);
+                        else chooseStyle();
+                    }
+                })
+                .show();
+    }
+
+    private void chooseStyle() {
+        final String[] names = {getString(R.string.style_wa), getString(R.string.style_gc)};
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.chat_menu_style)
+                .setSingleChoiceItems(names, Prefs.chatStyle(this), new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int which) {
+                        Prefs.setChatStyle(ChatActivity.this, which);
+                        d.dismiss();
+                        applyStyle();
                     }
                 })
                 .show();
@@ -431,21 +551,101 @@ public class ChatActivity extends Activity implements Events.Listener {
         return super.onKeyDown(code, e);
     }
 
-    // ------------------------------------------------------------ תצוגה
+    // ------------------------------------------------------------ בניית שורות הודעה
 
-    private int attrColor(int attr) {
-        TypedValue tv = new TypedValue();
-        getTheme().resolveAttribute(attr, tv, true);
-        return tv.data;
+    private TextView text(String s, int color, float sp) {
+        TextView t = new TextView(this);
+        t.setText(s);
+        t.setTextColor(color);
+        t.setTextSize(sp);
+        return t;
     }
 
-    private String describe(ChatStore.Msg m) {
+    /** תוכן ההודעה: טקסט, קובץ, או נגן קול (כפתור, גל קול ומשך). */
+    private View content(ChatStore.Msg m) {
         if (m.isVoice()) {
             boolean playing = m.text.equals(playingFile);
-            return (playing ? "■ " : "▶ ") + getString(R.string.voice_label, mmss(Storage.voiceSeconds(m.text)));
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            TextView play = text(playing ? "■" : "▶", 0xFFFFFFFF, 14);
+            play.setGravity(Gravity.CENTER);
+            play.setBackgroundDrawable(UiKit.oval(cAccent));
+            row.addView(play, new LinearLayout.LayoutParams(UiKit.dp(this, 36), UiKit.dp(this, 36)));
+            UiKit.WaveView wave = new UiKit.WaveView(this, m.text.hashCode(), cAccent, (cSub & 0x00FFFFFF) | 0x88000000);
+            LinearLayout.LayoutParams wl = new LinearLayout.LayoutParams(UiKit.dp(this, 120), UiKit.dp(this, 30));
+            wl.leftMargin = UiKit.dp(this, 10); wl.rightMargin = UiKit.dp(this, 10);
+            row.addView(wave, wl);
+            if (playing) playingWave = wave;
+            row.addView(text(mmss(Storage.voiceSeconds(m.text)), cSub, 12));
+            return row;
         }
-        if (ChatStore.T_FILE.equals(m.kind)) return "[קובץ] " + m.text;
-        return m.text;
+        TextView t = text(ChatStore.T_FILE.equals(m.kind) ? "[קובץ] " + m.text : m.text, cText, 16);
+        t.setMaxWidth(UiKit.dp(this, 270));
+        return t;
+    }
+
+    private View waRow(ChatStore.Msg m, boolean sel) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.VERTICAL);
+        row.setPadding(UiKit.dp(this, 12), UiKit.dp(this, 3), UiKit.dp(this, 12), UiKit.dp(this, 3));
+        LinearLayout bubble = new LinearLayout(this);
+        bubble.setOrientation(LinearLayout.VERTICAL);
+        bubble.setPadding(UiKit.dp(this, 11), UiKit.dp(this, 7), UiKit.dp(this, 11), UiKit.dp(this, 5));
+        int color = m.out ? cMine : cTheirs;
+        bubble.setBackgroundDrawable(sel ? UiKit.rect(this, color, 14, cAccent, 3) : UiKit.rect(this, color, 14));
+        bubble.addView(content(m));
+        TextView time = text(fmt.format(new Date(m.time)) + (m.out ? "  ✓" : ""), cSub, 11);
+        LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        tl.gravity = Gravity.END;
+        tl.topMargin = UiKit.dp(this, 2);
+        bubble.addView(time, tl);
+        LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        bl.gravity = m.out ? Gravity.START : Gravity.END;
+        row.addView(bubble, bl);
+        return row;
+    }
+
+    private View gcRow(ChatStore.Msg m, ChatStore.Msg prev, boolean sel) {
+        boolean grouped = prev != null && prev.out == m.out && (m.time - prev.time) < 6 * 60 * 1000;
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setPadding(UiKit.dp(this, 14), UiKit.dp(this, grouped ? 1 : 10), UiKit.dp(this, 14), UiKit.dp(this, 1));
+        String who = m.out ? getString(R.string.chat_me) : deviceName;
+        TextView av = new TextView(this);
+        LinearLayout.LayoutParams al = new LinearLayout.LayoutParams(UiKit.dp(this, 36), UiKit.dp(this, 36));
+        al.rightMargin = UiKit.dp(this, 10);
+        row.addView(av, al);
+        if (grouped) av.setVisibility(View.INVISIBLE);
+        UiKit.avatar(av, who, 36);
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        if (!grouped) {
+            LinearLayout head = new LinearLayout(this);
+            head.setOrientation(LinearLayout.HORIZONTAL);
+            TextView n = text(m.out ? who : Fmt.ltr(who), cText, 14);
+            n.setTypeface(null, android.graphics.Typeface.BOLD);
+            head.addView(n);
+            TextView tm = text("   " + fmt.format(new Date(m.time)), cSub, 12);
+            head.addView(tm);
+            col.addView(head);
+        }
+        View c = content(m);
+        if (m.isVoice()) {
+            // בגוגל צ'אט הקול בתוך "גלולה"
+            LinearLayout pill = new LinearLayout(this);
+            pill.setPadding(UiKit.dp(this, 8), UiKit.dp(this, 6), UiKit.dp(this, 12), UiKit.dp(this, 6));
+            pill.setBackgroundDrawable(UiKit.rect(this, m.out ? cMine : cTheirs, 22));
+            pill.addView(c);
+            LinearLayout.LayoutParams pl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            pl.topMargin = UiKit.dp(this, 3);
+            col.addView(pill, pl);
+        } else {
+            col.addView(c);
+        }
+        row.addView(col, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        if (sel) row.setBackgroundDrawable(UiKit.rect(this, 0x00000000, 12, cAccent, 3));
+        return row;
     }
 
     private final class Adapter extends BaseAdapter {
@@ -453,20 +653,9 @@ public class ChatActivity extends Activity implements Events.Listener {
         @Override public Object getItem(int i) { return msgs.get(i); }
         @Override public long getItemId(int i) { return i; }
         @Override public View getView(int pos, View convert, ViewGroup parent) {
-            View v = convert != null ? convert : LayoutInflater.from(ChatActivity.this).inflate(R.layout.row_msg, parent, false);
             ChatStore.Msg m = msgs.get(pos);
-            TextView t = (TextView) v.findViewById(R.id.msgText);
-            TextView time = (TextView) v.findViewById(R.id.msgTime);
-            t.setText(describe(m));
-            time.setText(fmt.format(new Date(m.time)));
-            GradientDrawable bg = new GradientDrawable();
-            bg.setCornerRadius(18);
-            bg.setColor(attrColor(m.out ? R.attr.sbBubbleOut : R.attr.sbBubbleIn));
-            t.setBackgroundDrawable(bg);
-            int g = m.out ? Gravity.START : Gravity.END;
-            ((LinearLayout.LayoutParams) t.getLayoutParams()).gravity = g;
-            ((LinearLayout.LayoutParams) time.getLayoutParams()).gravity = g;
-            return v;
+            boolean sel = list.hasFocus() && list.getSelectedItemPosition() == pos;
+            return style == 0 ? waRow(m, sel) : gcRow(m, pos > 0 ? msgs.get(pos - 1) : null, sel);
         }
     }
 }
