@@ -27,10 +27,21 @@ import java.util.concurrent.ConcurrentHashMap;
 public class BtService extends Service {
     static final String CHANNEL_SERVICE = "se_service";
     static final String CHANNEL_SERVICE_MIN = "se_service_min";
-    static final String CHANNEL_EVENTS = "se_events";
+    static final String CHANNEL_EVENTS = "se_events2";
     static final String CHANNEL_EVENTS_SILENT = "se_events_silent";
     private static final int ID_FOREGROUND = 1;
     private static final int ID_PROGRESS = 2;
+    static final String ACTION_CANCEL_RX = "il.sendeasy.bt.CANCEL_RX";
+
+    /** חיבורים שמקבלים עכשיו קובץ (לכתובת). */
+    private static final ConcurrentHashMap<Session, String> RECEIVING = new ConcurrentHashMap<Session, String>();
+
+    /** מבטל קבלת קובץ פעילה: מהמכשיר עם הכתובת הזו, או מכולם כש-address הוא null. */
+    static void cancelReceiving(String address) {
+        for (java.util.Map.Entry<Session, String> e : RECEIVING.entrySet()) {
+            if (address == null || address.equals(e.getValue())) e.getKey().cancelIncomingFile();
+        }
+    }
     private static final int ID_EVENT_BASE = 100;
 
     private static volatile boolean running;
@@ -79,6 +90,11 @@ public class BtService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         // אחרי startForegroundService חובה לקרוא ל-startForeground, גם אם עומדים לעצור (אחרת קריסה ב-API 26+)
+        if (intent != null && ACTION_CANCEL_RX.equals(intent.getAction()) && alive) {
+            cancelReceiving(null);
+            cancelProgress();
+            return START_STICKY;
+        }
         boolean fg = false;
         try {
             createChannels();
@@ -271,17 +287,19 @@ public class BtService extends Service {
 
         @Override
         public void onFileProgress(Session s, Session.IncomingFile f, long got) {
+            RECEIVING.put(s, address);
             long now = System.currentTimeMillis();
             if (now - lastProgressNotify < 700 && got < f.size) return;
             lastProgressNotify = now;
             int pct = f.size > 0 ? (int) (got * 100 / f.size) : 0;
-            Events.post(Events.PROGRESS, f.name + "|" + pct);
+            Events.post(Events.PROGRESS, f.name + "|" + pct + "|" + address + "|" + (f.fromChat ? "1" : "0"));
             notifyProgress(f.name, pct);
         }
 
         @Override
         public boolean onFileReceived(Session s, Session.IncomingFile f, File temp) {
-            cancelProgress();
+            RECEIVING.remove(s);
+            cancelProgress(address);
             if (Storage.isVoiceName(f.name)) {
                 // הודעה קולית: נשמרת בתיקייה פנימית ומופיעה בצ'אט, לא בתיקיית ההורדות
                 String stored = Storage.storeVoice(BtService.this, temp, f.name);
@@ -317,7 +335,8 @@ public class BtService extends Service {
 
         @Override
         public void onFileFailed(Session s, Session.IncomingFile f, int status) {
-            cancelProgress();
+            RECEIVING.remove(s);
+            cancelProgress(address);
         }
 
         @Override
@@ -325,7 +344,8 @@ public class BtService extends Service {
             sessions.remove(s);
             BY_ADDRESS.remove(address, s);
             sessionEnded();
-            cancelProgress();
+            RECEIVING.remove(s);
+            cancelProgress(address);
         }
     }
 
@@ -338,8 +358,9 @@ public class BtService extends Service {
             nm.createNotificationChannel(new NotificationChannel(CHANNEL_SERVICE, getString(R.string.channel_service), NotificationManager.IMPORTANCE_LOW));
             // ערוץ שקט וממוזער (בלי אייקון בסטטוס בר) להתראה הקבועה כשהמשתמש בחר להסתיר אותה
             nm.createNotificationChannel(new NotificationChannel(CHANNEL_SERVICE_MIN, getString(R.string.channel_service_min), NotificationManager.IMPORTANCE_MIN));
+            try { nm.deleteNotificationChannel("se_events"); } catch (RuntimeException ignored) { } // ישן: היה עם רטט של הערוץ
             NotificationChannel ev = new NotificationChannel(CHANNEL_EVENTS, getString(R.string.channel_events), NotificationManager.IMPORTANCE_DEFAULT);
-            ev.enableVibration(true);
+            ev.enableVibration(false); // הרטט ידני, לפי ההגדרה
             nm.createNotificationChannel(ev);
             NotificationChannel quiet = new NotificationChannel(CHANNEL_EVENTS_SILENT, getString(R.string.channel_events_silent), NotificationManager.IMPORTANCE_DEFAULT);
             quiet.setSound(null, null);
@@ -379,14 +400,24 @@ public class BtService extends Service {
     private void notifyProgress(String name, int pct) {
         NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) return;
+        Intent ci = new Intent(this, BtService.class);
+        ci.setAction(ACTION_CANCEL_RX);
+        int fl = PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0);
+        PendingIntent cancelPi = PendingIntent.getService(this, 1, ci, fl);
         Notification n = builder(CHANNEL_EVENTS)
                 .setContentTitle(getString(R.string.rx_progress, name))
                 .setSmallIcon(android.R.drawable.stat_sys_download)
                 .setProgress(100, pct, false)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
+                .addAction(android.R.drawable.ic_menu_close_clear_cancel, getString(R.string.rx_cancel), cancelPi)
                 .build();
         try { nm.notify(ID_PROGRESS, n); } catch (RuntimeException ignored) { }
+    }
+
+    private void cancelProgress(String address) {
+        Events.post(Events.PROGRESS, "|-1|" + address + "|0"); // מסיר את שורת ההתקדמות בצ'אט
+        cancelProgress();
     }
 
     private void cancelProgress() {
@@ -398,6 +429,7 @@ public class BtService extends Service {
     private void notifyEvent(String title, String text, String chatAddress) {
         NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null || !Prefs.notifyEvents(this)) return;
+        if (chatAddress != null && chatAddress.equals(ChatActivity.openAddress)) return; // הצ'אט פתוח בחזית
         boolean sound = Prefs.notifySound(this);
         Notification n = builder(sound ? CHANNEL_EVENTS : CHANNEL_EVENTS_SILENT)
                 .setContentTitle(title)
@@ -405,8 +437,27 @@ public class BtService extends Service {
                 .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
                 .setContentIntent(openMain(chatAddress))
                 .setAutoCancel(true)
-                .setDefaults(sound ? Notification.DEFAULT_ALL : Notification.DEFAULT_LIGHTS) // צליל ורטט ל-API פחות מ-26 (מ-26 הערוץ קובע)
+                .setDefaults(sound ? (Notification.DEFAULT_SOUND | Notification.DEFAULT_LIGHTS) : Notification.DEFAULT_LIGHTS) // צליל ורטט ל-API פחות מ-26 (מ-26 הערוץ קובע)
                 .build();
         try { nm.notify(ID_EVENT_BASE + (eventCounter++ % 50), n); } catch (RuntimeException ignored) { }
+        if (Prefs.notifyVibrate(this)) {
+            try {
+                android.os.Vibrator v = (android.os.Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+                if (v != null) v.vibrate(400);
+            } catch (RuntimeException ignored) { }
+        }
+        if (Prefs.notifyWake(this)) wakeScreen();
+    }
+
+    @SuppressWarnings("deprecation")
+    private void wakeScreen() {
+        try {
+            PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            if (pm == null) return;
+            PowerManager.WakeLock w = pm.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK
+                    | PowerManager.ACQUIRE_CAUSES_WAKEUP | PowerManager.ON_AFTER_RELEASE, "sendeasy:notify");
+            w.setReferenceCounted(false);
+            w.acquire(5000); // משתחרר אוטומטית אחרי 5 שניות
+        } catch (RuntimeException ignored) { }
     }
 }

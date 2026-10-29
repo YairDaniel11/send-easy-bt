@@ -142,4 +142,14 @@
     <string name="menu_sound_on">צליל בעת קבלת הודעה: פעיל</string>
     <string name="menu_sound_off">צליל בעת קבלת הודעה: כבוי</string>
     <string name="channel_events_silent">התראות ללא צליל</string>
+    <string name="menu_notify_alerts">התראה בעת קבלת הודעה</string>
+    <string name="alert_ring">צלצול</string>
+    <string name="alert_vibrate">רטט</string>
+    <string name="alert_wake">הדלקת המסך</string>
+    <string name="rx_cancel">ביטול</string>
+    <string name="kind_image">תמונה</string>
+    <string name="kind_voice">הקלטה</string>
+    <string name="kind_file">קובץ</string>
+    <string name="receiving_chat">מקבל %1$s…  %2$d%%   ·   ביטול: לחיצה כאן או מקש רך ימני</string>
+    <string name="sending_voice">שולח הקלטה…  %1$d%%   ·   ביטול: לחיצה כאן או מקש רך ימני</string>
 </resources>

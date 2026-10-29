@@ -83,7 +83,10 @@ public class ChatActivity extends Activity implements Events.Listener {
     private int highlightPos = -1;
     private final AtomicBoolean picCancel = new AtomicBoolean(false);
     private volatile boolean picSending;
-    private static final int GREEN = 0xFF1B9E4B;
+    /** קבלת קובץ מהצ'אט בעיצומה (מוצגת בשורת ההתקדמות). */
+    private boolean rxActive;
+    /** כתובת הצ'אט שפתוח כעת בחזית (או null). */
+    static volatile String openAddress;
 
     // פלטת הצבעים של הסגנון הנוכחי
     private int style;
@@ -198,7 +201,7 @@ public class ChatActivity extends Activity implements Events.Listener {
             @Override public void onClick(View v) { cancelRecording(); }
         });
         sendProgressT.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { picCancel.set(true); }
+            @Override public void onClick(View v) { cancelTransfer(); }
         });
         input.setOnEditorActionListener(new android.widget.TextView.OnEditorActionListener() {
             @Override public boolean onEditorAction(TextView v, int action, KeyEvent e) {
@@ -296,7 +299,11 @@ public class ChatActivity extends Activity implements Events.Listener {
         boolean has = input.getText().length() > 0;
         sendBtn.setVisibility(has ? View.VISIBLE : View.GONE);
         micBtn.setVisibility(has ? View.GONE : View.VISIBLE);
-        attachBtn.setNextFocusRightId(has ? R.id.chatSend : R.id.chatMic);
+        // סדר פיזי מימין לשמאל: שליחה (רק עם טקסט), שדה, צרף, מיקרופון (רק בלי טקסט)
+        input.setNextFocusRightId(has ? R.id.chatSend : R.id.chatInput);
+        attachBtn.setNextFocusLeftId(has ? R.id.chatAttach : R.id.chatMic);
+        if (has && micBtn.hasFocus()) input.requestFocus();
+        if (!has && sendBtn.hasFocus()) input.requestFocus();
     }
 
     // ------------------------------------------------------------ מחזור חיים
@@ -305,6 +312,7 @@ public class ChatActivity extends Activity implements Events.Listener {
     protected void onResume() {
         super.onResume();
         if (address == null) return;
+        openAddress = address;
         Events.add(this);
         reload();
         flushReads();
@@ -312,6 +320,7 @@ public class ChatActivity extends Activity implements Events.Listener {
 
     @Override
     protected void onPause() {
+        if (address != null && address.equals(openAddress)) openAddress = null;
         Events.remove(this);
         super.onPause();
     }
@@ -332,6 +341,7 @@ public class ChatActivity extends Activity implements Events.Listener {
 
     @Override
     public void onEvent(String kind, String arg) {
+        if (Events.PROGRESS.equals(kind)) { onRxProgress(arg); return; }
         if (address == null || !address.equals(arg)) return;
         if (Events.CHAT.equals(kind)) {
             reload();
@@ -447,6 +457,29 @@ public class ChatActivity extends Activity implements Events.Listener {
         return null;
     }
 
+    /** ביטול ההעברה שמוצגת בשורת ההתקדמות: שליחה או קבלה. */
+    private void cancelTransfer() {
+        if (picSending) picCancel.set(true);
+        else if (rxActive) BtService.cancelReceiving(address);
+    }
+
+    private void onRxProgress(String arg) {
+        if (arg == null || address == null || picSending) return;
+        String[] p = arg.split("\\|", 4);
+        if (p.length < 4 || !address.equals(p[2])) return;
+        int pct;
+        try { pct = Integer.parseInt(p[1]); } catch (NumberFormatException e) { return; }
+        if (pct < 0 || !"1".equals(p[3])) {
+            if (rxActive) { rxActive = false; sendProgressT.setVisibility(View.GONE); }
+            return;
+        }
+        String kind = Storage.isImageName(p[0]) ? getString(R.string.kind_image)
+                : Storage.isVoiceName(p[0]) ? getString(R.string.kind_voice) : getString(R.string.kind_file);
+        rxActive = true;
+        sendProgressT.setText(getString(R.string.receiving_chat, kind, pct));
+        sendProgressT.setVisibility(View.VISIBLE);
+    }
+
     private void setPicProgress(final int idx, final int total, final int pct) {
         ui.post(new Runnable() {
             @Override public void run() {
@@ -560,6 +593,7 @@ public class ChatActivity extends Activity implements Events.Listener {
         final String text = input.getText().toString().trim();
         if (text.length() == 0) return;
         input.setText("");
+        input.requestFocus();
         final Context app = getApplicationContext();
         io.execute(new Runnable() {
             @Override public void run() {
@@ -665,6 +699,16 @@ public class ChatActivity extends Activity implements Events.Listener {
         endRecordingUi();
     }
 
+    private void setVoiceProgress(final int pct) {
+        ui.post(new Runnable() {
+            @Override public void run() {
+                if (destroyed) return;
+                sendProgressT.setText(getString(R.string.sending_voice, pct));
+                sendProgressT.setVisibility(View.VISIBLE);
+            }
+        });
+    }
+
     private void stopRecordingAndSend() {
         final File f = recorder.stop(this);
         endRecordingUi();
@@ -673,17 +717,35 @@ public class ChatActivity extends Activity implements Events.Listener {
             return;
         }
         final Context app = getApplicationContext();
+        final boolean track = !picSending; // אם נשלחות תמונות עכשיו: בלי שורת ביטול נפרדת
+        final AtomicBoolean vcancel = track ? picCancel : new AtomicBoolean(false);
+        if (track) {
+            picSending = true;
+            picCancel.set(false);
+            setVoiceProgress(0);
+        }
         io.execute(new Runnable() {
             @Override public void run() {
                 String err = null;
                 try {
-                    err = sendLocalFile(f, new AtomicBoolean(false), null);
+                    err = sendLocalFile(f, vcancel, track ? new Session.SendProgress() {
+                        @Override public void onProgress(long sent, long tot) {
+                            setVoiceProgress(tot > 0 ? (int) (sent * 100 / tot) : 0);
+                        }
+                    } : null);
                 } catch (IOException e) {
                     err = e.getMessage();
                 } catch (InterruptedException e) {
                     return;
                 } catch (RuntimeException e) {
                     err = String.valueOf(e.getMessage());
+                } finally {
+                    if (track) {
+                        picSending = false;
+                        ui.post(new Runnable() {
+                            @Override public void run() { sendProgressT.setVisibility(View.GONE); }
+                        });
+                    }
                 }
                 if (err == null) {
                     ChatStore.add(app, address, new ChatStore.Msg(System.currentTimeMillis(), true, ChatStore.T_VOICE, f.getName()));
@@ -844,8 +906,13 @@ public class ChatActivity extends Activity implements Events.Listener {
             }
             return true;
         }
-        if (picSending && Keys.isBackAlt(code)) { // מקש רך ימני בזמן שליחת תמונות = ביטול
-            if (e.getAction() == KeyEvent.ACTION_DOWN && e.getRepeatCount() == 0) picCancel.set(true);
+        if ((picSending || rxActive) && Keys.isBackAlt(code)) { // מקש רך ימני בזמן שליחה/קבלה = ביטול
+            if (e.getAction() == KeyEvent.ACTION_DOWN && e.getRepeatCount() == 0) cancelTransfer();
+            return true;
+        }
+        // בשדה הקלט עם טקסט: אישור/Enter שולח (במקלדת מקשים תמיד אפשר לשלוח)
+        if (Keys.isSelect(code) && input != null && input.hasFocus() && input.getText().toString().trim().length() > 0) {
+            if (e.getAction() == KeyEvent.ACTION_DOWN && e.getRepeatCount() == 0) send();
             return true;
         }
         // בשדה הקלט # הוא תו רגיל; התפריט נשאר זמין במקשי MENU והמקש הרך השמאלי
@@ -934,14 +1001,21 @@ public class ChatActivity extends Activity implements Events.Listener {
         return iv;
     }
 
-    /** שעה, ולהודעה יוצאת גם סימני ✓ (נשלחה), ✓✓ אפור (נמסרה), ✓✓ ירוק (נקראה). */
+    /** שעה, ולהודעה יוצאת גם סימני ✓ אפור (נשלחה/נמסרה), ✓✓ ירוק מודגש (נקראה). */
     private CharSequence timeWithTicks(ChatStore.Msg m, boolean withTime) {
         String t = withTime ? fmt.format(new Date(m.time)) : "";
         if (!m.out) return t;
         SpannableStringBuilder sb = new SpannableStringBuilder(withTime ? t + "  " : t);
         int start = sb.length();
-        sb.append(ChatStore.S_SENT.equals(m.status) ? "✓" : "✓✓");
-        sb.setSpan(new ForegroundColorSpan(ChatStore.S_READ.equals(m.status) ? GREEN : cSub), start, sb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        boolean read = ChatStore.S_READ.equals(m.status);
+        // עד שנקרא: ✓ אפור בודד (גם "נמסרה"); אחרי קריאה: ✓✓ ירוק מודגש וגדול
+        sb.append(read ? "✓✓" : "✓");
+        int green = ThemeUtil.isDark(this) ? 0xFF5BE08A : 0xFF0A7A32;
+        sb.setSpan(new ForegroundColorSpan(read ? green : cSub), start, sb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        if (read) {
+            sb.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD), start, sb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            sb.setSpan(new android.text.style.RelativeSizeSpan(1.25f), start, sb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
         return sb;
     }
 

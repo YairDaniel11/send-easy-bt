@@ -582,6 +582,25 @@ public class MainActivity extends Activity implements Events.Listener {
         Toast.makeText(this, R.string.savedir_set, Toast.LENGTH_SHORT).show();
     }
 
+    private void showAlertsDialog() {
+        final boolean[] on = {Prefs.notifySound(this), Prefs.notifyVibrate(this), Prefs.notifyWake(this)};
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.menu_notify_alerts)
+                .setMultiChoiceItems(new String[]{getString(R.string.alert_ring), getString(R.string.alert_vibrate), getString(R.string.alert_wake)}, on,
+                        new DialogInterface.OnMultiChoiceClickListener() {
+                            @Override public void onClick(DialogInterface d, int which, boolean checked) { on[which] = checked; }
+                        })
+                .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) {
+                        Prefs.setNotifySound(MainActivity.this, on[0]);
+                        Prefs.setNotifyVibrate(MainActivity.this, on[1]);
+                        Prefs.setNotifyWake(MainActivity.this, on[2]);
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
     private void showMenu() {
         final String[] items = {
                 getString(R.string.menu_toggle_receive),
@@ -589,7 +608,7 @@ public class MainActivity extends Activity implements Events.Listener {
                 getString(R.string.menu_receive_dir),
                 getString(R.string.menu_save_dir),
                 getString(Prefs.notifyEvents(this) ? R.string.menu_notify_shown : R.string.menu_notify_hidden),
-                getString(Prefs.notifySound(this) ? R.string.menu_sound_on : R.string.menu_sound_off),
+                getString(R.string.menu_notify_alerts),
                 getString(R.string.menu_chat_style),
                 getString(R.string.menu_check_update),
                 getString(R.string.menu_about)};
@@ -614,7 +633,7 @@ public class MainActivity extends Activity implements Events.Listener {
                         } else if (which == 4) {
                             Prefs.setNotifyEvents(MainActivity.this, !Prefs.notifyEvents(MainActivity.this));
                         } else if (which == 5) {
-                            Prefs.setNotifySound(MainActivity.this, !Prefs.notifySound(MainActivity.this));
+                            showAlertsDialog();
                         } else if (which == 6) {
                             new AlertDialog.Builder(MainActivity.this)
                                     .setTitle(R.string.menu_chat_style)

@@ -12,7 +12,7 @@ final class Events {
     static final String CHAT = "chat";         // arg = כתובת המכשיר
     static final String VOICE = "voice";       // arg = כתובת המכשיר: הגיעה הודעה קולית
     static final String RECEIVED = "received"; // arg = שם הקובץ
-    static final String PROGRESS = "progress"; // arg = "שם|אחוז"
+    static final String PROGRESS = "progress"; // arg = "שם|אחוז|כתובת|1 אם מהצ'אט" (אחוז -1 = הסתיים)
     static final String STATE = "state";       // השירות התחיל/נעצר
 
     interface Listener {

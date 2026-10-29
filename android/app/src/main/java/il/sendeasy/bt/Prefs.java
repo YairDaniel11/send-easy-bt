@@ -58,7 +58,25 @@ final class Prefs {
         sp(c).edit().putBoolean("notifyEvents", on).apply();
     }
 
-    /** צליל בעת קבלת הודעה (ברירת מחדל כן). */
+    /** רטט בעת קבלת הודעה (ברירת מחדל כן). */
+    static boolean notifyVibrate(Context c) {
+        return sp(c).getBoolean("notifyVibrate", true);
+    }
+
+    static void setNotifyVibrate(Context c, boolean on) {
+        sp(c).edit().putBoolean("notifyVibrate", on).apply();
+    }
+
+    /** הדלקת המסך בעת קבלת הודעה (ברירת מחדל לא). */
+    static boolean notifyWake(Context c) {
+        return sp(c).getBoolean("notifyWake", false);
+    }
+
+    static void setNotifyWake(Context c, boolean on) {
+        sp(c).edit().putBoolean("notifyWake", on).apply();
+    }
+
+    /** צלצול בעת קבלת הודעה (ברירת מחדל כן). */
     static boolean notifySound(Context c) {
         return sp(c).getBoolean("notifySound", true);
     }
