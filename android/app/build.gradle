@@ -14,16 +14,15 @@ android {
     }
 
     // חתימה קבועה (כדי שעדכונים יותקנו מעל הגרסה הקודמת): אם יש קובץ debug.keystore
-    // (ב-CI הוא נכתב מסוד של המאגר, לא נשמר בקוד), משתמשים בו. אחרת: מפתח ה-debug הרגיל של Gradle.
+    // (מפתח ה-debug הציבורי הקבוע, סיסמה android, כמו באפליקציות האחרות), משתמשים בו.
     def fixedKeystore = file('debug.keystore')
     if (fixedKeystore.exists()) {
         signingConfigs {
             debug {
                 storeFile fixedKeystore
-                def ksPass = System.getenv('ANDROID_KEYSTORE_PASSWORD') ?: 'android'
-                storePassword ksPass
-                keyAlias System.getenv('ANDROID_KEY_ALIAS') ?: 'sendeasy'
-                keyPassword ksPass
+                storePassword 'android'
+                keyAlias 'androiddebugkey'
+                keyPassword 'android'
             }
         }
     }

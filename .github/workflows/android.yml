@@ -30,12 +30,6 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: מפתח חתימה קבוע (אם הוגדר סוד במאגר)
-        env:
-          KS: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
-        run: |
-          if [ -n "$KS" ]; then echo "$KS" | base64 -d > app/debug.keystore; echo "ANDROID_KEYSTORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> $GITHUB_ENV; fi
-
       - name: מספר גרסה
         run: |
           sed -i "s/versionCode [0-9]*/versionCode ${{ github.run_number }}/" app/build.gradle

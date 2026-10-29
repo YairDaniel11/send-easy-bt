@@ -6,3 +6,5 @@ local.properties
 captures/
 *.keystore
 *.jks
+# מפתח ה-debug הציבורי הקבוע (סיסמה android, לא סוד): כדי שבניות יותקנו זו מעל זו
+!app/debug.keystore
