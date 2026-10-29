@@ -311,8 +311,10 @@ public class BtService extends Service {
                 notifyEvent(getString(R.string.rx_voice, name()), getString(R.string.voice_label, (secs / 60) + ":" + (secs % 60 < 10 ? "0" : "") + (secs % 60)), address);
                 return true;
             }
-            boolean pic = Storage.isImageName(f.name);
-            // תמונה: עותק פנימי להצגה בצ'אט (בנוסף לפרסום בהורדות)
+            // רק קובץ שנשלח מתוך הצ'אט מופיע בשיחה. קובץ שנשלח בשליחה רגילה (מסך שליחה במחשב) נשמר בתיקייה
+            // ומוצג כהתראת קבלה רגילה, בלי שורה בצ'אט.
+            boolean pic = f.fromChat && Storage.isImageName(f.name);
+            // תמונה מהצ'אט: עותק פנימי להצגה בשיחה (בנוסף לפרסום בהורדות)
             String stored = pic ? Storage.storeImage(BtService.this, temp, f.name) : null;
             String where = Storage.publish(BtService.this, temp, f.name);
             if (where == null) {
@@ -326,11 +328,12 @@ public class BtService extends Service {
                 notifyEvent(getString(R.string.rx_pic, name()), f.name, address);
                 return true;
             }
-            ChatStore.add(BtService.this, address, new ChatStore.Msg(System.currentTimeMillis(), false, ChatStore.T_FILE, f.name, 0, ChatStore.S_UNREAD));
-            Events.post(Events.CHAT, address);
+            if (f.fromChat) {
+                ChatStore.add(BtService.this, address, new ChatStore.Msg(System.currentTimeMillis(), false, ChatStore.T_FILE, f.name, 0, ChatStore.S_UNREAD));
+                Events.post(Events.CHAT, address);
+            }
             Events.post(Events.RECEIVED, f.name);
-            notifyEvent(getString(R.string.rx_file, f.name), where, null);
-            return true;
+            notifyEvent(getString(R.string.rx_file, f.name), where, null);            return true;
         }
 
         @Override
