@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Windows;
 using System.Windows.Input;
 
@@ -7,16 +7,16 @@ namespace SendEasy.App;
 /// <summary>תפריט המגש בעיצוב התוכנה (במקום תפריט Windows Forms הישן).</summary>
 public partial class TrayMenuWindow : Window
 {
-    readonly Action _send, _chat, _history, _folder, _settings, _exit;
+    readonly Action _send, _chat, _history, _folder, _settings, _exit, _about;
     readonly Action<bool> _receiveChanged;
     bool _closing;
 
     public TrayMenuWindow(bool receiveEnabled, string status, Action send, Action chat, Action history,
-        Action folder, Action settings, Action exit, Action<bool> receiveChanged)
+        Action folder, Action settings, Action exit, Action<bool> receiveChanged, Action about)
     {
         InitializeComponent();
         _send = send; _chat = chat; _history = history; _folder = folder; _settings = settings; _exit = exit;
-        _receiveChanged = receiveChanged;
+        _receiveChanged = receiveChanged; _about = about;
         ReceiveSwitch.IsChecked = receiveEnabled;
         StatusLine.Text = status;
         Loaded += (_, _) => PositionNearTray();
@@ -44,6 +44,7 @@ public partial class TrayMenuWindow : Window
     void History_Click(object s, RoutedEventArgs e) { CloseMenu(); _history(); }
     void Folder_Click(object s, RoutedEventArgs e) { CloseMenu(); _folder(); }
     void Settings_Click(object s, RoutedEventArgs e) { CloseMenu(); _settings(); }
+    void About_Click(object s, RoutedEventArgs e) { CloseMenu(); _about(); }
     void Exit_Click(object s, RoutedEventArgs e) { CloseMenu(); _exit(); }
     void Receive_Click(object s, RoutedEventArgs e) => _receiveChanged(ReceiveSwitch.IsChecked == true);
 

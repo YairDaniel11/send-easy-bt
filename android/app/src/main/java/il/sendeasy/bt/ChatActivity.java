@@ -832,25 +832,17 @@ public class ChatActivity extends Activity implements Events.Listener {
     // ------------------------------------------------------------ מקשים ותפריט
 
     private void showMenu() {
-        final String[] items = {getString(R.string.voice_record), getString(R.string.chat_menu_file), getString(R.string.chat_menu_style), getString(R.string.act_rename), getString(R.string.chat_delete)};
+        final String[] items = {getString(R.string.voice_record), getString(R.string.chat_menu_file), getString(R.string.chat_menu_style), getString(R.string.chat_delete)};
         new AlertDialog.Builder(this)
                 .setItems(items, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int which) {
-                        if (which == 4) {
+                        if (which == 3) {
                             ChatStore.confirmDelete(ChatActivity.this, address, deviceName, new Runnable() {
                                 @Override public void run() { stopPlay(); finish(); }
                             });
                         } else if (which == 0) toggleRecording();
                         else if (which == 1) FilePicker.pick(ChatActivity.this);
                         else if (which == 2) chooseStyle();
-                        else if (which == 3) DeviceNames.rename(ChatActivity.this, address, realName, new Runnable() {
-                            @Override public void run() {
-                                deviceName = DeviceNames.resolve(ChatActivity.this, address, realName);
-                                titleT.setText(Fmt.ltr(deviceName));
-                                UiKit.avatar(avatarT, deviceName, 40);
-                                adapter.notifyDataSetChanged();
-                            }
-                        });
                     }
                 })
                 .show();

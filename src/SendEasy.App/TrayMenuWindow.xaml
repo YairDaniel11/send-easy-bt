@@ -1,4 +1,4 @@
-<Window x:Class="SendEasy.App.TrayMenuWindow"
+﻿<Window x:Class="SendEasy.App.TrayMenuWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
@@ -91,6 +91,12 @@
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Style="{StaticResource Glyph}" Text="&#xE713;"/>
                     <TextBlock Text="הגדרות..." VerticalAlignment="Center"/>
+                </StackPanel>
+            </Button>
+            <Button Style="{StaticResource MenuRow}" Click="About_Click">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE946;"/>
+                    <TextBlock Text="אודות" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
             <Button Style="{StaticResource MenuRow}" Click="Exit_Click">

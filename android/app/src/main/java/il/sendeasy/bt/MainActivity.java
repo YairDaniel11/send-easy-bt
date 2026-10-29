@@ -288,22 +288,13 @@ public class MainActivity extends Activity implements Events.Listener {
             pickHint.setVisibility(View.GONE);
             return;
         }
-        final boolean hasChat = !ChatStore.load(this, d.getAddress()).isEmpty();
-        final String[] items = hasChat
-                ? new String[]{getString(R.string.act_send_file), getString(R.string.act_chat), getString(R.string.act_rename), getString(R.string.chat_delete_short)}
-                : new String[]{getString(R.string.act_send_file), getString(R.string.act_chat), getString(R.string.act_rename)};
+        final String[] items = {getString(R.string.act_send_file), getString(R.string.act_chat)};
         new AlertDialog.Builder(this)
                 .setTitle(DeviceNames.display(this, d))
                 .setItems(items, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface dlg, int which) {
                         if (which == 0) pickFiles(d.getAddress());
-                        else if (which == 1) openChat(d.getAddress());
-                        else if (which == 3) ChatStore.confirmDelete(MainActivity.this, d.getAddress(), DeviceNames.display(MainActivity.this, d), new Runnable() {
-                            @Override public void run() { loadUnread(); adapter.notifyDataSetChanged(); }
-                        });
-                        else DeviceNames.rename(MainActivity.this, d.getAddress(), nameOf(d), new Runnable() {
-                            @Override public void run() { reload(); }
-                        });
+                        else openChat(d.getAddress());
                     }
                 })
                 .show();
@@ -582,6 +573,106 @@ public class MainActivity extends Activity implements Events.Listener {
         Toast.makeText(this, R.string.savedir_set, Toast.LENGTH_SHORT).show();
     }
 
+    private static final String REPO_URL = "https://github.com/YairDaniel11/send-easy-bt";
+
+    private void showAbout() {
+        String ver = "";
+        try {
+            ver = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+        } catch (Exception ignored) { }
+        int pad = UiKit.dp(this, 20);
+        TextView t = new TextView(this);
+        t.setPadding(pad, pad, pad, pad / 2);
+        t.setTextSize(16);
+        t.setText(getString(R.string.about_text, getString(R.string.app_name), Fmt.ltr(ver == null ? "" : ver), REPO_URL));
+        android.text.util.Linkify.addLinks(t, android.text.util.Linkify.WEB_URLS);
+        t.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
+        final AlertDialog d = new AlertDialog.Builder(this)
+                .setView(t)
+                .setPositiveButton(R.string.about_open_repo, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface dlg, int w) {
+                        try {
+                            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(REPO_URL)));
+                        } catch (RuntimeException e) { // כולל ActivityNotFoundException
+                            Toast.makeText(MainActivity.this, R.string.about_no_browser, Toast.LENGTH_LONG).show();
+                        }
+                    }
+                })
+                .setNegativeButton(R.string.savedir_close, null)
+                .create();
+        d.show();
+        Button b = d.getButton(DialogInterface.BUTTON_POSITIVE);
+        if (b != null) b.requestFocus();
+    }
+
+    /** רשימת המכשירים המצומדים לבחירה, ואז דיאלוג שינוי השם. */
+    private void showRenameDevice() {
+        if (devices.isEmpty()) { Toast.makeText(this, R.string.main_no_devices, Toast.LENGTH_SHORT).show(); return; }
+        final List<BluetoothDevice> list2 = new ArrayList<BluetoothDevice>(devices);
+        String[] names = new String[list2.size()];
+        for (int i = 0; i < names.length; i++) names[i] = DeviceNames.display(this, list2.get(i));
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.menu_rename_device)
+                .setItems(names, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface dlg, int which) {
+                        BluetoothDevice d = list2.get(which);
+                        DeviceNames.rename(MainActivity.this, d.getAddress(), nameOf(d), new Runnable() {
+                            @Override public void run() { reload(); }
+                        });
+                    }
+                })
+                .show();
+    }
+
+    /** בחירה מרובה של שיחות למחיקה (רק מכשירים שיש להן הודעות), עם אישור לפני המחיקה. */
+    private void showDeleteChats() {
+        final List<BluetoothDevice> withChat = new ArrayList<BluetoothDevice>();
+        final List<String> labels = new ArrayList<String>();
+        for (BluetoothDevice d : devices) {
+            int n = ChatStore.load(this, d.getAddress()).size();
+            if (n > 0) {
+                withChat.add(d);
+                labels.add(DeviceNames.display(this, d) + " (" + n + ")");
+            }
+        }
+        if (withChat.isEmpty()) { Toast.makeText(this, R.string.chats_none, Toast.LENGTH_SHORT).show(); return; }
+        final boolean[] sel = new boolean[withChat.size()];
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.menu_delete_chats)
+                .setMultiChoiceItems(labels.toArray(new String[0]), sel, new DialogInterface.OnMultiChoiceClickListener() {
+                    @Override public void onClick(DialogInterface d, int which, boolean checked) { sel[which] = checked; }
+                })
+                .setPositiveButton(R.string.chat_delete_btn, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface dlg, int w) {
+                        boolean any = false;
+                        for (boolean b : sel) any |= b;
+                        if (!any) return;
+                        confirmDeleteChats(withChat, sel);
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void confirmDeleteChats(final List<BluetoothDevice> withChat, final boolean[] sel) {
+        AlertDialog dlg = new AlertDialog.Builder(this)
+                .setMessage(R.string.chats_delete_confirm)
+                .setPositiveButton(R.string.chat_delete_btn, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) {
+                        for (int i = 0; i < sel.length; i++) {
+                            if (sel[i]) ChatStore.delete(getApplicationContext(), withChat.get(i).getAddress());
+                        }
+                        loadUnread();
+                        adapter.notifyDataSetChanged();
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .create();
+        dlg.show();
+        Button neg = dlg.getButton(DialogInterface.BUTTON_NEGATIVE);
+        if (neg != null) neg.requestFocus();
+    }
+
     private void showAlertsDialog() {
         final boolean[] on = {Prefs.notifySound(this), Prefs.notifyVibrate(this), Prefs.notifyWake(this)};
         new AlertDialog.Builder(this)
@@ -610,6 +701,8 @@ public class MainActivity extends Activity implements Events.Listener {
                 getString(Prefs.notifyEvents(this) ? R.string.menu_notify_shown : R.string.menu_notify_hidden),
                 getString(R.string.menu_notify_alerts),
                 getString(R.string.menu_chat_style),
+                getString(R.string.menu_rename_device),
+                getString(R.string.menu_delete_chats),
                 getString(R.string.menu_check_update),
                 getString(R.string.menu_about)};
         new AlertDialog.Builder(this)
@@ -641,11 +734,13 @@ public class MainActivity extends Activity implements Events.Listener {
                                         @Override public void onClick(DialogInterface d, int w) { Prefs.setChatStyle(MainActivity.this, w); d.dismiss(); }
                                     }).show();
                         } else if (which == 7) {
+                            showRenameDevice();
+                        } else if (which == 8) {
+                            showDeleteChats();
+                        } else if (which == 9) {
                             checkUpdate(true);
                         } else {
-                            new AlertDialog.Builder(MainActivity.this)
-                                    .setMessage(R.string.about_text)
-                                    .setPositiveButton(android.R.string.ok, null).show();
+                            showAbout();
                         }
                     }
                 })

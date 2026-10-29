@@ -9,7 +9,7 @@
 AppId={{B1E2F7C4-3D5A-4F7E-9A21-6C0D8E5B7A10}
 AppName=שליחה קלה - BT
 AppVersion={#AppVersion}
-AppPublisher=קוד פתוח
+AppPublisher=שליחה קלה - BT
 DefaultDirName={localappdata}\Programs\SendEasyBT
 DisableProgramGroupPage=yes
 DisableDirPage=yes

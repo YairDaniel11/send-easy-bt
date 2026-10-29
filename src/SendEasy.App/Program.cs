@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.IO.Pipes;
 using System.Linq;
@@ -74,6 +74,7 @@ static class Program
         if (args.Contains("--chat")) tray.OpenChat();
         if (args.Contains("--history")) tray.OpenHistory();
         if (args.Contains("--settings")) _ = app.Dispatcher.BeginInvoke(tray.ShowSettings);
+        if (args.Contains("--about")) _ = app.Dispatcher.BeginInvoke(tray.ShowAbout);
         app.Run();
     }
 }

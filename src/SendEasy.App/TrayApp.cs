@@ -93,7 +93,8 @@ sealed class TrayApp : IDisposable
                 folder: () => OpenFolder(_settings.ReceiveDir),
                 settings: ShowSettings,
                 exit: ExitApp,
-                receiveChanged: on => { _settings.ReceiveEnabled = on; _settings.Save(); });
+                receiveChanged: on => { _settings.ReceiveEnabled = on; _settings.Save(); },
+                about: ShowAbout);
             _menu.Show();
         });
     }
@@ -110,6 +111,16 @@ sealed class TrayApp : IDisposable
         }
         if (address != 0) _chat.Open(address, name);
         WindowFront.Bring(_chat);
+    }
+
+    AboutWindow? _about;
+
+    public void ShowAbout()
+    {
+        if (_about is { IsLoaded: true }) { WindowFront.Bring(_about); return; }
+        _about = new AboutWindow();
+        _about.Show();
+        WindowFront.Bring(_about);
     }
 
     public void OpenHistory()

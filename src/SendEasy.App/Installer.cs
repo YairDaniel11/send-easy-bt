@@ -60,7 +60,7 @@ static class Installer
         {
             u.SetValue("DisplayName", AppName);
             u.SetValue("DisplayVersion", "0.1.0");
-            u.SetValue("Publisher", "קוד פתוח");
+            u.SetValue("Publisher", AppName);
             u.SetValue("DisplayIcon", exe);
             u.SetValue("InstallLocation", InstallDir);
             u.SetValue("UninstallString", $"\"{exe}\" --uninstall");
