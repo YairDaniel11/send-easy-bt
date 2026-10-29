@@ -261,7 +261,11 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
                 FontSize = 12.5, Foreground = B(_p.Sub), TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 2, 0, 0),
             });
             g.Children.Add(sp);
-            ConvList.Items.Add(new ListBoxItem { Content = g, Tag = c, HorizontalContentAlignment = HorizontalAlignment.Stretch });
+            var item = new ListBoxItem { Content = g, Tag = c, HorizontalContentAlignment = HorizontalAlignment.Stretch };
+            var del = new MenuItem { Header = "מחק שיחה", Tag = c };
+            del.Click += DeleteConv_Click;
+            item.ContextMenu = new ContextMenu { FlowDirection = FlowDirection.RightToLeft, Items = { del } };
+            ConvList.Items.Add(item);
         }
         if (sel >= 0 && sel < ConvList.Items.Count) ConvList.SelectedIndex = sel;
     }
@@ -284,6 +288,22 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         HeaderStatus.Text = PeerConnections.IsConnected(_cur.Address) ? "מחובר בבלוטוס" : "ההודעות נשלחות דרך האפליקציה בטלפון";
         HeaderInitial.Text = _cur.Name.TrimStart('ה', '-', ' ').Substring(0, 1).ToUpperInvariant();
         HeaderAvatar.Background = new SolidColorBrush(_cur.Color);
+    }
+
+    /// <summary>מחיקת שיחה (קליק ימני על שיחה ברשימה).</summary>
+    void DeleteConv_Click(object sender, RoutedEventArgs e)
+    {
+        if (((FrameworkElement)sender).Tag is not Conv c) return;
+        if (!ConfirmDialog.Ask(this, "למחוק את השיחה?", "כל ההודעות וההקלטות בשיחה עם " + Disp(c.Name) + " יימחקו. קבצים שהתקבלו בתיקיית הקבלה לא יימחקו.", "מחק", "ביטול")) return;
+        StopPlayback();
+        ChatLog.Delete(c.Address);
+        c.Messages.Clear();
+        bool keep = _settings.Favorites.Any(f => f.Address == c.Address); // מועדף נשאר ברשימה, ריק
+        if (!keep) _convs.Remove(c);
+        if (_cur == c) _cur = null!;
+        RebuildConvList();
+        if (_convs.Count > 0) ConvList.SelectedIndex = 0;
+        else { MsgPanel.Children.Clear(); HeaderName.Text = "אין שיחות עדיין. הודעה מהטלפון או מכשיר מועדף יפתחו שיחה."; HeaderStatus.Text = ""; }
     }
 
     // ---- הודעות ----

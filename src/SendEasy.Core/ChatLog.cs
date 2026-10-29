@@ -106,6 +106,23 @@ public static class ChatLog
         catch { return false; }
     }
 
+    /// <summary>מוחק שיחה: את היסטוריית ההודעות ואת קובצי ההקלטות שלה (קבצים שהתקבלו בתיקיית הקבלה לא נמחקים).</summary>
+    public static void Delete(ulong address)
+    {
+        try
+        {
+            lock (Gate)
+            {
+                foreach (var e in Load(address, int.MaxValue))
+                    if (e.Kind == "voice" && !string.IsNullOrEmpty(e.Path) && e.Path.StartsWith(VoiceDir, StringComparison.OrdinalIgnoreCase))
+                        try { File.Delete(e.Path); } catch { }
+                var f = FileOf(address);
+                if (File.Exists(f)) File.Delete(f);
+            }
+        }
+        catch { }
+    }
+
     /// <summary>הודעות נכנסות שעוד לא אישרנו קריאה שלהן.</summary>
     public static List<ChatEntry> Unread(ulong address) =>
         Load(address).Where(e => !e.Mine && e.MsgId != 0 && e.Status != "read" && e.Kind == "text").ToList();
