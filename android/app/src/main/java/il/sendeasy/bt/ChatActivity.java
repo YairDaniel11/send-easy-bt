@@ -1123,8 +1123,15 @@ public class ChatActivity extends Activity implements Events.Listener {
         if (m.isPic()) return picView(m);
         TextView t = text(ChatStore.T_FILE.equals(m.kind) ? "[קובץ] " + m.text : m.text, cText, 16);
         if (ChatStore.T_TEXT.equals(m.kind)) t.setText(Emoticons.render(this, m.text, t.getTextSize()));
+        // הודעה בלי אותיות (רק אימוג'י/סימנים) נחשבת LTR ונדבקת שמאלה: מכריחים כיוון RTL כמו שאר הממשק
+        if (android.os.Build.VERSION.SDK_INT >= 17 && !hasLetter(m.text)) t.setTextDirection(View.TEXT_DIRECTION_RTL);
         t.setMaxWidth(UiKit.dp(this, 270));
         return t;
+    }
+
+    private static boolean hasLetter(String s) {
+        for (int i = 0; i < s.length(); i++) if (Character.isLetter(s.charAt(i))) return true;
+        return false;
     }
 
     private int picHeight(Bitmap b) {
