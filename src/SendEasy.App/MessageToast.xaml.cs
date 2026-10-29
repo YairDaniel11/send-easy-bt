@@ -14,7 +14,7 @@ public partial class MessageToast : Window
     {
         InitializeComponent();
         TitleText.Text = title;
-        BodyText.Text = body;
+        Emoticons.Fill(BodyText, Emoticons.ToCodes(body), 14);
         MouseLeftButtonUp += (_, e) => { onClick(); Close(); };
         MouseRightButtonUp += (_, _) => Close();
         _timer.Tick += (_, _) => { _timer.Stop(); Close(); };
