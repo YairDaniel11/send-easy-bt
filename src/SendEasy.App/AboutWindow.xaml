@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-        Title="אודות" Width="460" Height="490" ResizeMode="NoResize"
+        Title="אודות" Width="460" Height="425" ResizeMode="NoResize"
         FlowDirection="RightToLeft" WindowStartupLocation="CenterScreen"
         WindowBackdropType="Mica" ExtendsContentIntoTitleBar="True">
     <Grid>
@@ -17,15 +17,15 @@
             <TextBlock Text="שליחה קלה - BT" FontSize="24" FontWeight="SemiBold"/>
             <TextBlock x:Name="VersionText" Opacity="0.75" Margin="0,4,0,0"/>
             <TextBlock Margin="0,16,0,0" TextWrapping="Wrap" LineHeight="22"
-                       Text="שליחה וקבלת קבצים, תמונות, הקלטות והודעות בבלוטוס בין המחשב לטלפון. אפשר לשלוח כל קובץ או תיקייה בקליק ימני, וגם לקבל קבצים מהטלפון במחשבים שבהם Windows לא מצליח לקבל אותם. מתאימה גם למכשירי מקשים."/>
+                       Text="שליחה וקבלת קבצים, תמונות, הקלטות והודעות בבלוטוס בין המחשב לטלפון. אפשר לשלוח כל קובץ או תיקייה בקליק ימני, וגם לקבל קבצים מהטלפון - גם במחשבים שבהם Windows לא מצליח לקבל אותם. מתאימה גם למכשירי מקשים."/>
             <TextBlock Margin="0,16,0,2" Opacity="0.7" Text="מאגר התוכנה ב-GitHub:"/>
             <TextBlock>
                 <Hyperlink x:Name="RepoLink" NavigateUri="https://github.com/YairDaniel11/send-easy-bt" RequestNavigate="Repo_Navigate">
                     <Run Text="github.com/YairDaniel11/send-easy-bt" FlowDirection="LeftToRight"/>
                 </Hyperlink>
             </TextBlock>
+            <ui:Button Content="סגור" Appearance="Primary" MinWidth="100" HorizontalAlignment="Right"
+                       Margin="0,16,0,0" Click="Close_Click"/>
         </StackPanel>
-        <ui:Button Grid.Row="2" Content="סגור" Appearance="Primary" MinWidth="100" HorizontalAlignment="Left"
-                   Margin="28,10,28,20" Click="Close_Click"/>
     </Grid>
 </ui:FluentWindow>
