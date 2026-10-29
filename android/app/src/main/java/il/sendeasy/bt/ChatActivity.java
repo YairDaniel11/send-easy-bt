@@ -65,8 +65,9 @@ public class ChatActivity extends Activity implements Events.Listener {
     private String deviceName;
     private String realName;
     private ListView list;
-    private TextView emptyT, recT, recHintT, titleT, subT, avatarT, micBtn, sendBtn, attachBtn, sendProgressT;
-    private TextView recPauseBtn, recSendBtn, recCancelBtn;
+    private TextView emptyT, recT, recHintT, titleT, subT, avatarT, sendProgressT;
+    private IconView micBtn, sendBtn, attachBtn;
+    private IconView recPauseBtn, recSendBtn, recCancelBtn;
     private View recBar;
     private EditText input;
     private View root, header, inputRow;
@@ -150,10 +151,10 @@ public class ChatActivity extends Activity implements Events.Listener {
         recT = (TextView) findViewById(R.id.chatRec);
         recHintT = (TextView) findViewById(R.id.chatRecHint);
         recBar = findViewById(R.id.chatRecBar);
-        recPauseBtn = (TextView) findViewById(R.id.chatRecPause);
-        recSendBtn = (TextView) findViewById(R.id.chatRecSend);
-        recCancelBtn = (TextView) findViewById(R.id.chatRecCancel);
-        attachBtn = (TextView) findViewById(R.id.chatAttach);
+        recPauseBtn = (IconView) findViewById(R.id.chatRecPause);
+        recSendBtn = (IconView) findViewById(R.id.chatRecSend);
+        recCancelBtn = (IconView) findViewById(R.id.chatRecCancel);
+        attachBtn = (IconView) findViewById(R.id.chatAttach);
         sendProgressT = (TextView) findViewById(R.id.chatSendProgress);
         touch = getPackageManager().hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN);
         if (!touch) {
@@ -161,8 +162,8 @@ public class ChatActivity extends Activity implements Events.Listener {
             recHintT.setVisibility(View.VISIBLE);
         }
         input = (EditText) findViewById(R.id.chatInput);
-        sendBtn = (TextView) findViewById(R.id.chatSend);
-        micBtn = (TextView) findViewById(R.id.chatMic);
+        sendBtn = (IconView) findViewById(R.id.chatSend);
+        micBtn = (IconView) findViewById(R.id.chatMic);
 
         titleT.setText(Fmt.ltr(deviceName));
         subT.setText(R.string.chat_sub);
@@ -257,16 +258,22 @@ public class ChatActivity extends Activity implements Events.Listener {
         input.setTextColor(cText);
         input.setHintTextColor(cSub);
         int fg = style == 1 && ThemeUtil.isDark(this) ? 0xFF1F1F1F : 0xFFFFFFFF;
-        micBtn.setTextColor(fg);
-        sendBtn.setTextColor(fg);
-        attachBtn.setTextColor(fg);
+        micBtn.setIcon(IconView.MIC);
+        sendBtn.setIcon(IconView.SEND);
+        attachBtn.setIcon(IconView.ATTACH);
+        micBtn.setIconColor(fg);
+        sendBtn.setIconColor(fg);
+        attachBtn.setIconColor(fg);
         micBtn.setBackgroundDrawable(focusCircle());
         sendBtn.setBackgroundDrawable(focusCircle());
         attachBtn.setBackgroundDrawable(focusCircle());
         // כפתורי פס ההקלטה על רקע אדום: עיגול שקוף-לבן, ובפוקוס טבעת לבנה
-        recPauseBtn.setBackgroundDrawable(recCircle());
-        recSendBtn.setBackgroundDrawable(recCircle());
-        recCancelBtn.setBackgroundDrawable(recCircle());
+        recPauseBtn.setBackgroundDrawable(recCircle(0xFF546E7A));
+        recSendBtn.setBackgroundDrawable(recCircle(0xFF1B9E4B));
+        recCancelBtn.setBackgroundDrawable(recCircle(0xFFD64545));
+        recSendBtn.setIcon(IconView.SEND);
+        recCancelBtn.setIcon(IconView.TRASH);
+        updateRecIcon();
         sendProgressT.setTextColor(cText);
         sendProgressT.setBackgroundColor(cInput);
         updateActionButtons();
@@ -284,14 +291,21 @@ public class ChatActivity extends Activity implements Events.Listener {
         return sl;
     }
 
-    private StateListDrawable recCircle() {
+    /** עיגול צבעוני בפס ההקלטה; בפוקוס טבעת לבנה עבה. */
+    private StateListDrawable recCircle(int color) {
         StateListDrawable sl = new StateListDrawable();
-        GradientDrawable focused = UiKit.oval(0x66FFFFFF);
-        focused.setStroke(UiKit.dp(this, 3), 0xFFFFFFFF);
+        GradientDrawable focused = UiKit.oval(color);
+        focused.setStroke(UiKit.dp(this, 4), 0xFFFFFFFF);
         sl.addState(new int[]{android.R.attr.state_focused}, focused);
         sl.addState(new int[]{android.R.attr.state_pressed}, focused);
-        sl.addState(new int[]{}, UiKit.oval(0x33FFFFFF));
+        GradientDrawable normal = UiKit.oval(color);
+        normal.setStroke(UiKit.dp(this, 1), 0x66FFFFFF);
+        sl.addState(new int[]{}, normal);
         return sl;
+    }
+
+    private void updateRecIcon() {
+        recPauseBtn.setIcon(recorder != null && recorder.isPaused() ? IconView.PLAY : IconView.PAUSE);
     }
 
     /** כשיש טקסט: כפתור שליחה; כשאין: מיקרופון. */
@@ -299,9 +313,8 @@ public class ChatActivity extends Activity implements Events.Listener {
         boolean has = input.getText().length() > 0;
         sendBtn.setVisibility(has ? View.VISIBLE : View.GONE);
         micBtn.setVisibility(has ? View.GONE : View.VISIBLE);
-        // סדר פיזי מימין לשמאל: שליחה (רק עם טקסט), שדה, צרף, מיקרופון (רק בלי טקסט)
-        input.setNextFocusRightId(has ? R.id.chatSend : R.id.chatInput);
-        attachBtn.setNextFocusLeftId(has ? R.id.chatAttach : R.id.chatMic);
+        // סדר פיזי מימין לשמאל: צרף, שדה, שליחה (עם טקסט) או מיקרופון (בלי טקסט)
+        input.setNextFocusLeftId(has ? R.id.chatSend : R.id.chatMic);
         if (has && micBtn.hasFocus()) input.requestFocus();
         if (!has && sendBtn.hasFocus()) input.requestFocus();
     }
@@ -678,7 +691,7 @@ public class ChatActivity extends Activity implements Events.Listener {
     private void updateRecUi() {
         boolean paused = recorder.isPaused();
         recT.setText(getString(paused ? R.string.voice_paused : R.string.voice_recording, mmss((int) (recorder.elapsedMs() / 1000))));
-        recPauseBtn.setText(paused ? "▶" : "⏸");
+        recPauseBtn.setIcon(paused ? IconView.PLAY : IconView.PAUSE);
     }
 
     private void togglePause() {
@@ -945,8 +958,9 @@ public class ChatActivity extends Activity implements Events.Listener {
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setGravity(Gravity.CENTER_VERTICAL);
-            TextView play = text(playing ? "■" : "▶", 0xFFFFFFFF, 14);
-            play.setGravity(Gravity.CENTER);
+            IconView play = new IconView(this);
+            play.setFocusable(false);
+            play.setIcon(playing ? IconView.STOP : IconView.PLAY);
             play.setBackgroundDrawable(UiKit.oval(cAccent));
             row.addView(play, new LinearLayout.LayoutParams(UiKit.dp(this, 36), UiKit.dp(this, 36)));
             UiKit.WaveView wave = new UiKit.WaveView(this, m.text.hashCode(), cAccent, (cSub & 0x00FFFFFF) | 0x88000000);

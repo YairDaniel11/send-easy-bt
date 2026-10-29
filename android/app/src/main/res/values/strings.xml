@@ -148,6 +148,8 @@
     <string name="alert_ring">צלצול</string>
     <string name="alert_vibrate">רטט</string>
     <string name="alert_wake">הדלקת המסך</string>
+    <string name="cd_send">שלח הודעה</string>
+    <string name="cd_mic">הקלט הודעה קולית</string>
     <string name="rx_cancel">ביטול</string>
     <string name="kind_image">תמונה</string>
     <string name="kind_voice">הקלטה</string>

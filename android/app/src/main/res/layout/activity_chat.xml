@@ -78,7 +78,7 @@
         android:id="@+id/chatRecBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#FFD64545"
+        android:background="#FF263238"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:padding="8dp"
@@ -112,53 +112,41 @@
                 android:visibility="gone" />
         </LinearLayout>
 
-        <TextView
+        <il.sendeasy.bt.IconView
             android:id="@+id/chatRecPause"
             android:layout_width="46dp"
             android:layout_height="46dp"
-            android:layout_marginLeft="6dp"
+            android:layout_marginLeft="12dp"
             android:contentDescription="@string/cd_rec_pause"
             android:focusable="true"
-            android:gravity="center"
             android:nextFocusDown="@+id/chatRecPause"
             android:nextFocusLeft="@+id/chatRecSend"
             android:nextFocusRight="@+id/chatRecCancel"
-            android:nextFocusUp="@+id/chatRecPause"
-            android:text="⏸"
-            android:textColor="#FFFFFFFF"
-            android:textSize="20sp" />
+            android:nextFocusUp="@+id/chatRecPause" />
 
-        <TextView
+        <il.sendeasy.bt.IconView
             android:id="@+id/chatRecSend"
             android:layout_width="46dp"
             android:layout_height="46dp"
-            android:layout_marginLeft="6dp"
+            android:layout_marginLeft="12dp"
             android:contentDescription="@string/cd_rec_send"
             android:focusable="true"
-            android:gravity="center"
             android:nextFocusDown="@+id/chatRecSend"
             android:nextFocusLeft="@+id/chatRecCancel"
             android:nextFocusRight="@+id/chatRecPause"
-            android:nextFocusUp="@+id/chatRecSend"
-            android:text="➤"
-            android:textColor="#FFFFFFFF"
-            android:textSize="20sp" />
+            android:nextFocusUp="@+id/chatRecSend" />
 
-        <TextView
+        <il.sendeasy.bt.IconView
             android:id="@+id/chatRecCancel"
             android:layout_width="46dp"
             android:layout_height="46dp"
-            android:layout_marginLeft="6dp"
+            android:layout_marginLeft="12dp"
             android:contentDescription="@string/cd_rec_cancel"
             android:focusable="true"
-            android:gravity="center"
             android:nextFocusDown="@+id/chatRecCancel"
             android:nextFocusLeft="@+id/chatRecPause"
             android:nextFocusRight="@+id/chatRecSend"
-            android:nextFocusUp="@+id/chatRecCancel"
-            android:text="🗑"
-            android:textColor="#FFFFFFFF"
-            android:textSize="20sp" />
+            android:nextFocusUp="@+id/chatRecCancel" />
     </LinearLayout>
 
     <TextView
@@ -178,20 +166,17 @@
         android:orientation="horizontal"
         android:padding="8dp">
 
-        <TextView
-            android:id="@+id/chatSend"
+        <il.sendeasy.bt.IconView
+            android:id="@+id/chatAttach"
             android:layout_width="46dp"
             android:layout_height="46dp"
             android:layout_marginLeft="8dp"
+            android:contentDescription="@string/cd_attach"
             android:focusable="true"
-            android:gravity="center"
-            android:nextFocusDown="@+id/chatSend"
+            android:nextFocusDown="@+id/chatAttach"
             android:nextFocusLeft="@+id/chatInput"
-            android:nextFocusRight="@+id/chatSend"
-            android:nextFocusUp="@+id/chatList"
-            android:text="➤"
-            android:textColor="#FFFFFFFF"
-            android:textSize="19sp" />
+            android:nextFocusRight="@+id/chatAttach"
+            android:nextFocusUp="@+id/chatList" />
 
         <EditText
             android:id="@+id/chatInput"
@@ -203,42 +188,35 @@
             android:inputType="textCapSentences|textMultiLine"
             android:maxLines="3"
             android:minHeight="44dp"
-            android:nextFocusLeft="@+id/chatAttach"
-            android:nextFocusRight="@+id/chatInput"
+            android:nextFocusLeft="@+id/chatMic"
+            android:nextFocusRight="@+id/chatAttach"
             android:nextFocusUp="@+id/chatList"
             android:paddingLeft="16dp"
             android:paddingRight="16dp"
             android:textSize="17sp" />
 
-        <TextView
-            android:id="@+id/chatAttach"
+        <il.sendeasy.bt.IconView
+            android:id="@+id/chatSend"
             android:layout_width="46dp"
             android:layout_height="46dp"
-            android:layout_marginLeft="8dp"
-            android:contentDescription="@string/cd_attach"
+            android:layout_marginRight="8dp"
+            android:contentDescription="@string/cd_send"
             android:focusable="true"
-            android:gravity="center"
-            android:nextFocusDown="@+id/chatAttach"
-            android:nextFocusLeft="@+id/chatMic"
+            android:nextFocusDown="@+id/chatSend"
+            android:nextFocusLeft="@+id/chatSend"
             android:nextFocusRight="@+id/chatInput"
-            android:nextFocusUp="@+id/chatList"
-            android:text="📎"
-            android:textColor="#FFFFFFFF"
-            android:textSize="19sp" />
+            android:nextFocusUp="@+id/chatList" />
 
-        <TextView
+        <il.sendeasy.bt.IconView
             android:id="@+id/chatMic"
             android:layout_width="46dp"
             android:layout_height="46dp"
-            android:layout_marginLeft="8dp"
+            android:layout_marginRight="8dp"
+            android:contentDescription="@string/cd_mic"
             android:focusable="true"
-            android:gravity="center"
             android:nextFocusDown="@+id/chatMic"
             android:nextFocusLeft="@+id/chatMic"
-            android:nextFocusRight="@+id/chatAttach"
-            android:nextFocusUp="@+id/chatList"
-            android:text="🎤"
-            android:textColor="#FFFFFFFF"
-            android:textSize="19sp" />
+            android:nextFocusRight="@+id/chatInput"
+            android:nextFocusUp="@+id/chatList" />
     </LinearLayout>
 </LinearLayout>
