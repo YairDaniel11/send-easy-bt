@@ -75,11 +75,12 @@ public static class SendService
             }
             catch (OperationCanceledException) { throw; }
             catch when (ct.IsCancellationRequested) { throw new OperationCanceledException(ct); }
-            catch (Exception)
+            catch (Exception ex)
             {
                 if (i == 3) return null;
+                System.Diagnostics.Debug.WriteLine($"PeerClient attempt {i} failed: {ex.GetType().Name} 0x{ex.HResult:X8} {ex.Message}");
                 status($"מתחבר לאפליקציה בטלפון... ניסיון {i + 1} מתוך 3");
-                await Task.Delay(2500, ct);
+                await Task.Delay(1000, ct);
             }
         }
         return null;
