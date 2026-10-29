@@ -24,7 +24,7 @@
     <string name="menu_toggle_receive">הפעל / כבה קבלה</string>
     <string name="menu_receive_dir">איפה נשמרים הקבצים</string>
     <string name="menu_about">אודות</string>
-    <string name="menu_chat_style">עיצוב הצ&apos;אט</string>
+    <string name="menu_chat_style">עיצוב הצ\'אט</string>
     <string name="about_text">שליחה וקבלת קבצים והודעות בבלוטוס בין הטלפון למחשב.\nקוד פתוח (MIT):\ngithub.com/YairDaniel11/send-easy-bt</string>
 
     <string name="send_title">שליחה</string>
@@ -60,9 +60,9 @@
 
     <string name="chat_sub">הודעות דרך בלוטוס</string>
     <string name="chat_me">אני</string>
-    <string name="chat_menu_style">עיצוב הצ&apos;אט</string>
+    <string name="chat_menu_style">עיצוב הצ\'אט</string>
     <string name="style_wa">ווטסאפ</string>
-    <string name="style_gc">גוגל צ&apos;אט</string>
+    <string name="style_gc">גוגל צ\'אט</string>
     <string name="voice_record">הקלט הודעה קולית</string>
     <string name="voice_recording">● מקליט  %1$s   אישור = שלח   חזרה = ביטול</string>
     <string name="voice_label">הודעה קולית %1$s</string>
