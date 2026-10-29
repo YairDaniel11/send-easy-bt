@@ -27,8 +27,10 @@
                     <Run Text="github.com/YairDaniel11/send-easy-bt" FlowDirection="LeftToRight"/>
                 </Hyperlink>
             </TextBlock>
-            <ui:Button Content="סגור" Appearance="Primary" MinWidth="100" HorizontalAlignment="Right"
-                       Margin="0,16,0,0" Click="Close_Click"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+                <ui:Button x:Name="UpdBtn" Content="בדוק עדכון" MinWidth="100" Margin="0,0,8,0" Click="Update_Click"/>
+                <ui:Button Content="סגור" Appearance="Primary" MinWidth="100" Click="Close_Click"/>
+            </StackPanel>
         </StackPanel>
     </Grid>
 </ui:FluentWindow>

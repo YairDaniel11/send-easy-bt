@@ -609,34 +609,39 @@ public class MainActivity extends Activity implements Events.Listener {
         t.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
         box.addView(t, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         final android.app.Dialog[] holder = new android.app.Dialog[1];
-        TextView open = UiKit.actionButton(this, getString(R.string.about_open_repo), new View.OnClickListener() {
-            @Override public void onClick(View v) {
-                try {
-                    startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(REPO_URL)));
-                } catch (RuntimeException e) { // כולל ActivityNotFoundException
-                    Toast.makeText(MainActivity.this, R.string.about_no_browser, Toast.LENGTH_LONG).show();
-                }
-            }
-        });
         TextView close = UiKit.actionButton(this, getString(R.string.savedir_close), new View.OnClickListener() {
             @Override public void onClick(View v) { if (holder[0] != null) holder[0].dismiss(); }
         });
-        LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        // כפתור סגור קטן, צמוד לשמאל (Gravity.LEFT מוחלט, לא תלוי בכיוון הכתיבה)
+        LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         bl.topMargin = UiKit.dp(this, 10);
-        box.addView(open, bl);
-        box.addView(close, bl);
-        open.setId(View.generateViewId());
+        bl.gravity = android.view.Gravity.LEFT;
+        close.setMinimumWidth(UiKit.dp(this, 90));
+        close.setMinimumHeight(UiKit.dp(this, 40));
+        close.setMinHeight(UiKit.dp(this, 40));
+        TextView upd = UiKit.actionButton(this, getString(R.string.menu_check_update), new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                if (holder[0] != null) holder[0].dismiss();
+                checkUpdate(true);
+            }
+        });
+        upd.setMinimumHeight(UiKit.dp(this, 40));
+        upd.setMinHeight(UiKit.dp(this, 40));
+        LinearLayout btnRow = new LinearLayout(this);
+        btnRow.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams ul = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        ul.rightMargin = UiKit.dp(this, 8);
+        btnRow.addView(close, ul);
+        btnRow.addView(upd, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        upd.setId(View.generateViewId());
         close.setId(View.generateViewId());
-        open.setNextFocusDownId(close.getId());
-        open.setNextFocusUpId(open.getId());
-        close.setNextFocusUpId(open.getId());
-        close.setNextFocusDownId(close.getId());
+        box.addView(btnRow, bl);
         android.widget.ScrollView sv = new android.widget.ScrollView(this);
         sv.addView(box);
         AlertDialog d = new AlertDialog.Builder(this).setView(sv).create();
         holder[0] = d;
         d.show();
-        open.requestFocus();
+        close.requestFocus();
     }
 
     /** רשימת המכשירים המצומדים לבחירה, ואז דיאלוג שינוי השם. */

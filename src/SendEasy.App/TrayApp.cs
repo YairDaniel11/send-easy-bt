@@ -122,7 +122,7 @@ sealed class TrayApp : IDisposable
     public void ShowAbout()
     {
         if (_about is { IsLoaded: true }) { WindowFront.Bring(_about); return; }
-        _about = new AboutWindow();
+        _about = new AboutWindow(OpenUpdate);
         _about.Show();
         WindowFront.Bring(_about);
     }

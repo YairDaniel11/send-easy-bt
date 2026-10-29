@@ -9,8 +9,11 @@ namespace SendEasy.App;
 /// <summary>אודות: גרסה, תיאור קצר וקישור למאגר ב-GitHub.</summary>
 public partial class AboutWindow : Wpf.Ui.Controls.FluentWindow
 {
-    public AboutWindow()
+    readonly Action _openUpdate;
+
+    public AboutWindow(Action openUpdate)
     {
+        _openUpdate = openUpdate;
         InitializeComponent();
         var v = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0);
         VersionText.Text = "גרסה " + TrayApp.Ltr(v.ToString(3));
@@ -28,6 +31,30 @@ public partial class AboutWindow : Wpf.Ui.Controls.FluentWindow
     {
         try { Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri) { UseShellExecute = true }); } catch { }
         e.Handled = true;
+    }
+
+    /// <summary>בודק עדכון עכשיו: אם יש גרסה חדשה פותח את חלון העדכון (הורדה והתקנה), אחרת מציג שהגרסה עדכנית.</summary>
+    async void Update_Click(object s, RoutedEventArgs e)
+    {
+        UpdBtn.IsEnabled = false;
+        UpdBtn.Content = "בודק...";
+        try
+        {
+            var cur = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0);
+            var r = await SendEasy.Core.UpdateChecker.CheckDetailedAsync(SendEasy.Core.Settings.Load().UpdateRepo, cur);
+            if (r != null)
+            {
+                UpdateState.Set(r);
+                _openUpdate();
+                Close();
+                return;
+            }
+            UpdBtn.Content = "הגרסה שלך עדכנית";
+        }
+        catch { UpdBtn.Content = "הבדיקה נכשלה"; }
+        await System.Threading.Tasks.Task.Delay(2500);
+        UpdBtn.Content = "בדוק עדכון";
+        UpdBtn.IsEnabled = true;
     }
 
     void Close_Click(object s, RoutedEventArgs e) => Close();
