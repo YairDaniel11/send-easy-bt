@@ -694,7 +694,7 @@ public class MainActivity extends Activity implements Events.Listener {
                 .setPositiveButton(R.string.chat_delete_btn, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
                         for (int i = 0; i < sel.length; i++) {
-                            if (sel[i]) ChatStore.delete(getApplicationContext(), withChat.get(i).getAddress());
+                            if (sel[i]) ChatStore.deleteAll(getApplicationContext(), withChat.get(i).getAddress());
                         }
                         loadUnread();
                         adapter.notifyDataSetChanged();
@@ -745,18 +745,18 @@ public class MainActivity extends Activity implements Events.Listener {
                 .show();
     }
 
-    /** צ'אט חדש: רשימת כל המכשירים המצומדים; בחירה פותחת את הצ'אט (ריק אם אין הודעות). */
+    /** צ'אט חדש עם המכשיר שהסמן עומד עליו ברשימה: פותח שיחה חדשה (ריקה), והקודמות נשארות זמינות מתוך הצ'אט. */
     private void showNewChat() {
-        if (devices.isEmpty()) { Toast.makeText(this, R.string.main_no_devices, Toast.LENGTH_SHORT).show(); return; }
-        final List<BluetoothDevice> l = new ArrayList<BluetoothDevice>(devices);
-        String[] names = new String[l.size()];
-        for (int i = 0; i < names.length; i++) names[i] = DeviceNames.display(this, l.get(i));
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.menu_new_chat)
-                .setItems(names, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface dlg, int which) { openChat(l.get(which).getAddress()); }
-                })
-                .show();
+        int pos = list.getSelectedItemPosition();
+        if (devices.isEmpty() || pos < 0 || pos >= devices.size()) {
+            Toast.makeText(this, R.string.main_no_devices, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String addr = devices.get(pos).getAddress();
+        if (!ChatStore.newThread(getApplicationContext(), addr)) Toast.makeText(this, R.string.chat_new_still_empty, Toast.LENGTH_SHORT).show();
+        loadUnread();
+        adapter.notifyDataSetChanged();
+        openChat(addr);
     }
 
     /** כל ההגדרות בחלונית אחת (רשימה נגישה ב-D-pad), עם מצב בטקסט של כל פריט. */

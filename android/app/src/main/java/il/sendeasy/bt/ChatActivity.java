@@ -865,7 +865,7 @@ public class ChatActivity extends Activity implements Events.Listener {
     // ------------------------------------------------------------ מקשים ותפריט
 
     private void showMenu() {
-        final String[] items = {getString(R.string.voice_record), getString(R.string.chat_menu_style), getString(R.string.chat_menu_emoticon), getString(R.string.chat_menu_paste), getString(R.string.chat_delete)};
+        final String[] items = {getString(R.string.voice_record), getString(R.string.chat_menu_style), getString(R.string.chat_menu_emoticon), getString(R.string.chat_menu_paste), getString(R.string.chat_delete), getString(R.string.menu_new_chat), getString(R.string.menu_other_chats)};
         new AlertDialog.Builder(this)
                 .setItems(items, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int which) {
@@ -879,8 +879,37 @@ public class ChatActivity extends Activity implements Events.Listener {
                             ChatStore.confirmDelete(ChatActivity.this, address, deviceName, new Runnable() {
                                 @Override public void run() { stopPlay(); finish(); }
                             });
+                        } else if (which == 5) {
+                            stopPlay();
+                            if (!ChatStore.newThread(getApplicationContext(), address)) Toast.makeText(ChatActivity.this, R.string.chat_new_still_empty, Toast.LENGTH_SHORT).show();
+                            reload();
+                        } else if (which == 6) {
+                            showOtherChats();
                         } else if (which == 0) toggleRecording();
                         else if (which == 1) chooseStyle();
+                    }
+                })
+                .show();
+    }
+
+    /** רשימת כל השיחות עם המכשיר (החדשה למעלה), עם תאריך תחילה ומספר הודעות; בחירה מעבירה אליה. */
+    private void showOtherChats() {
+        final List<Integer> ths = ChatStore.threads(this, address);
+        final int act = ChatStore.activeThread(this, address);
+        java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("dd/MM/yy HH:mm");
+        String[] labels = new String[ths.size()];
+        for (int i = 0; i < labels.length; i++) {
+            List<ChatStore.Msg> l = ChatStore.loadThread(this, address, ths.get(i));
+            String when = l.isEmpty() ? getString(R.string.chats_empty) : df.format(new Date(l.get(0).time)) + " · " + getString(R.string.chats_count, l.size());
+            labels[i] = getString(R.string.chats_item, ths.get(i), when) + (ths.get(i) == act ? " ✓" : "");
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(getString(R.string.chats_title, Fmt.ltr(deviceName)))
+                .setItems(labels, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int which) {
+                        stopPlay();
+                        ChatStore.setActiveThread(getApplicationContext(), address, ths.get(which));
+                        reload();
                     }
                 })
                 .show();

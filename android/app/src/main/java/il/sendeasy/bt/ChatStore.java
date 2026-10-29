@@ -44,10 +44,75 @@ final class ChatStore {
 
     private static final int MAX_KEEP = 500;
 
-    private static File file(Context c, String address) {
+    private static String base(String address) {
+        return address.replace(":", "").toLowerCase();
+    }
+
+    private static File dir(Context c) {
         File dir = new File(c.getFilesDir(), "chat");
         dir.mkdirs();
-        return new File(dir, address.replace(":", "").toLowerCase() + ".log");
+        return dir;
+    }
+
+    /** קובץ של שיחה מספר n עם המכשיר (1 = הקובץ המקורי, בלי סיומת מספר). */
+    private static File threadFile(Context c, String address, int n) {
+        return new File(dir(c), base(address) + (n <= 1 ? "" : "." + n) + ".log");
+    }
+
+    /** קובץ השיחה הפעילה: אליה נכנסות הודעות חדשות ואותה הצ'אט מציג. */
+    private static File file(Context c, String address) {
+        return threadFile(c, address, activeThread(c, address));
+    }
+
+    private static android.content.SharedPreferences threadPrefs(Context c) {
+        return c.getSharedPreferences("chat_threads", Context.MODE_PRIVATE);
+    }
+
+    static int activeThread(Context c, String address) {
+        return threadPrefs(c).getInt(base(address), 1);
+    }
+
+    static void setActiveThread(Context c, String address, int n) {
+        threadPrefs(c).edit().putInt(base(address), n).commit();
+    }
+
+    /** מספרי כל השיחות הקיימות עם המכשיר (כולל הפעילה גם אם עוד ריקה), מהחדשה לישנה. */
+    static synchronized List<Integer> threads(Context c, String address) {
+        List<Integer> out = new ArrayList<Integer>();
+        String b = base(address);
+        File[] fs = dir(c).listFiles();
+        if (fs != null) for (File f : fs) {
+            String nm = f.getName();
+            if (!nm.startsWith(b) || !nm.endsWith(".log")) continue;
+            String mid = nm.substring(b.length(), nm.length() - 4);
+            if (mid.length() == 0) out.add(1);
+            else if (mid.startsWith(".")) {
+                try { out.add(Integer.parseInt(mid.substring(1))); } catch (NumberFormatException ignored) { }
+            }
+        }
+        int act = activeThread(c, address);
+        if (!out.contains(act)) out.add(act);
+        java.util.Collections.sort(out, java.util.Collections.reverseOrder());
+        return out;
+    }
+
+    /** הודעות של שיחה מסוימת (לתצוגה ברשימת השיחות). */
+    static List<Msg> loadThread(Context c, String address, int n) {
+        return loadFile(threadFile(c, address, n));
+    }
+
+    /**
+     * פותח שיחה חדשה עם המכשיר והופך אותה לפעילה. אם הפעילה עדיין ריקה, נשארים בה (לא יוצרים ריקות).
+     * מחזיר true אם נוצרה שיחה חדשה.
+     */
+    static synchronized boolean newThread(Context c, String address) {
+        int act = activeThread(c, address);
+        if (!file(c, address).exists() || file(c, address).length() == 0) return false;
+        int max = act;
+        for (int n : threads(c, address)) if (n > max) max = n;
+        setActiveThread(c, address, max + 1);
+        Events.post(Events.CHAT, address);
+        return true;
     }
 
     private static String esc(String s) {
@@ -177,16 +242,32 @@ final class ChatStore {
         }
     }
 
-    /** מוחק שיחה: את קובץ ההיסטוריה ואת ההקלטות והתמונות הפנימיות שהוזכרו בה. קבצים בתיקיית ההורדות לא נוגעים. */
+    /** מוחק את השיחה הפעילה: את קובץ ההיסטוריה ואת ההקלטות והתמונות הפנימיות שהוזכרו בה. קבצים בתיקיית ההורדות לא נוגעים. */
     static synchronized void delete(Context c, String address) {
-        for (Msg m : load(c, address)) {
+        deleteFile(c, file(c, address), load(c, address));
+        int act = activeThread(c, address);
+        // עוברים לשיחה הקודמת הקיימת, אם יש
+        int next = 1;
+        for (int n : threads(c, address)) if (n != act && threadFile(c, address, n).exists()) { next = n; break; }
+        setActiveThread(c, address, next);
+        Events.post(Events.CHAT, address);
+    }
+
+    /** מוחק את כל השיחות עם המכשיר. */
+    static synchronized void deleteAll(Context c, String address) {
+        for (int n : threads(c, address)) deleteFile(c, threadFile(c, address, n), loadThread(c, address, n));
+        setActiveThread(c, address, 1);
+        Events.post(Events.CHAT, address);
+    }
+
+    private static void deleteFile(Context c, File f, List<Msg> msgs) {
+        for (Msg m : msgs) {
             String n = new File(m.text).getName();
             if (n.length() == 0) continue;
             if (m.isVoice()) new File(Storage.voiceDir(c), n).delete();
             else if (m.isPic()) new File(Storage.imagesDir(c), n).delete();
         }
-        file(c, address).delete();
-        Events.post(Events.CHAT, address);
+        f.delete();
     }
 
     /** דיאלוג אישור למחיקת שיחה. פוקוס התחלתי על "ביטול". */
@@ -208,8 +289,11 @@ final class ChatStore {
     }
 
     static synchronized List<Msg> load(Context c, String address) {
+        return loadFile(file(c, address));
+    }
+
+    private static synchronized List<Msg> loadFile(File f) {
         List<Msg> list = new ArrayList<Msg>();
-        File f = file(c, address);
         if (!f.exists()) return list;
         try {
             BufferedReader r = new BufferedReader(new InputStreamReader(new FileInputStream(f), "UTF-8"));
