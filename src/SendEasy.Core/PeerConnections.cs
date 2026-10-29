@@ -1,54 +1,63 @@
 ﻿namespace SendEasy.Core;
 
 /// <summary>
-/// חיבורים פתוחים אל אפליקציית הטלפון, בשני הכיוונים (יוצאים שפתחנו, ונכנסים שהטלפון פתח). חיבור אחד לכל מכשיר,
-/// לשימוש חוזר בצ'אט ובאישורי קריאה.
+/// חיבורים פתוחים אל אפליקציית הטלפון. שני סוגים:
+/// יוצאים (אנחנו פתחנו): מתאימים לשליחת הודעות, קבצים והקלטות, כי האפליקציה בטלפון מקבלת עליהם תוכן;
+/// נכנסים (הטלפון פתח כדי לשלוח לנו): בצד הטלפון הם חיבור שליחה בלבד ולכן מסרבים לקבל קבצים,
+/// ומשמשים רק לאישורי קריאה.
 /// </summary>
 public static class PeerConnections
 {
-    static readonly Dictionary<ulong, PeerSession> Sessions = new();
+    static readonly Dictionary<ulong, PeerSession> Outbound = new();
+    static readonly Dictionary<ulong, PeerSession> Inbound = new();
     static readonly SemaphoreSlim Gate = new(1, 1);
 
     /// <summary>הצד השני קרא הודעה שלנו: (כתובת המכשיר, מזהה ההודעה).</summary>
     public static event Action<ulong, long>? ReadReceived;
 
-    public static bool IsConnected(ulong address)
+    static bool Alive(Dictionary<ulong, PeerSession> d, ulong address, out PeerSession? s)
     {
-        lock (Sessions) return Sessions.TryGetValue(address, out var s) && !s.IsClosed;
+        lock (d) return d.TryGetValue(address, out s) && !s.IsClosed;
     }
 
-    /// <summary>רושם חיבור (נכנס או יוצא) כחיבור הפעיל של המכשיר.</summary>
-    public static void Register(ulong address, PeerSession s)
+    public static bool IsConnected(ulong address) => Alive(Outbound, address, out _) || Alive(Inbound, address, out _);
+
+    /// <summary>רושם חיבור כחיבור הפעיל של המכשיר (inbound = הטלפון פתח אותו).</summary>
+    public static void Register(ulong address, PeerSession s, bool inbound)
     {
         if (address == 0) return;
+        var map = inbound ? Inbound : Outbound;
         s.RemoteAddress = address;
         s.ReadReceived += id => ReadReceived?.Invoke(address, id);
-        lock (Sessions) Sessions[address] = s;
-        s.Closed += _ => { lock (Sessions) if (Sessions.TryGetValue(address, out var cur) && ReferenceEquals(cur, s)) Sessions.Remove(address); };
+        lock (map) map[address] = s;
+        s.Closed += _ => { lock (map) if (map.TryGetValue(address, out var cur) && ReferenceEquals(cur, s)) map.Remove(address); };
     }
 
-    /// <summary>מחזיר חיבור קיים או פותח חדש. null אם האפליקציה לא מותקנת או לא פתוחה בטלפון.</summary>
+    /// <summary>
+    /// מחזיר חיבור יוצא קיים או פותח חדש (לשליחת תוכן). null אם האפליקציה לא מותקנת או לא פתוחה בטלפון.
+    /// לא משתמש בחיבורים נכנסים, כי הטלפון לא מקבל עליהם קבצים.
+    /// </summary>
     public static async Task<PeerSession?> GetAsync(ulong address, CancellationToken ct = default)
     {
         await Gate.WaitAsync(ct);
         try
         {
-            lock (Sessions)
-                if (Sessions.TryGetValue(address, out var existing) && !existing.IsClosed) return existing;
+            if (Alive(Outbound, address, out var existing)) return existing;
             var s = await PeerClient.TryConnectAsync(address, ct);
             if (s == null) return null;
-            Register(address, s);
+            Register(address, s, inbound: false);
             return s;
         }
         finally { Gate.Release(); }
     }
 
-    /// <summary>שולח אישורי קריאה להודעות של המכשיר. מחזיר true אם נשלחו.</summary>
+    /// <summary>שולח אישורי קריאה להודעות של המכשיר, על כל חיבור פתוח (ואם אין, פותח חיבור יוצא). true אם נשלחו.</summary>
     public static async Task<bool> SendReadAsync(ulong address, IEnumerable<long> msgIds)
     {
         try
         {
-            var s = await GetAsync(address);
+            PeerSession? s = null;
+            if (!Alive(Inbound, address, out s) && !Alive(Outbound, address, out s)) s = await GetAsync(address);
             if (s == null) return false;
             foreach (var id in msgIds) await s.SendReadAsync(id);
             return true;
@@ -58,6 +67,7 @@ public static class PeerConnections
 
     public static void CloseAll()
     {
-        lock (Sessions) { foreach (var s in Sessions.Values.ToArray()) s.Close(); Sessions.Clear(); }
+        foreach (var map in new[] { Outbound, Inbound })
+            lock (map) { foreach (var s in map.Values.ToArray()) s.Close(); map.Clear(); }
     }
 }

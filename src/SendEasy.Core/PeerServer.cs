@@ -107,7 +107,7 @@ public sealed class PeerServer : IDisposable
             session.Failed += f => Aborted?.Invoke(f);
             session.TextReceived += t => TextReceived?.Invoke(session.PeerName.Length > 0 ? session.PeerName : from, addr, t);
             session.TextReceivedEx += (t, id) => TextReceivedEx?.Invoke(from, addr, t, id);
-            PeerConnections.Register(addr, session); // אפשר לשלוח עליו הודעות ואישורי קריאה חזרה
+            PeerConnections.Register(addr, session, inbound: true); // משמש לאישורי קריאה בלבד
             var s = session;
             session.Closed += ex => { lock (_sessions) _sessions.Remove(s); if (ex is not (null or EndOfStreamException or OperationCanceledException)) Error?.Invoke(ex.Message); };
             lock (_sessions) _sessions.Add(session);
