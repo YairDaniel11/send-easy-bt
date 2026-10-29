@@ -127,6 +127,9 @@ final class UpdateChecker {
                 if (tag.startsWith(OLD_TAG_PREFIX)) ver = tag.substring(OLD_TAG_PREFIX.length());
                 else if (tag.startsWith(TAG_PREFIX)) ver = tag.substring(TAG_PREFIX.length());
                 else continue;
+                // מספר הגרסה של ה-APK עצמו כתוב בהערות ה-Release (הוא לא משתנה כשמתעדכנת רק תוכנת ה-Windows)
+                java.util.regex.Matcher vm = java.util.regex.Pattern.compile("android-version:\\s*([0-9.]+)").matcher(o.optString("body", ""));
+                if (vm.find()) ver = vm.group(1);
                 String url = o.optString("html_url", "");
                 if (ver.length() == 0 || !url.startsWith("https://")) continue;
                 String apk = null;

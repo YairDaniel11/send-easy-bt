@@ -615,29 +615,30 @@ public class MainActivity extends Activity implements Events.Listener {
         TextView close = UiKit.actionButton(this, getString(R.string.savedir_close), new View.OnClickListener() {
             @Override public void onClick(View v) { if (holder[0] != null) holder[0].dismiss(); }
         });
-        // כפתור סגור קטן, צמוד לשמאל (Gravity.LEFT מוחלט, לא תלוי בכיוון הכתיבה)
-        LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        bl.topMargin = UiKit.dp(this, 10);
-        bl.gravity = android.view.Gravity.LEFT;
-        close.setMinimumWidth(UiKit.dp(this, 90));
-        close.setMinimumHeight(UiKit.dp(this, 40));
-        close.setMinHeight(UiKit.dp(this, 40));
+        // שני הכפתורים לרוחב כל החלונית, עם רווח גדול ביניהם. השורה LTR כדי ש"סגור" יישאר פיזית משמאל
+        close.setMinimumHeight(UiKit.dp(this, 44));
+        close.setMinHeight(UiKit.dp(this, 44));
         TextView upd = UiKit.actionButton(this, getString(R.string.menu_check_update), new View.OnClickListener() {
             @Override public void onClick(View v) {
                 if (holder[0] != null) holder[0].dismiss();
                 checkUpdate(true);
             }
         });
-        upd.setMinimumHeight(UiKit.dp(this, 40));
-        upd.setMinHeight(UiKit.dp(this, 40));
+        upd.setMinimumHeight(UiKit.dp(this, 44));
+        upd.setMinHeight(UiKit.dp(this, 44));
         LinearLayout btnRow = new LinearLayout(this);
         btnRow.setOrientation(LinearLayout.HORIZONTAL);
-        LinearLayout.LayoutParams ul = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        ul.rightMargin = UiKit.dp(this, 8);
-        btnRow.addView(close, ul);
-        btnRow.addView(upd, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        btnRow.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
+        LinearLayout.LayoutParams cl = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        cl.rightMargin = UiKit.dp(this, 12);
+        LinearLayout.LayoutParams ul = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        ul.leftMargin = UiKit.dp(this, 12);
+        btnRow.addView(close, cl);
+        btnRow.addView(upd, ul);
         upd.setId(View.generateViewId());
         close.setId(View.generateViewId());
+        LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        bl.topMargin = UiKit.dp(this, 14);
         box.addView(btnRow, bl);
         android.widget.ScrollView sv = new android.widget.ScrollView(this);
         sv.addView(box);
@@ -734,13 +735,12 @@ public class MainActivity extends Activity implements Events.Listener {
                 .show();
     }
 
-    /** התפריט הראשי: הגדרות, בדיקת עדכון, אודות. */
+    /** התפריט הראשי: הגדרות, צ'אט חדש, מכשירי בלוטוס, אודות (בדיקת העדכון נמצאת באודות ובהגדרות). */
     private void showMenu() {
         final String[] items = {
                 getString(R.string.menu_settings),
                 getString(R.string.menu_new_chat),
                 getString(R.string.menu_bt_devices),
-                getString(R.string.menu_check_update),
                 getString(R.string.menu_about)};
         new AlertDialog.Builder(this)
                 .setItems(items, new DialogInterface.OnClickListener() {
@@ -748,7 +748,6 @@ public class MainActivity extends Activity implements Events.Listener {
                         if (which == 0) showSettings();
                         else if (which == 1) showNewChat();
                         else if (which == 2) openBluetoothSettings();
-                        else if (which == 3) checkUpdate(true);
                         else showAbout();
                     }
                 })

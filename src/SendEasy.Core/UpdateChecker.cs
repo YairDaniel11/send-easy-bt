@@ -94,6 +94,10 @@ public static class UpdateChecker
             if (!rel.TryGetProperty("assets", out var assets)) continue;
             // תגית רגילה (vX.Y.Z, מתקין ו-APK באותו Release) או תגית ישנה android-vX.Y.Z
             var verText = tag.StartsWith("android-v", StringComparison.OrdinalIgnoreCase) ? tag.Substring("android-v".Length) : tag.TrimStart('v', 'V');
+            // מספר הגרסה של ה-APK עצמו כתוב בהערות ה-Release (הוא לא משתנה כשמתעדכנת רק תוכנת ה-Windows)
+            var bodyText = rel.TryGetProperty("body", out var bd) ? bd.GetString() ?? "" : "";
+            var vm = System.Text.RegularExpressions.Regex.Match(bodyText, @"android-version:\s*([0-9.]+)");
+            if (vm.Success) verText = vm.Groups[1].Value;
             if (!Version.TryParse(verText, out var ver)) continue;
             if (bestVersion != null && ver <= bestVersion) continue;
             foreach (var a in assets.EnumerateArray())
@@ -108,7 +112,7 @@ public static class UpdateChecker
             }
         }
         if (bestUrl == null || bestName == null || bestTag == null) throw new IOException("לא נמצאה גרסת אנדרואיד ב-GitHub");
-        return new AndroidRelease(bestTag.StartsWith("android-v", StringComparison.OrdinalIgnoreCase) ? bestTag.Substring("android-v".Length) : bestTag.TrimStart('v', 'V'), bestName, bestUrl, bestSize, bestSha);
+        return new AndroidRelease(bestVersion!.ToString(), bestName, bestUrl, bestSize, bestSha);
     }
 
     /// <summary>הנתיב של ה-APK האחרון אם הוא כבר קיים בתיקייה (בגודל הנכון), אחרת null.</summary>

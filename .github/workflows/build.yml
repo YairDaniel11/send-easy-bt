@@ -20,31 +20,75 @@ permissions:
 jobs:
   android:
     runs-on: ubuntu-latest
+    outputs:
+      apkver: ${{ steps.ver.outputs.apkver }}
     defaults:
       run:
         working-directory: android
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # האפליקציה נבנית מחדש (ומקבלת מספר גרסה חדש) רק אם הקוד שלה השתנה מאז ה-Release האחרון.
+      # אחרת ה-APK הקיים עובר לגרסה החדשה כמו שהוא, כדי שלא תקפוץ בטלפון התראה על עדכון.
+      - name: האם האפליקציה השתנתה
+        id: chg
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          changed=true
+          tag=$(gh release list --limit 1 --json tagName -q '.[0].tagName' || true)
+          if [ -n "$tag" ] && gh release view "$tag" --json assets -q '.assets[].name' | grep -qx 'SendEasyBT.apk'; then
+            base=$(git rev-list -n1 "$tag" 2>/dev/null || true)
+            if [ -n "$base" ] && git diff --quiet "$base" "${{ github.sha }}" -- android; then changed=false; fi
+          fi
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-java@v4
+        if: steps.chg.outputs.changed == 'true'
         with:
           distribution: temurin
           java-version: '17'
 
       - uses: gradle/actions/setup-gradle@v4
+        if: steps.chg.outputs.changed == 'true'
         with:
           gradle-version: '8.7'
 
       - name: מספר גרסה
+        if: steps.chg.outputs.changed == 'true'
         run: |
           sed -i "s/versionCode [0-9]*/versionCode ${{ github.run_number }}/" app/build.gradle
           sed -i "s/versionName \"[^\"]*\"/versionName \"0.1.${{ github.run_number }}\"/" app/build.gradle
 
       - name: בניית APK
-        run: gradle assembleDebug --no-daemon
+        if: steps.chg.outputs.changed == 'true'
+        run: |
+          gradle assembleDebug --no-daemon
+          cp app/build/outputs/apk/debug/*.apk SendEasyBT.apk
 
-      - name: שם קבוע לקובץ
-        run: cp app/build/outputs/apk/debug/*.apk SendEasyBT.apk
+      - name: שימוש ב-APK הקיים
+        if: steps.chg.outputs.changed != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tag="${{ steps.chg.outputs.tag }}"
+          gh release download "$tag" -p SendEasyBT.apk -D .
+          body=$(gh release view "$tag" --json body -q .body)
+          v=$(printf '%s' "$body" | grep -o 'android-version: [0-9.]*' | head -1 | cut -d' ' -f2 || true)
+          [ -n "$v" ] || v="${tag#v}"
+          echo "$v" > apk-version.txt
+
+      - name: גרסת האפליקציה
+        id: ver
+        run: |
+          if [ "${{ steps.chg.outputs.changed }}" = "true" ]; then v="0.1.${{ github.run_number }}"; else v=$(cat apk-version.txt); fi
+          echo "apkver=$v" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -111,4 +155,9 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           v="0.1.${{ github.run_number }}"
-          gh release create "v$v" out/SendEasyBT-Setup.exe out/SendEasyBT.apk             --latest             --title "שליחה קלה - BT $v"             --notes "גרסה $v. מתקין ה-Windows (SendEasyBT-Setup.exe) ואפליקציית האנדרואיד (SendEasyBT.apk, אנדרואיד 4.4 ומעלה, גרסת בדיקה debug) באותו מספר גרסה. נבנה אוטומטית מהקוד של ${{ github.sha }}."
+          notes="גרסה $v. מתקין ה-Windows (SendEasyBT-Setup.exe) ואפליקציית האנדרואיד (SendEasyBT.apk, אנדרואיד 4.4 ומעלה, גרסת בדיקה debug). נבנה אוטומטית מהקוד של ${{ github.sha }}."
+          notes="$notes"$'\n\n'"android-version: ${{ needs.android.outputs.apkver }}"
+          gh release create "v$v" out/SendEasyBT-Setup.exe out/SendEasyBT.apk \
+            --latest \
+            --title "שליחה קלה - BT $v" \
+            --notes "$notes"

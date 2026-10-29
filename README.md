@@ -28,7 +28,7 @@
 ## אפליקציית אנדרואיד
 
 ### התקנה בטלפון
-1. הורד את `SendEasyBT.apk` מהגרסה האחרונה ב-[Releases](../../releases/latest), או ישירות מהקישור הקבוע: https://github.com/YairDaniel11/send-easy-bt/releases/latest/download/SendEasyBT.apk . כל גרסה כוללת את מתקין ה-Windows ואת ה-APK, באותו מספר גרסה.
+1. הורד את `SendEasyBT.apk` מהגרסה האחרונה ב-[Releases](../../releases/latest), או ישירות מהקישור הקבוע: https://github.com/YairDaniel11/send-easy-bt/releases/latest/download/SendEasyBT.apk . כל Release כולל את מתקין ה-Windows ואת ה-APK העדכני.
 2. פתח את הקובץ בטלפון ואשר התקנה ממקור לא ידוע.
 3. הפעל את האפליקציה ואשר את ההרשאות שהיא מבקשת.
 
@@ -165,7 +165,7 @@ gradle assembleDebug
 ה-APK נוצר ב-`android/app/build/outputs/apk/debug/`.
 
 ### גרסאות אוטומטיות
-תהליך GitHub Actions אחד ([build.yml](.github/workflows/build.yml)) רץ רק כשהקוד משתנה (`src/`, `tests/`, `build/`, `android/` או קובץ התהליך). שינויים ב-README או ברישיון לא מפעילים בנייה. הוא מריץ בדיקות, בונה את מתקין ה-Windows ואת ה-APK, ומפרסם Release אחד בתגית `v0.1.N` עם שני הקבצים (`SendEasyBT-Setup.exe` ו-`SendEasyBT.apk`) ומספר גרסה אחד. אם אחד מהם נכשל, לא מתפרסם Release. מפתח החתימה של ה-Windows נשמר כסוד של המאגר ואינו מופיע בקוד. ה-APK נחתם במפתח ה-debug הציבורי שבמאגר.
+תהליך GitHub Actions אחד ([build.yml](.github/workflows/build.yml)) רץ רק כשהקוד משתנה (`src/`, `tests/`, `build/`, `android/` או קובץ התהליך). שינויים ב-README או ברישיון לא מפעילים בנייה. הוא מריץ בדיקות, בונה את מתקין ה-Windows ואת ה-APK, ומפרסם Release אחד בתגית `v0.1.N` עם שני הקבצים (`SendEasyBT-Setup.exe` ו-`SendEasyBT.apk`). אם קוד האפליקציה לא השתנה, ה-APK הקיים עובר לגרסה החדשה כמו שהוא, עם מספר הגרסה שלו (הוא רשום בהערות ה-Release בשורה `android-version`), כדי שלא תופיע בטלפון התראת עדכון סתם. אם אחד מהם נכשל, לא מתפרסם Release. מפתח החתימה של ה-Windows נשמר כסוד של המאגר ואינו מופיע בקוד. ה-APK נחתם במפתח ה-debug הציבורי שבמאגר.
 
 ## רישיון
 [MIT](LICENSE)
