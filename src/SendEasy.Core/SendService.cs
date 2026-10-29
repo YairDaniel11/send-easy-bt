@@ -32,6 +32,7 @@ public static class SendService
                 finally { peer.Dispose(); }
             }
 
+            status("האפליקציה בטלפון לא זמינה - שולח בבלוטוס רגיל (הטלפון יבקש אישור קבלה)");
             for (int i = 0; i < files.Count; i++)
             {
                 var f = files[i];
