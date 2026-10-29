@@ -22,7 +22,7 @@ import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 
-/** בדיקת גרסה חדשה ב-GitHub Releases (תגיות android-vX.Y.Z). רצה ברקע ושותקת בכל כשל. */
+/** בדיקת גרסה חדשה ב-GitHub Releases (תגית vX.Y.Z, עם ה-APK והמתקין באותו Release). רצה ברקע ושותקת בכל כשל. */
 final class UpdateChecker {
     private UpdateChecker() {}
 
@@ -48,7 +48,8 @@ final class UpdateChecker {
     }
 
     private static final String API = "https://api.github.com/repos/YairDaniel11/send-easy-bt/releases?per_page=15";
-    private static final String TAG_PREFIX = "android-v";
+    private static final String TAG_PREFIX = "v";
+    private static final String OLD_TAG_PREFIX = "android-v"; // תגיות ישנות, לפני האיחוד
     private static final long MIN_INTERVAL = 12L * 60 * 60 * 1000;
 
     static boolean online(Context c) {
@@ -102,7 +103,7 @@ final class UpdateChecker {
         return c.getPackageManager().getPackageInfo(c.getPackageName(), 0).versionName;
     }
 
-    /** מחזיר את פרטי ה-Release הראשון של האנדרואיד, או null. */
+    /** מחזיר את פרטי ה-Release האחרון שיש בו APK, או null. */
     private static Info fetchLatest() throws Exception {
         HttpsURLConnection c = (HttpsURLConnection) new URL(API).openConnection();
         try {
@@ -121,8 +122,11 @@ final class UpdateChecker {
             for (int i = 0; i < arr.length(); i++) {
                 JSONObject o = arr.getJSONObject(i);
                 String tag = o.optString("tag_name", "");
-                if (!tag.startsWith(TAG_PREFIX) || o.optBoolean("draft", false)) continue;
-                String ver = tag.substring(TAG_PREFIX.length());
+                if (o.optBoolean("draft", false)) continue;
+                String ver;
+                if (tag.startsWith(OLD_TAG_PREFIX)) ver = tag.substring(OLD_TAG_PREFIX.length());
+                else if (tag.startsWith(TAG_PREFIX)) ver = tag.substring(TAG_PREFIX.length());
+                else continue;
                 String url = o.optString("html_url", "");
                 if (ver.length() == 0 || !url.startsWith("https://")) continue;
                 String apk = null;
@@ -139,7 +143,8 @@ final class UpdateChecker {
                         break;
                     }
                 }
-                return new Info(ver, url, apk, apk == null || size < 0 ? 0 : size);
+                if (apk == null) continue; // Release בלי APK (למשל גרסת Windows ישנה)
+                return new Info(ver, url, apk, size < 0 ? 0 : size);
             }
             return null;
         } finally {

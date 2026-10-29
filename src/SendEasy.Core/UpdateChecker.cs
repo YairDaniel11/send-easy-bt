@@ -76,7 +76,7 @@ public static class UpdateChecker
         return dest;
     }
 
-    /// <summary>פרטי ה-APK האחרון של אפליקציית האנדרואיד (התגית android-v* הגבוהה ביותר).</summary>
+    /// <summary>פרטי ה-APK האחרון של אפליקציית האנדרואיד (ה-Release הגבוה ביותר שיש בו APK).</summary>
     public sealed record AndroidRelease(string Version, string FileName, string Url, long Size, string? Sha256);
 
     public static async Task<AndroidRelease> FindLatestAndroidAsync(string repo, CancellationToken ct)
@@ -91,8 +91,10 @@ public static class UpdateChecker
         foreach (var rel in doc.RootElement.EnumerateArray())
         {
             var tag = rel.GetProperty("tag_name").GetString() ?? "";
-            if (!tag.StartsWith("android-v", StringComparison.OrdinalIgnoreCase) || !rel.TryGetProperty("assets", out var assets)) continue;
-            if (!Version.TryParse(tag.Substring("android-v".Length), out var ver)) continue;
+            if (!rel.TryGetProperty("assets", out var assets)) continue;
+            // תגית רגילה (vX.Y.Z, מתקין ו-APK באותו Release) או תגית ישנה android-vX.Y.Z
+            var verText = tag.StartsWith("android-v", StringComparison.OrdinalIgnoreCase) ? tag.Substring("android-v".Length) : tag.TrimStart('v', 'V');
+            if (!Version.TryParse(verText, out var ver)) continue;
             if (bestVersion != null && ver <= bestVersion) continue;
             foreach (var a in assets.EnumerateArray())
             {
@@ -106,7 +108,7 @@ public static class UpdateChecker
             }
         }
         if (bestUrl == null || bestName == null || bestTag == null) throw new IOException("לא נמצאה גרסת אנדרואיד ב-GitHub");
-        return new AndroidRelease(bestTag.Substring("android-v".Length), bestName, bestUrl, bestSize, bestSha);
+        return new AndroidRelease(bestTag.StartsWith("android-v", StringComparison.OrdinalIgnoreCase) ? bestTag.Substring("android-v".Length) : bestTag.TrimStart('v', 'V'), bestName, bestUrl, bestSize, bestSha);
     }
 
     /// <summary>הנתיב של ה-APK האחרון אם הוא כבר קיים בתיקייה (בגודל הנכון), אחרת null.</summary>
@@ -116,7 +118,7 @@ public static class UpdateChecker
         return File.Exists(p) && (r.Size <= 0 || new FileInfo(p).Length == r.Size) ? p : null;
     }
 
-    /// <summary>מוריד את ה-APK האחרון של אפליקציית האנדרואיד (התגית android-v*) לתיקיית היעד. מחזיר נתיב וגרסה.</summary>
+    /// <summary>מוריד את ה-APK האחרון של אפליקציית האנדרואיד לתיקיית היעד. מחזיר נתיב וגרסה.</summary>
     public static async Task<(string Path, string Version)> DownloadLatestAndroidAsync(string repo, string destDir, IProgress<double>? progress, CancellationToken ct)
     {
         var r = await FindLatestAndroidAsync(repo, ct);

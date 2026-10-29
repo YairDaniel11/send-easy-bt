@@ -18,7 +18,7 @@
 
 ## הורדה והתקנה
 
-1. הורד את `SendEasyBT-Setup.exe` מעמוד [Releases](../../releases/latest).
+1. הורד את `SendEasyBT-Setup.exe` מעמוד [Releases](../../releases/latest), או ישירות מהקישור הקבוע: https://github.com/YairDaniel11/send-easy-bt/releases/latest/download/SendEasyBT-Setup.exe
 2. הפעל אותו. ההתקנה היא למשתמש הנוכחי ולא דורשת הרשאות מנהל, חוץ מהצעד האופציונלי של Windows 11 (ראה למטה).
 3. אם .NET 8 Desktop Runtime כבר מותקן, המתקין מדלג עליו. אם לא, הוא מוריד ומתקין אותו (כ-58MB, יבקש אישור מנהל).
 
@@ -28,7 +28,7 @@
 ## אפליקציית אנדרואיד
 
 ### התקנה בטלפון
-1. מעמוד [Releases](../../releases) הורד את קובץ ה-APK מהגרסה האחרונה שהתגית שלה מתחילה ב-`android-v` (למשל `android-v0.1.5`). הגרסאות האלה נפרדות מגרסאות ה-Windows.
+1. הורד את `SendEasyBT.apk` מהגרסה האחרונה ב-[Releases](../../releases/latest), או ישירות מהקישור הקבוע: https://github.com/YairDaniel11/send-easy-bt/releases/latest/download/SendEasyBT.apk . כל גרסה כוללת את מתקין ה-Windows ואת ה-APK, באותו מספר גרסה.
 2. פתח את הקובץ בטלפון ואשר התקנה ממקור לא ידוע.
 3. הפעל את האפליקציה ואשר את ההרשאות שהיא מבקשת.
 
@@ -165,10 +165,7 @@ gradle assembleDebug
 ה-APK נוצר ב-`android/app/build/outputs/apk/debug/`.
 
 ### גרסאות אוטומטיות
-שני תהליכי GitHub Actions, ושניהם רצים רק כשהקוד שלהם משתנה. שינויים ב-README או ברישיון לא מפעילים בנייה.
-
-- [build.yml](.github/workflows/build.yml): תוכנת Windows. מופעל על `src/`, `tests/`, `build/` או קובץ התהליך. מריץ בדיקות, בונה את המתקין ומפרסם Release בתגית `v0.1.N`. מפתח החתימה נשמר כסוד של המאגר ואינו מופיע בקוד.
-- [android.yml](.github/workflows/android.yml): אפליקציית אנדרואיד. מופעל על `android/` או קובץ התהליך. בונה APK ומפרסם Release בתגית `android-v0.1.N` (לא מסומן כ"אחרון", כדי לא להתערבב עם גרסת ה-Windows). אם מוגדר הסוד `ANDROID_DEBUG_KEYSTORE_BASE64`, ה-APK נחתם במפתח קבוע.
+תהליך GitHub Actions אחד ([build.yml](.github/workflows/build.yml)) רץ רק כשהקוד משתנה (`src/`, `tests/`, `build/`, `android/` או קובץ התהליך). שינויים ב-README או ברישיון לא מפעילים בנייה. הוא מריץ בדיקות, בונה את מתקין ה-Windows ואת ה-APK, ומפרסם Release אחד בתגית `v0.1.N` עם שני הקבצים (`SendEasyBT-Setup.exe` ו-`SendEasyBT.apk`) ומספר גרסה אחד. אם אחד מהם נכשל, לא מתפרסם Release. מפתח החתימה של ה-Windows נשמר כסוד של המאגר ואינו מופיע בקוד. ה-APK נחתם במפתח ה-debug הציבורי שבמאגר.
 
 ## רישיון
 [MIT](LICENSE)
