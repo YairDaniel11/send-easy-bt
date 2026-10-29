@@ -109,9 +109,9 @@
                         <Button Grid.Column="2" x:Name="EmojiBtn" Width="42" Height="42" FontSize="20" Margin="0,0,4,0"
                                 FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Background="Transparent" BorderThickness="0" Click="Emoji_Click" Content="&#xE76E;" ToolTip="הוסף אייקון"/>
                         <Button Grid.Column="3" x:Name="PauseBtn" Width="44" Height="44" FontSize="16" Margin="0,0,4,0"
-                                BorderThickness="0" Click="Pause_Click" Content="⏸" ToolTip="השהה את ההקלטה" Visibility="Collapsed"/>
+                                FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" BorderThickness="0" Click="Pause_Click" Content="&#xE769;" ToolTip="השהה את ההקלטה" Visibility="Collapsed"/>
                         <Button Grid.Column="4" x:Name="ActionBtn" Width="44" Height="44" FontSize="18"
-                                BorderThickness="0" Click="Action_Click" Content="🎤" ToolTip="הקלטת הודעה קולית"/>
+                                FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" BorderThickness="0" Click="Action_Click" Content="&#xE720;" ToolTip="הקלטת הודעה קולית"/>
                     </Grid>
                     </StackPanel>
                 </Border>

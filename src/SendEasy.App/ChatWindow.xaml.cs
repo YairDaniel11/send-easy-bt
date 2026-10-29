@@ -58,13 +58,13 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         InitializeComponent();
         LoadConversations();
         _wa = _settings.ChatStyle == 0;
-        ActionBtn.Content = "🎤";
+        ActionBtn.Content = "\uE720";
         ActionBtn.ToolTip = "הקלטת הודעה קולית";
         Activated += (_, _) => SendReadReceipts();
         HookPaste();
         _recTimer.Tick += (_, _) => RecordLabel.Text = _voice.IsPaused
-            ? $"⏸ מושהה  {Fmt(_voice.ElapsedSeconds)}   (לחץ ▶ להמשך, ➤ לשליחה)"
-            : $"● מקליט  {Fmt(_voice.ElapsedSeconds)}   (⏸ להשהיה, ➤ לשליחה)";
+            ? $"⏸ מושהה  {Fmt(_voice.ElapsedSeconds)}   (כפתור ההשהיה: המשך, כפתור השליחה: שלח)"
+            : $"● מקליט  {Fmt(_voice.ElapsedSeconds)}   (כפתור ההשהיה: השהה, כפתור השליחה: שלח)";
         ConvList.ItemContainerStyle = ConvItemStyle();
         ApplyStyle();
         if (_convs.Count > 0) ConvList.SelectedIndex = 0;
@@ -604,7 +604,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         }
         if (_recording) return;
         bool empty = InputIsEmpty && _pastedImage == null;
-        ActionBtn.Content = empty ? "🎤" : "➤";
+        ActionBtn.Content = empty ? "\uE720" : "\uE724";
         ActionBtn.ToolTip = empty ? "הקלטת הודעה קולית" : "שלח";
     }
 
@@ -835,8 +835,8 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
     async void Pause_Click(object s, RoutedEventArgs e)
     {
         if (!_recording) return;
-        if (_voice.IsPaused) { await _voice.ResumeAsync(); PauseBtn.Content = "⏸"; PauseBtn.ToolTip = "השהה את ההקלטה"; }
-        else { await _voice.PauseAsync(); PauseBtn.Content = "▶"; PauseBtn.ToolTip = "המשך הקלטה"; }
+        if (_voice.IsPaused) { await _voice.ResumeAsync(); PauseBtn.Content = "\uE769"; PauseBtn.ToolTip = "השהה את ההקלטה"; }
+        else { await _voice.PauseAsync(); PauseBtn.Content = "\uE768"; PauseBtn.ToolTip = "המשך הקלטה"; }
     }
 
     async Task StartRecordingAsync()
@@ -848,9 +848,9 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         _recording = true;
         Input.Visibility = Visibility.Hidden;
         RecordLabel.Visibility = Visibility.Visible;
-        RecordLabel.Text = "● מקליט  0:00   (⏸ להשהיה, ➤ לשליחה)";
-        PauseBtn.Content = "⏸"; PauseBtn.ToolTip = "השהה את ההקלטה"; PauseBtn.Visibility = Visibility.Visible;
-        AttachBtn.Content = "\uE74D"; ActionBtn.Content = "➤"; ActionBtn.ToolTip = "שלח הודעה קולית";
+        RecordLabel.Text = "● מקליט  0:00   (כפתור ההשהיה: השהה, כפתור השליחה: שלח)";
+        PauseBtn.Content = "\uE769"; PauseBtn.ToolTip = "השהה את ההקלטה"; PauseBtn.Visibility = Visibility.Visible;
+        AttachBtn.Content = "\uE74D"; ActionBtn.Content = "\uE724"; ActionBtn.ToolTip = "שלח הודעה קולית";
         _recTimer.Start();
     }
 
