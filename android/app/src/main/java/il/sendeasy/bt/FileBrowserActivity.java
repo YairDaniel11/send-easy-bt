@@ -31,7 +31,13 @@ public class FileBrowserActivity extends Activity {
     /** true = מציג תיקיות וקבצי תמונה בלבד (לכפתור הצירוף בצ'אט). */
     static final String EXTRA_IMAGES_ONLY = "imagesOnly";
 
+    /** true = מצב בחירת תיקייה: רק תיקיות, תפריט = בחר את התיקייה הנוכחית, כוכבית = תיקייה חדשה. */
+    static final String EXTRA_PICK_DIR = "pickDir";
+    /** התוצאה במצב בחירת תיקייה: נתיב התיקייה שנבחרה. */
+    static final String EXTRA_DIR = "dir";
+
     private boolean imagesOnly;
+    private boolean pickDir;
 
     private ListView list;
     private TextView pathT, countT, emptyT;
@@ -58,9 +64,19 @@ public class FileBrowserActivity extends Activity {
         });
 
         imagesOnly = getIntent().getBooleanExtra(EXTRA_IMAGES_ONLY, false);
+        pickDir = getIntent().getBooleanExtra(EXTRA_PICK_DIR, false);
         if (imagesOnly) setTitle(R.string.browser_images_title);
         root = Environment.getExternalStorageDirectory();
         dir = root;
+        if (pickDir) {
+            setTitle(R.string.browser_dir_title);
+            ((TextView) findViewById(R.id.browserHint)).setText(R.string.browser_dir_hint);
+            String start = Prefs.saveDir(this);
+            if (start != null) {
+                File sf = new File(start);
+                if (sf.isDirectory() && sf.getPath().startsWith(root.getPath())) dir = sf;
+            }
+        }
         if (!Perms.hasReadStorage(this)) {
             Toast.makeText(this, R.string.browser_no_perm, Toast.LENGTH_LONG).show();
             Perms.requestMissing(this);
@@ -86,6 +102,7 @@ public class FileBrowserActivity extends Activity {
             });
             for (File k : kids) {
                 if (k.getName().startsWith(".")) continue;
+                if (pickDir && !k.isDirectory()) continue;
                 if (imagesOnly && !k.isDirectory() && !Storage.isImageName(k.getName())) continue;
                 entries.add(k);
             }
@@ -136,10 +153,43 @@ public class FileBrowserActivity extends Activity {
     }
 
     private void updateCount() {
+        if (pickDir) {
+            countT.setText(R.string.browser_dir_choose);
+            return;
+        }
         countT.setText(selected.isEmpty() ? "" : getString(R.string.browser_selected, selected.size()) + "  ·  " + getString(R.string.browser_send));
     }
 
+    private void newFolder() {
+        final android.widget.EditText et = new android.widget.EditText(this);
+        et.setSingleLine(true);
+        new android.app.AlertDialog.Builder(this)
+                .setTitle(R.string.browser_new_folder)
+                .setView(et)
+                .setPositiveButton(android.R.string.ok, new android.content.DialogInterface.OnClickListener() {
+                    @Override public void onClick(android.content.DialogInterface d, int w) {
+                        String n = Storage.sanitize(et.getText().toString());
+                        File nf = new File(dir, n);
+                        if (nf.isDirectory() || nf.mkdirs()) {
+                            dir = nf;
+                            load();
+                        } else {
+                            Toast.makeText(FileBrowserActivity.this, R.string.browser_new_folder_fail, Toast.LENGTH_LONG).show();
+                        }
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
     private void done() {
+        if (pickDir) {
+            Intent r = new Intent();
+            r.putExtra(EXTRA_DIR, dir.getAbsolutePath());
+            setResult(RESULT_OK, r);
+            finish();
+            return;
+        }
         if (selected.isEmpty()) {
             // לא סומן כלום: שולחים את הקובץ שעליו עומדים
             int pos = list.getSelectedItemPosition();
@@ -164,6 +214,10 @@ public class FileBrowserActivity extends Activity {
                 else if (back) up();
                 else { setResult(RESULT_CANCELED); finish(); }
             }
+            return true;
+        }
+        if (pickDir && code == KeyEvent.KEYCODE_STAR) {
+            if (e.getAction() == KeyEvent.ACTION_DOWN && e.getRepeatCount() == 0) newFolder();
             return true;
         }
         return super.dispatchKeyEvent(e);

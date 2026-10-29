@@ -55,6 +55,7 @@
         android:textStyle="bold" />
 
     <TextView
+        android:id="@+id/browserHint"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="?attr/sbRow"

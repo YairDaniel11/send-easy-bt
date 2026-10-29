@@ -117,4 +117,24 @@
     <string name="upd_current">אתה מעודכן</string>
     <string name="upd_no_net">אין חיבור לאינטרנט</string>
     <string name="upd_failed">לא ניתן לבדוק עדכון כרגע</string>
+    <string name="menu_save_dir">תיקיית שמירה</string>
+    <string name="savedir_current">נשמר בתיקייה: %1$s</string>
+    <string name="savedir_choose">בחר תיקייה</string>
+    <string name="savedir_default">ברירת מחדל</string>
+    <string name="savedir_close">סגור</string>
+    <string name="savedir_set">הקבצים יישמרו מעכשיו בתיקייה שבחרת</string>
+    <string name="savedir_reset">חזרה לתיקיית ברירת המחדל</string>
+    <string name="savedir_unsupported">אי אפשר לבחור תיקייה במכשיר הזה</string>
+    <string name="savedir_failed">לא ניתן לשמור את התיקייה שנבחרה</string>
+    <string name="save_fallback">נשמר בתיקיית ברירת המחדל (התיקייה שנבחרה לא זמינה): %1$s</string>
+    <string name="save_fallback_toast">התיקייה שנבחרה לא זמינה. הקובץ נשמר בתיקיית ברירת המחדל</string>
+    <string name="browser_dir_title">בחר תיקיית שמירה</string>
+    <string name="browser_dir_hint">אישור = כניסה לתיקייה   ·   תפריט = בחר את התיקייה הנוכחית   ·   כוכבית = תיקייה חדשה   ·   חזרה = למעלה</string>
+    <string name="browser_dir_choose">תפריט = בחר את התיקייה הנוכחית</string>
+    <string name="browser_new_folder">תיקייה חדשה</string>
+    <string name="browser_new_folder_fail">יצירת התיקייה נכשלה</string>
+    <string name="chat_delete">מחק את השיחה</string>
+    <string name="chat_delete_short">מחק שיחה</string>
+    <string name="chat_delete_btn">מחק</string>
+    <string name="chat_delete_confirm">למחוק את כל ההודעות עם %1$s? הקבצים שנשמרו בתיקיית ההורדות לא יימחקו.</string>
 </resources>

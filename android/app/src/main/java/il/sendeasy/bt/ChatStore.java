@@ -177,6 +177,36 @@ final class ChatStore {
         }
     }
 
+    /** מוחק שיחה: את קובץ ההיסטוריה ואת ההקלטות והתמונות הפנימיות שהוזכרו בה. קבצים בתיקיית ההורדות לא נוגעים. */
+    static synchronized void delete(Context c, String address) {
+        for (Msg m : load(c, address)) {
+            String n = new File(m.text).getName();
+            if (n.length() == 0) continue;
+            if (m.isVoice()) new File(Storage.voiceDir(c), n).delete();
+            else if (m.isPic()) new File(Storage.imagesDir(c), n).delete();
+        }
+        file(c, address).delete();
+        Events.post(Events.CHAT, address);
+    }
+
+    /** דיאלוג אישור למחיקת שיחה. פוקוס התחלתי על "ביטול". */
+    static void confirmDelete(android.app.Activity a, final String address, String name, final Runnable after) {
+        final Context app = a.getApplicationContext();
+        android.app.AlertDialog d = new android.app.AlertDialog.Builder(a)
+                .setMessage(a.getString(R.string.chat_delete_confirm, Fmt.ltr(name)))
+                .setPositiveButton(R.string.chat_delete_btn, new android.content.DialogInterface.OnClickListener() {
+                    @Override public void onClick(android.content.DialogInterface x, int w) {
+                        delete(app, address);
+                        if (after != null) after.run();
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .create();
+        d.show();
+        android.widget.Button neg = d.getButton(android.content.DialogInterface.BUTTON_NEGATIVE);
+        if (neg != null) neg.requestFocus();
+    }
+
     static synchronized List<Msg> load(Context c, String address) {
         List<Msg> list = new ArrayList<Msg>();
         File f = file(c, address);

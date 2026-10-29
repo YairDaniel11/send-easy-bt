@@ -81,6 +81,32 @@ final class Prefs {
         e.apply();
     }
 
+    /** תיקיית שמירה מותאמת כנתיב רגיל (API 19-28). null = ברירת המחדל. */
+    static String saveDir(Context c) {
+        String s = sp(c).getString("saveDir", null);
+        return s == null || s.length() == 0 ? null : s;
+    }
+
+    /** תיקיית שמירה מותאמת כ-treeUri של SAF (API 21+). null = ברירת המחדל. */
+    static String saveTree(Context c) {
+        String s = sp(c).getString("saveTree", null);
+        return s == null || s.length() == 0 ? null : s;
+    }
+
+    /** שומר נתיב רגיל (מבטל treeUri). */
+    static void setSaveDir(Context c, String path) {
+        sp(c).edit().putString("saveDir", path).remove("saveTree").apply();
+    }
+
+    /** שומר treeUri (מבטל נתיב רגיל). */
+    static void setSaveTree(Context c, String uri) {
+        sp(c).edit().putString("saveTree", uri).remove("saveDir").apply();
+    }
+
+    static void clearSaveLocation(Context c) {
+        sp(c).edit().remove("saveDir").remove("saveTree").apply();
+    }
+
     static long lastUpdateCheck(Context c) {
         return sp(c).getLong("updCheck", 0L);
     }

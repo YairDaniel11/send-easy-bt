@@ -288,13 +288,19 @@ public class MainActivity extends Activity implements Events.Listener {
             pickHint.setVisibility(View.GONE);
             return;
         }
-        final String[] items = {getString(R.string.act_send_file), getString(R.string.act_chat), getString(R.string.act_rename)};
+        final boolean hasChat = !ChatStore.load(this, d.getAddress()).isEmpty();
+        final String[] items = hasChat
+                ? new String[]{getString(R.string.act_send_file), getString(R.string.act_chat), getString(R.string.act_rename), getString(R.string.chat_delete_short)}
+                : new String[]{getString(R.string.act_send_file), getString(R.string.act_chat), getString(R.string.act_rename)};
         new AlertDialog.Builder(this)
                 .setTitle(DeviceNames.display(this, d))
                 .setItems(items, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface dlg, int which) {
                         if (which == 0) pickFiles(d.getAddress());
                         else if (which == 1) openChat(d.getAddress());
+                        else if (which == 3) ChatStore.confirmDelete(MainActivity.this, d.getAddress(), DeviceNames.display(MainActivity.this, d), new Runnable() {
+                            @Override public void run() { loadUnread(); adapter.notifyDataSetChanged(); }
+                        });
                         else DeviceNames.rename(MainActivity.this, d.getAddress(), nameOf(d), new Runnable() {
                             @Override public void run() { reload(); }
                         });
@@ -317,6 +323,10 @@ public class MainActivity extends Activity implements Events.Listener {
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
+        if (req == REQ_SAVE_TREE || req == REQ_SAVE_BROWSE) {
+            if (res == RESULT_OK && data != null) onSaveDirChosen(req, data);
+            return;
+        }
         if (res != RESULT_OK || data == null || pickAddress == null) return;
         ArrayList<Uri> uris = FilePicker.result(req, data);
         if (!uris.isEmpty()) FilePicker.startSend(this, pickAddress, uris);
@@ -492,11 +502,92 @@ public class MainActivity extends Activity implements Events.Listener {
         });
     }
 
+    // ------------------------------------------------------------ תיקיית שמירה
+
+    private static final int REQ_SAVE_TREE = 21;
+    private static final int REQ_SAVE_BROWSE = 22;
+
+    private void showSaveDirDialog() {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.menu_save_dir)
+                .setMessage(getString(R.string.savedir_current, Fmt.ltr(Storage.receiveDirLabel(this))))
+                .setPositiveButton(R.string.savedir_choose, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) { chooseSaveDir(); }
+                })
+                .setNeutralButton(R.string.savedir_default, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) {
+                        releaseOldTree();
+                        Prefs.clearSaveLocation(MainActivity.this);
+                        updateStatus();
+                        Toast.makeText(MainActivity.this, R.string.savedir_reset, Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton(R.string.savedir_close, null)
+                .show();
+    }
+
+    private void chooseSaveDir() {
+        boolean touch = getPackageManager().hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN);
+        int sdk = Build.VERSION.SDK_INT;
+        if (sdk >= 29 || (sdk >= 21 && touch)) {
+            try {
+                Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+                i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                        | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+                startActivityForResult(i, REQ_SAVE_TREE);
+                return;
+            } catch (RuntimeException e) { // כולל ActivityNotFoundException
+                if (sdk >= 29) {
+                    Toast.makeText(this, R.string.savedir_unsupported, Toast.LENGTH_LONG).show();
+                    return;
+                }
+            }
+        }
+        if (sdk >= 23 && sdk <= 28 && !Perms.has(this, android.Manifest.permission.WRITE_EXTERNAL_STORAGE)) Perms.requestMissing(this);
+        Intent b = new Intent(this, FileBrowserActivity.class);
+        b.putExtra(FileBrowserActivity.EXTRA_PICK_DIR, true);
+        startActivityForResult(b, REQ_SAVE_BROWSE);
+    }
+
+    private void releaseOldTree() {
+        String old = Prefs.saveTree(this);
+        if (old == null || Build.VERSION.SDK_INT < 19) return;
+        try {
+            getContentResolver().releasePersistableUriPermission(Uri.parse(old),
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        } catch (RuntimeException ignored) { }
+    }
+
+    private void onSaveDirChosen(int req, Intent data) {
+        if (req == REQ_SAVE_TREE) {
+            Uri u = data.getData();
+            if (u == null) return;
+            try {
+                getContentResolver().takePersistableUriPermission(u,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+            } catch (RuntimeException e) {
+                Toast.makeText(this, R.string.savedir_failed, Toast.LENGTH_LONG).show();
+                return;
+            }
+            String old = Prefs.saveTree(this);
+            if (old != null && !old.equals(u.toString())) releaseOldTree();
+            Prefs.setSaveTree(this, u.toString());
+        } else {
+            String p = data.getStringExtra(FileBrowserActivity.EXTRA_DIR);
+            if (p == null) return;
+            releaseOldTree();
+            Prefs.setSaveDir(this, p);
+        }
+        updateStatus();
+        Toast.makeText(this, R.string.savedir_set, Toast.LENGTH_SHORT).show();
+    }
+
     private void showMenu() {
         final String[] items = {
                 getString(R.string.menu_toggle_receive),
                 getString(Prefs.showServiceNotification(this) ? R.string.menu_svc_notif_shown : R.string.menu_svc_notif_hidden),
                 getString(R.string.menu_receive_dir),
+                getString(R.string.menu_save_dir),
                 getString(R.string.menu_chat_style),
                 getString(R.string.menu_check_update),
                 getString(R.string.menu_about)};
@@ -517,12 +608,14 @@ public class MainActivity extends Activity implements Events.Listener {
                                     .setMessage(getString(R.string.main_receive_dir, Fmt.ltr(Storage.receiveDirLabel(MainActivity.this))))
                                     .setPositiveButton(android.R.string.ok, null).show();
                         } else if (which == 3) {
+                            showSaveDirDialog();
+                        } else if (which == 4) {
                             new AlertDialog.Builder(MainActivity.this)
                                     .setTitle(R.string.menu_chat_style)
                                     .setSingleChoiceItems(new String[]{getString(R.string.style_wa), getString(R.string.style_gc)}, Prefs.chatStyle(MainActivity.this), new DialogInterface.OnClickListener() {
                                         @Override public void onClick(DialogInterface d, int w) { Prefs.setChatStyle(MainActivity.this, w); d.dismiss(); }
                                     }).show();
-                        } else if (which == 4) {
+                        } else if (which == 5) {
                             checkUpdate(true);
                         } else {
                             new AlertDialog.Builder(MainActivity.this)

@@ -4,14 +4,20 @@ import android.annotation.TargetApi;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
+import android.content.UriPermission;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.StatFs;
+import android.provider.DocumentsContract;
 import android.provider.MediaStore;
 import android.webkit.MimeTypeMap;
+import android.widget.Toast;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -19,6 +25,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -76,10 +84,138 @@ final class Storage {
 
     /** תיאור המקום שבו נשמרים קבצים, להצגה למשתמש. */
     static String receiveDirLabel(Context c) {
+        String custom = customLabel(c);
+        if (custom != null) return custom;
+        return defaultLabel(c);
+    }
+
+    private static String defaultLabel(Context c) {
         if (Build.VERSION.SDK_INT >= 29) return "Download/" + DIR_NAME;
         if (canWritePublic(c)) return new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), DIR_NAME).getPath();
         File f = c.getExternalFilesDir(null);
         return f == null ? "" : new File(f, DIR_NAME).getPath();
+    }
+
+    // ---- תיקיית שמירה מותאמת ----
+
+    /** האם המשתמש הגדיר תיקייה מותאמת שרלוונטית לגרסת המכשיר (גם אם כרגע אין גישה אליה). */
+    static boolean hasCustom(Context c) {
+        if (Build.VERSION.SDK_INT >= 21 && Prefs.saveTree(c) != null) return true;
+        return Build.VERSION.SDK_INT < 29 && Prefs.saveDir(c) != null;
+    }
+
+    /** האם התיקייה המותאמת ניתנת לכתיבה כרגע (הרשאה בתוקף). */
+    private static boolean customUsable(Context c) {
+        if (Build.VERSION.SDK_INT >= 21 && Prefs.saveTree(c) != null) {
+            return hasTreePermission(c, Uri.parse(Prefs.saveTree(c)));
+        }
+        return Build.VERSION.SDK_INT < 29 && Prefs.saveDir(c) != null && canWritePublic(c);
+    }
+
+    /** תיאור התיקייה המותאמת (null אם אין או אם אין גישה אליה). */
+    private static String customLabel(Context c) {
+        if (!hasCustom(c) || !customUsable(c)) return null;
+        if (Build.VERSION.SDK_INT >= 21 && Prefs.saveTree(c) != null) return treeLabel(Uri.parse(Prefs.saveTree(c)));
+        return Prefs.saveDir(c);
+    }
+
+    @TargetApi(21)
+    static String treeLabel(Uri tree) {
+        try {
+            String id = DocumentsContract.getTreeDocumentId(tree);
+            if (id.startsWith("primary:")) id = id.substring(8);
+            else id = id.replace(':', '/');
+            return id.length() == 0 ? "/" : id;
+        } catch (RuntimeException e) {
+            return tree.toString();
+        }
+    }
+
+    @TargetApi(21)
+    private static boolean hasTreePermission(Context c, Uri tree) {
+        try {
+            List<UriPermission> l = c.getContentResolver().getPersistedUriPermissions();
+            for (UriPermission p : l) {
+                if (p.getUri().equals(tree) && p.isWritePermission()) return true;
+            }
+        } catch (RuntimeException ignored) { }
+        return false;
+    }
+
+    private static void toastMain(Context c, final int res) {
+        final Context app = c.getApplicationContext();
+        new Handler(Looper.getMainLooper()).post(new Runnable() {
+            @Override public void run() {
+                try { Toast.makeText(app, res, Toast.LENGTH_LONG).show(); } catch (RuntimeException ignored) { }
+            }
+        });
+    }
+
+    /** שמירה בתיקייה המותאמת. זורק חריגה בכשל (והקובץ הזמני נשאר שלם). */
+    private static String publishCustom(Context c, File temp, String name) throws IOException {
+        if (Build.VERSION.SDK_INT >= 21 && Prefs.saveTree(c) != null) return publishTree(c, temp, name);
+        if (!canWritePublic(c)) throw new IOException("אין הרשאת כתיבה");
+        File dir = new File(Prefs.saveDir(c));
+        if (!dir.isDirectory() && !dir.mkdirs()) throw new IOException("אי אפשר ליצור תיקייה");
+        File dest = uniqueFile(dir, name);
+        if (!temp.renameTo(dest)) copyToFile(temp, dest);
+        MediaScannerConnection.scanFile(c, new String[]{dest.getAbsolutePath()}, null, null);
+        return dest.getAbsolutePath();
+    }
+
+    @TargetApi(21)
+    private static String publishTree(Context c, File temp, String name) throws IOException {
+        Uri tree = Uri.parse(Prefs.saveTree(c));
+        if (!hasTreePermission(c, tree)) throw new IOException("ההרשאה לתיקייה פקעה");
+        ContentResolver cr = c.getContentResolver();
+        String parentId = DocumentsContract.getTreeDocumentId(tree);
+        Uri parent = DocumentsContract.buildDocumentUriUsingTree(tree, parentId);
+        String finalName = uniqueDocName(cr, tree, parentId, name);
+        Uri doc = DocumentsContract.createDocument(cr, parent, mimeOf(finalName), finalName);
+        if (doc == null) throw new IOException("יצירת הקובץ נכשלה");
+        try {
+            OutputStream os = cr.openOutputStream(doc);
+            if (os == null) throw new IOException("אין פלט");
+            InputStream is;
+            try {
+                is = new FileInputStream(temp);
+            } catch (IOException e) {
+                try { os.close(); } catch (IOException ignored) { }
+                throw e;
+            }
+            copy(is, os);
+        } catch (IOException e) {
+            try { DocumentsContract.deleteDocument(cr, doc); } catch (Exception ignored) { }
+            throw e;
+        } catch (RuntimeException e) {
+            try { DocumentsContract.deleteDocument(cr, doc); } catch (Exception ignored) { }
+            throw e;
+        }
+        return treeLabel(tree) + "/" + finalName;
+    }
+
+    /** שם שלא קיים עדיין בתיקייה (name, name (1), ...), כדי לא לדרוס. */
+    @TargetApi(21)
+    private static String uniqueDocName(ContentResolver cr, Uri tree, String parentId, String name) {
+        HashSet<String> existing = new HashSet<String>();
+        Cursor cur = null;
+        try {
+            Uri kids = DocumentsContract.buildChildDocumentsUriUsingTree(tree, parentId);
+            cur = cr.query(kids, new String[]{DocumentsContract.Document.COLUMN_DISPLAY_NAME}, null, null, null);
+            if (cur != null) while (cur.moveToNext()) existing.add(cur.getString(0));
+        } catch (RuntimeException ignored) {
+        } finally {
+            if (cur != null) cur.close();
+        }
+        if (!existing.contains(name)) return name;
+        int dot = name.lastIndexOf('.');
+        String stem = dot > 0 ? name.substring(0, dot) : name;
+        String ext = dot > 0 ? name.substring(dot) : "";
+        for (int i = 1; i < 10000; i++) {
+            String n = stem + " (" + i + ")" + ext;
+            if (!existing.contains(n)) return n;
+        }
+        return stem + "-" + System.currentTimeMillis() + ext;
     }
 
     private static boolean canWritePublic(Context c) {
@@ -90,6 +226,23 @@ final class Storage {
 
     /** מפרסם את הקובץ הזמני ביעד הסופי. מחזיר תיאור מיקום, או null בכשל. לא דורס קבצים קיימים. */
     static String publish(Context c, File temp, String name) {
+        boolean customFailed = false;
+        if (hasCustom(c)) {
+            try {
+                return publishCustom(c, temp, name);
+            } catch (Exception e) {
+                customFailed = true; // נופלים לברירת המחדל; הקובץ הזמני עדיין קיים
+            }
+        }
+        String where = publishDefault(c, temp, name);
+        if (customFailed && where != null) {
+            toastMain(c, R.string.save_fallback_toast);
+            return c.getString(R.string.save_fallback, where);
+        }
+        return where;
+    }
+
+    private static String publishDefault(Context c, File temp, String name) {
         try {
             if (Build.VERSION.SDK_INT >= 29) return publishMediaStore(c, temp, name);
             File dir;
@@ -276,6 +429,9 @@ final class Storage {
         File dest;
         if (isVoiceName(name)) {
             dest = c.getFilesDir();
+        } else if (hasCustom(c) && customUsable(c)) {
+            if (Build.VERSION.SDK_INT >= 21 && Prefs.saveTree(c) != null) dest = Environment.getExternalStorageDirectory();
+            else dest = new File(Prefs.saveDir(c));
         } else if (Build.VERSION.SDK_INT >= 29) {
             dest = Environment.getExternalStorageDirectory();
         } else if (canWritePublic(c)) {
