@@ -14,6 +14,8 @@ public static class PeerConnections
 
     /// <summary>הצד השני קרא הודעה שלנו: (כתובת המכשיר, מזהה ההודעה).</summary>
     public static event Action<ulong, long>? ReadReceived;
+    /// <summary>הטלפון פתח צ'אט חדש איתנו.</summary>
+    public static event Action<ulong>? NewChatReceived;
 
     static bool Alive(Dictionary<ulong, PeerSession> d, ulong address, out PeerSession? s)
     {
@@ -29,6 +31,7 @@ public static class PeerConnections
         var map = inbound ? Inbound : Outbound;
         s.RemoteAddress = address;
         s.ReadReceived += id => ReadReceived?.Invoke(address, id);
+        s.NewChatReceived += () => NewChatReceived?.Invoke(address);
         lock (map) map[address] = s;
         s.Closed += _ => { lock (map) if (map.TryGetValue(address, out var cur) && ReferenceEquals(cur, s)) map.Remove(address); };
     }
@@ -63,6 +66,18 @@ public static class PeerConnections
             return true;
         }
         catch { return false; }
+    }
+
+    /// <summary>מודיע לטלפון שנפתח צ'אט חדש (אם מחובר או ניתן להתחבר).</summary>
+    public static async Task SendNewChatAsync(ulong address)
+    {
+        try
+        {
+            PeerSession? s = null;
+            if (!Alive(Inbound, address, out s) && !Alive(Outbound, address, out s)) s = await GetAsync(address);
+            if (s != null) await s.SendNewChatAsync();
+        }
+        catch { }
     }
 
     public static void CloseAll()

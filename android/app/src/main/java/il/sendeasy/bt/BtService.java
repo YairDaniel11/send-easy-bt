@@ -220,6 +220,11 @@ public class BtService extends Service {
             final String address = dev.getAddress();
             Session s = new Session(sock.getInputStream(), sock.getOutputStream(), sock,
                     Prefs.deviceId(this), Connector.myName(this), Connector.tmpDir(this), new Incoming(address, deviceName(dev)));
+            s.newChatHandler = new Runnable() {
+                @Override public void run() {
+                    if (ChatStore.newThread(getApplicationContext(), address)) Events.post(Events.CHAT, address);
+                }
+            };
             sessions.put(s, Boolean.TRUE);
             BY_ADDRESS.put(address, s);
             sessionStarted();

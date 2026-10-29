@@ -16,7 +16,7 @@ public static class PeerProtocol
     public const int MaxNameBytes = 255;
     public const long MaxFileSize = 4L * 1024 * 1024 * 1024;
 
-    public const byte Hello = 0x01, Ping = 0x02, Pong = 0x03, Text = 0x10, Ack = 0x11, Read = 0x12,
+    public const byte Hello = 0x01, Ping = 0x02, Pong = 0x03, Text = 0x10, Ack = 0x11, Read = 0x12, NewChat = 0x13,
         FileOffer = 0x20, FileAccept = 0x21, FileReject = 0x22, FileChunk = 0x23, FileEnd = 0x24,
         FileDone = 0x25, Cancel = 0x26, Error = 0xF0;
 
@@ -76,6 +76,8 @@ public sealed class PeerSession : IDisposable
     public event Action<string, long>? TextReceivedEx;
     /// <summary>הצד השני קרא הודעה שלנו (מזהה ההודעה).</summary>
     public event Action<long>? ReadReceived;
+    /// <summary>הצד השני פתח צ'אט חדש.</summary>
+    public event Action? NewChatReceived;
     public ulong RemoteAddress { get; set; }
     public event Action<Exception?>? Closed;
 
@@ -175,6 +177,7 @@ public sealed class PeerSession : IDisposable
             case PeerProtocol.Ping: await SendFrameAsync(PeerProtocol.Pong, default, default); break;
             case PeerProtocol.Pong: break;
             case PeerProtocol.Text: await OnTextAsync(p); break;
+            case PeerProtocol.NewChat: NewChatReceived?.Invoke(); break;
             case PeerProtocol.Read:
                 if (p.Length >= 8) ReadReceived?.Invoke(BinaryPrimitives.ReadInt64BigEndian(p));
                 break;
@@ -350,6 +353,7 @@ public sealed class PeerSession : IDisposable
     public async Task<bool> SendTextAsync(string text, CancellationToken ct = default) => (await SendTextWithIdAsync(text, ct)).Ok;
 
     /// <summary>מאשר שקראנו הודעה של הצד השני (וי ירוק אצלו).</summary>
+    public Task SendNewChatAsync() => SendFrameAsync(PeerProtocol.NewChat, default, default);
     public Task SendReadAsync(long msgId) => SendFrameAsync(PeerProtocol.Read, Id8(msgId), default);
 
     public async Task<(bool Ok, long Id)> SendTextWithIdAsync(string text, CancellationToken ct = default)

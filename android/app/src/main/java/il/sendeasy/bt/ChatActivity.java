@@ -58,6 +58,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public class ChatActivity extends Activity implements Events.Listener {
     static final String EXTRA_ADDRESS = "address";
+    static final String EXTRA_ANNOUNCE_NEW = "announce_new";
     private static final int REQ_MIC = 4002;
     private static final long MAX_RECORD_MS = 5 * 60 * 1000;
 
@@ -132,6 +133,8 @@ public class ChatActivity extends Activity implements Events.Listener {
         ThemeUtil.forceRtl(this);
 
         address = getIntent().getStringExtra(EXTRA_ADDRESS);
+        final boolean announceNew = getIntent().getBooleanExtra(EXTRA_ANNOUNCE_NEW, false);
+        if (announceNew) announceNewChat();
         if (address == null) { finish(); return; }
         BluetoothAdapter bt = BluetoothAdapter.getDefaultAdapter();
         realName = address;
@@ -609,6 +612,11 @@ public class ChatActivity extends Activity implements Events.Listener {
                 s.close();
                 throw new InterruptedException();
             }
+            s.newChatHandler = new Runnable() {
+                @Override public void run() {
+                    if (ChatStore.newThread(getApplicationContext(), address)) Events.post(Events.CHAT, address);
+                }
+            };
             session = s;
         }
         return session;
@@ -881,7 +889,8 @@ public class ChatActivity extends Activity implements Events.Listener {
                             });
                         } else if (which == 5) {
                             stopPlay();
-                            if (!ChatStore.newThread(getApplicationContext(), address)) Toast.makeText(ChatActivity.this, R.string.chat_new_still_empty, Toast.LENGTH_SHORT).show();
+                            if (ChatStore.newThread(getApplicationContext(), address)) announceNewChat();
+                            else Toast.makeText(ChatActivity.this, R.string.chat_new_still_empty, Toast.LENGTH_SHORT).show();
                             reload();
                         } else if (which == 6) {
                             showOtherChats();
@@ -892,9 +901,19 @@ public class ChatActivity extends Activity implements Events.Listener {
                 .show();
     }
 
+    /** מודיע לצד השני (אם מחובר) שנפתח צ'אט חדש, כדי שגם אצלו ההודעות ייכנסו לשיחה חדשה. */
+    private void announceNewChat() {
+        io.execute(new Runnable() {
+            @Override public void run() {
+                try { ensureSession().sendNewChat(); } catch (Exception ignored) { }
+            }
+        });
+    }
+
     /** רשימת כל השיחות עם המכשיר (החדשה למעלה), עם תאריך תחילה ומספר הודעות; בחירה מעבירה אליה. */
     private void showOtherChats() {
         final List<Integer> ths = ChatStore.threads(this, address);
+        if (ths.size() < 2) { Toast.makeText(this, R.string.chats_no_others, Toast.LENGTH_SHORT).show(); return; }
         final int act = ChatStore.activeThread(this, address);
         java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("dd/MM/yy HH:mm");
         String[] labels = new String[ths.size()];
@@ -1147,8 +1166,10 @@ public class ChatActivity extends Activity implements Events.Listener {
             play.setBackgroundDrawable(UiKit.oval(cAccent));
             row.addView(play, new LinearLayout.LayoutParams(UiKit.dp(this, 36), UiKit.dp(this, 36)));
             UiKit.WaveView wave = new UiKit.WaveView(this, m.text.hashCode(), cAccent, (cSub & 0x00FFFFFF) | 0x88000000);
-            LinearLayout.LayoutParams wl = new LinearLayout.LayoutParams(UiKit.dp(this, 120), UiKit.dp(this, 30));
-            wl.leftMargin = UiKit.dp(this, 10); wl.rightMargin = UiKit.dp(this, 10);
+            // במסך צר (240dp) הגל הקבוע דחף את משך ההקלטה החוצה; מצמצמים אותו לפי הרוחב הפנוי
+            int waveW = Math.max(UiKit.dp(this, 36), Math.min(UiKit.dp(this, 120), getResources().getDisplayMetrics().widthPixels - UiKit.dp(this, 200)));
+            LinearLayout.LayoutParams wl = new LinearLayout.LayoutParams(waveW, UiKit.dp(this, 30));
+            wl.leftMargin = UiKit.dp(this, 6); wl.rightMargin = UiKit.dp(this, 6);
             row.addView(wave, wl);
             if (playing) playingWave = wave;
             row.addView(text(mmss(Storage.voiceSeconds(m.text)), cSub, 12));

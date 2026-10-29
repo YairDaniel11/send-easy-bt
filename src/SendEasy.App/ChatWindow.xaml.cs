@@ -293,7 +293,10 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         HeaderAvatar.Background = new SolidColorBrush(_cur.Color);
         var hdel = new MenuItem { Header = "מחק שיחה", Tag = _cur };
         hdel.Click += DeleteConv_Click;
-        HeaderBar.ContextMenu = new ContextMenu { FlowDirection = FlowDirection.RightToLeft, Items = { BuildThreadsMenu(_cur), hdel } };
+        var hmenu = new ContextMenu { FlowDirection = FlowDirection.RightToLeft };
+        if (BuildThreadsMenu(_cur) is { } tm) hmenu.Items.Add(tm);
+        hmenu.Items.Add(hdel);
+        HeaderBar.ContextMenu = hmenu;
     }
 
     /// <summary>מחיקת שיחה (קליק ימני על שיחה ברשימה).</summary>
@@ -324,8 +327,8 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
             return;
         }
         StopPlayback();
-        if (!ChatLog.NewThread(_cur.Address))
-            ConfirmDialog.Tell(this, "צ'אט חדש", "הצ'אט הנוכחי עדיין ריק, אין צורך בצ'אט חדש.");
+        if (ChatLog.NewThread(_cur.Address)) _ = PeerConnections.SendNewChatAsync(_cur.Address);
+        else ConfirmDialog.Tell(this, "צ'אט חדש", "הצ'אט הנוכחי עדיין ריק, אין צורך בצ'אט חדש.");
         SwitchedThread();
     }
 
@@ -339,8 +342,9 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
     }
 
     /// <summary>תת-תפריט "צ'אטים אחרים": כל השיחות עם המכשיר, עם תאריך תחילה ומספר הודעות.</summary>
-    MenuItem BuildThreadsMenu(Conv c)
+    MenuItem? BuildThreadsMenu(Conv c)
     {
+        if (ChatLog.Threads(c.Address).Count < 2) return null;
         var root = new MenuItem { Header = "עבור לצ'אטים אחרים עם המכשיר" };
         int act = ChatLog.ActiveThread(c.Address);
         foreach (var n in ChatLog.Threads(c.Address))

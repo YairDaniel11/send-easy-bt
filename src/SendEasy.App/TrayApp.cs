@@ -55,6 +55,10 @@ sealed class TrayApp : IDisposable
             if (ChatLog.MarkRead(addr, id) && _chat is { IsLoaded: true }) _chat.Refresh(addr, "");
         });
         _peer.ReceivedFrom += (addr, f, path) => _ui.BeginInvoke(() => OnFileInChat(addr, f, path));
+        PeerConnections.NewChatReceived += addr => _ui.BeginInvoke(() =>
+        {
+            if (ChatLog.NewThread(addr) && _chat is { IsLoaded: true }) _chat.Refresh(addr, "");
+        });
         _peer.Error += msg => Debug.WriteLine("peer error: " + msg);
         _ = StartServerAsync();
 
@@ -235,6 +239,18 @@ sealed class TrayApp : IDisposable
     void OnFileInChat(ulong addr, IncomingFile f, string path)
     {
         bool voice = ChatLog.IsVoiceName(f.Name);
+        // תמונה בצ'אט: עותק משלנו, כדי שהיא תוצג גם אם הקובץ בתיקיית הקבלה יימחק או יזוז
+        if (!voice && System.IO.Path.GetExtension(f.Name).ToLowerInvariant() is ".jpg" or ".jpeg" or ".png" or ".gif" or ".bmp" or ".webp")
+        {
+            try
+            {
+                System.IO.Directory.CreateDirectory(ChatLog.ImageDir);
+                var copy = FileNames.UniquePath(ChatLog.ImageDir, f.Name);
+                System.IO.File.Copy(path, copy);
+                path = copy;
+            }
+            catch { }
+        }
         ChatLog.Add(addr, new ChatEntry { Mine = false, Kind = voice ? "voice" : "file", Text = f.Name, Size = f.Size, Path = path, Device = f.FromName, Status = "delivered" });
         if (_chat is { IsLoaded: true }) _chat.Refresh(addr, f.FromName);
         if (voice && _chat is not { IsActive: true }) NotifyMessage(addr, f.FromName, "🎤 הודעה קולית");

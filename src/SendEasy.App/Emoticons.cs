@@ -120,7 +120,8 @@ static class Emoticons
         {
             var sp = new StackPanel { Orientation = Orientation.Horizontal };
             sp.Children.Add(Icon(item.Kind, 24));
-            sp.Children.Add(new TextBlock { Text = "  " + item.Name + "   " + item.Code, VerticalAlignment = VerticalAlignment.Center });
+            sp.Children.Add(new TextBlock { Text = "  " + item.Name + "  ", FontFamily = new FontFamily("Segoe UI"), FontSize = 14, VerticalAlignment = VerticalAlignment.Center });
+            sp.Children.Add(new TextBlock { Text = item.Code, FlowDirection = FlowDirection.LeftToRight, FontFamily = new FontFamily("Segoe UI"), FontSize = 13, Opacity = 0.55, VerticalAlignment = VerticalAlignment.Center });
             var mi = new MenuItem { Header = sp };
             var it = item;
             mi.Click += (_, _) => onPick(it);

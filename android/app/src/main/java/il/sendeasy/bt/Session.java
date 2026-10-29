@@ -231,6 +231,9 @@ final class Session {
             case Protocol.T_ACK:
                 if (p.length >= 8) acks.offer(getLong(p, 0));
                 break;
+            case Protocol.T_NEWCHAT:
+                if (newChatHandler != null) newChatHandler.run();
+                break;
             case Protocol.T_READ:
                 if (p.length >= 8) listener.onRead(this, getLong(p, 0));
                 break;
@@ -461,6 +464,13 @@ final class Session {
             if (a != null && a == id) return id;
         }
         return 0;
+    }
+
+    /** נקרא כשהצד השני פותח צ'אט חדש. */
+    volatile Runnable newChatHandler;
+
+    void sendNewChat() throws IOException {
+        send(Protocol.T_NEWCHAT, null, null, 0, 0);
     }
 
     /** מודיע שההודעה עם ה-msgId הזה הוצגה למשתמש (READ). */

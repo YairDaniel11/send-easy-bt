@@ -764,10 +764,14 @@ public class MainActivity extends Activity implements Events.Listener {
             return;
         }
         String addr = devices.get(pos).getAddress();
-        if (!ChatStore.newThread(getApplicationContext(), addr)) Toast.makeText(this, R.string.chat_new_still_empty, Toast.LENGTH_SHORT).show();
+        boolean created = ChatStore.newThread(getApplicationContext(), addr);
+        if (!created) Toast.makeText(this, R.string.chat_new_still_empty, Toast.LENGTH_SHORT).show();
         loadUnread();
         adapter.notifyDataSetChanged();
-        openChat(addr);
+        Intent i = new Intent(this, ChatActivity.class);
+        i.putExtra(ChatActivity.EXTRA_ADDRESS, addr);
+        i.putExtra(ChatActivity.EXTRA_ANNOUNCE_NEW, created);
+        startActivity(i);
     }
 
     /** כל ההגדרות בחלונית אחת (רשימה נגישה ב-D-pad), עם מצב בטקסט של כל פריט. */

@@ -22,6 +22,8 @@ final class Protocol {
     static final int T_TEXT = 0x10;
     static final int T_ACK = 0x11;
     static final int T_READ = 0x12;
+    /** הצד השני פתח שיחה חדשה (צ'אט חדש) איתנו. */
+    static final int T_NEWCHAT = 0x13;
     static final int T_FILE_OFFER = 0x20;
     static final int T_FILE_ACCEPT = 0x21;
     static final int T_FILE_REJECT = 0x22;
