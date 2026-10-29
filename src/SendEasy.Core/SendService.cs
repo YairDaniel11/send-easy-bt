@@ -96,7 +96,13 @@ public static class SendService
             string label = files.Count > 1 ? $"({i + 1}/{files.Count}) " : "";
             status($"{label}שולח {Path.GetFileName(f)} (דרך האפליקציה)...");
             long size = new FileInfo(f).Length;
-            var p = new Progress<long>(b => progress.Report(size > 0 ? (double)b / size : 1));
+            int lastPct = -1;
+            var p = new Progress<long>(b =>
+            {
+                progress.Report(size > 0 ? (double)b / size : 1);
+                int pct = size > 0 ? (int)(b * 100 / size) : 100;
+                if (pct != lastPct) { lastPct = pct; status($"{label}שולח {Path.GetFileName(f)} (דרך האפליקציה)... {pct}%"); }
+            });
             await using var fs = new FileStream(f, FileMode.Open, FileAccess.Read, FileShare.Read, 64 * 1024, true);
             var r = await peer.SendFileAsync(fs, Path.GetFileName(f), size, p, ct);
             switch (r)
