@@ -230,7 +230,7 @@ public class MainActivity extends Activity implements Events.Listener {
     private void updateStatus() {
         boolean on = Prefs.receiveEnabled(this);
         String s = getString(on ? R.string.main_receiving_on : R.string.main_receiving_off);
-        if (on) s += "\n" + getString(R.string.main_receive_dir, Fmt.ltr(Storage.receiveDirLabel(this)));
+        // מיקום השמירה מופיע בהגדרות ("תיקיית שמירה"), לא בכותרת
         status.setText(s);
     }
 
