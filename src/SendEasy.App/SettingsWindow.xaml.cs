@@ -14,9 +14,12 @@ public partial class SettingsWindow : Wpf.Ui.Controls.FluentWindow
     readonly List<FavoriteDevice> _favs;
     ulong _default;
 
-    public SettingsWindow(Settings s)
+    readonly Action? _openUpdate;
+
+    public SettingsWindow(Settings s, Action? openUpdate = null)
     {
         _s = s;
+        _openUpdate = openUpdate;
         // עובדים על עותק, ושומרים רק בלחיצה על "שמור"
         _favs = s.Favorites.Select(f => new FavoriteDevice { Name = f.Name, Address = f.Address, Hotkey = f.Hotkey }).ToList();
         _default = s.DefaultDevice;
@@ -41,6 +44,29 @@ public partial class SettingsWindow : Wpf.Ui.Controls.FluentWindow
     }
 
     /// <summary>מוריד את גרסת האנדרואיד האחרונה מ-GitHub לתיקיית הקבלה ופותח את התיקייה.</summary>
+    /// <summary>בודק עדכון לתוכנה: אם יש גרסה חדשה פותח את חלון העדכון (הורדה והתקנה), אחרת מציג שהגרסה עדכנית.</summary>
+    async void Update_Click(object s, RoutedEventArgs e)
+    {
+        UpdBtn.IsEnabled = false;
+        UpdStatus.Text = "בודק...";
+        try
+        {
+            var cur = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0);
+            var r = await UpdateChecker.CheckDetailedAsync(_s.UpdateRepo, cur);
+            if (r != null && _openUpdate != null)
+            {
+                UpdateState.Set(r);
+                UpdStatus.Text = $"יש גרסה חדשה: {TrayApp.Ltr(r.Version.ToString(3))}";
+                // ההגדרות הן חלון מודאלי ויחסמו את חלון העדכון, לכן סוגרים אותן (בלי שמירה) ופותחים את העדכון
+                DialogResult = false;
+                Dispatcher.BeginInvoke(_openUpdate);
+            }
+            else UpdStatus.Text = $"הגרסה שלך ({TrayApp.Ltr(cur.ToString(3))}) עדכנית.";
+        }
+        catch { UpdStatus.Text = "הבדיקה נכשלה. ודא שיש חיבור לאינטרנט."; }
+        UpdBtn.IsEnabled = true;
+    }
+
     string? _apkLocal;
 
     /// <summary>אם ה-APK האחרון כבר נמצא בתיקיית הקבלה: מציגים שיש הגרסה העדכנית, והכפתור פותח את הקובץ במקום להוריד שוב.</summary>

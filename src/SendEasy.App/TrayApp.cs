@@ -137,7 +137,7 @@ sealed class TrayApp : IDisposable
 
     public void ShowSettings()
     {
-        var w = new SettingsWindow(_settings);
+        var w = new SettingsWindow(_settings, OpenUpdate);
         w.Loaded += (_, _) => WindowFront.Bring(w);
         if (w.ShowDialog() == true) { _settings.Save(); ApplyHotkeys(); _chat?.ReloadStyle(); }
     }

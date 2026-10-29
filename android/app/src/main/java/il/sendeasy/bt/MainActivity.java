@@ -793,7 +793,8 @@ public class MainActivity extends Activity implements Events.Listener {
                 getString(R.string.menu_notify_alerts),
                 getString(R.string.menu_chat_style),
                 getString(R.string.menu_rename_device),
-                getString(R.string.menu_delete_chats)};
+                getString(R.string.menu_delete_chats),
+                getString(R.string.menu_check_update)};
         new AlertDialog.Builder(this)
                 .setTitle(R.string.menu_settings)
                 .setItems(items, new DialogInterface.OnClickListener() {
@@ -825,8 +826,10 @@ public class MainActivity extends Activity implements Events.Listener {
                                     }).show();
                         } else if (which == 7) {
                             showRenameDevice();
-                        } else {
+                        } else if (which == 8) {
                             showDeleteChats();
+                        } else {
+                            checkUpdate(true);
                         }
                     }
                 })
