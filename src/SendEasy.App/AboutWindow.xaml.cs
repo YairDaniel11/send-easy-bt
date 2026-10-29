@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Linq;
 using System.Windows;
 using System.Windows.Navigation;
 
@@ -15,10 +16,10 @@ public partial class AboutWindow : Wpf.Ui.Controls.FluentWindow
         VersionText.Text = "גרסה " + TrayApp.Ltr(v.ToString(3));
         try
         {
-            var icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath!);
-            if (icon != null)
-                Logo.Source = System.Windows.Interop.Imaging.CreateBitmapSourceFromHIcon(icon.Handle, Int32Rect.Empty,
-                    System.Windows.Media.Imaging.BitmapSizeOptions.FromWidthAndHeight(64, 64));
+            // האייקון בגודל הגדול ביותר שיש בקובץ (חד), ולא האייקון הקטן של הקובץ המריץ
+            var dec = System.Windows.Media.Imaging.BitmapDecoder.Create(new Uri("pack://application:,,,/Assets/app.ico"),
+                System.Windows.Media.Imaging.BitmapCreateOptions.None, System.Windows.Media.Imaging.BitmapCacheOption.OnLoad);
+            Logo.Source = dec.Frames.OrderByDescending(f => f.PixelWidth).First();
         }
         catch { }
     }

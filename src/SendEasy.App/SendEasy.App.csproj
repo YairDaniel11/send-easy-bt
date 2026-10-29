@@ -19,4 +19,7 @@
   <ItemGroup>
     <ProjectReference Include="..\SendEasy.Core\SendEasy.Core.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Assets\app.ico" />
+  </ItemGroup>
 </Project>

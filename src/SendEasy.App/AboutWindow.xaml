@@ -13,7 +13,8 @@
         </Grid.RowDefinitions>
         <ui:TitleBar Grid.Row="0" Title="אודות - שליחה קלה - BT" FlowDirection="LeftToRight" ShowMaximize="False" ShowMinimize="False"/>
         <StackPanel Grid.Row="1" Margin="28,10,28,0">
-            <Image x:Name="Logo" Width="64" Height="64" HorizontalAlignment="Right" Margin="0,0,0,10"/>
+            <Image x:Name="Logo" Width="80" Height="80" HorizontalAlignment="Center" Margin="0,0,0,12"
+                   RenderOptions.BitmapScalingMode="HighQuality" SnapsToDevicePixels="True"/>
             <TextBlock Text="שליחה קלה - BT" FontSize="24" FontWeight="SemiBold"/>
             <TextBlock x:Name="VersionText" Opacity="0.75" Margin="0,4,0,0"/>
             <TextBlock Margin="0,16,0,0" TextWrapping="Wrap" LineHeight="22"
