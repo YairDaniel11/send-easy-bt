@@ -37,6 +37,23 @@ public partial class SettingsWindow : Wpf.Ui.Controls.FluentWindow
         BuildFavorites();
     }
 
+    /// <summary>מוריד את גרסת האנדרואיד האחרונה מ-GitHub לתיקיית הקבלה ופותח את התיקייה.</summary>
+    async void Apk_Click(object s, RoutedEventArgs e)
+    {
+        ApkBtn.IsEnabled = false;
+        ApkBar.Visibility = Visibility.Visible; ApkBar.Value = 0;
+        ApkStatus.Text = "מוריד את האפליקציה מ-GitHub...";
+        try
+        {
+            var prog = new Progress<double>(f => ApkBar.Value = Math.Clamp(f * 1000, 0, 1000));
+            var dir = DirBox.Text.Trim().Length > 0 ? DirBox.Text.Trim() : _s.ReceiveDir;
+            var (path, ver) = await UpdateChecker.DownloadLatestAndroidAsync(_s.UpdateRepo, dir, prog, default);
+            ApkStatus.Text = $"הורדה הסתיימה (גרסה {TrayApp.Ltr(ver)}): {TrayApp.Ltr(path)}\nהעבר את הקובץ לטלפון (למשל בבלוטוס) והתקן אותו.";
+            System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{path}\"");
+        }
+        catch (Exception ex) { ApkStatus.Text = "ההורדה נכשלה: " + ex.Message; }
+        finally { ApkBtn.IsEnabled = true; ApkBar.Visibility = Visibility.Collapsed; }
+    }
     void BuildFavorites()
     {
         FavPanel.Children.Clear();

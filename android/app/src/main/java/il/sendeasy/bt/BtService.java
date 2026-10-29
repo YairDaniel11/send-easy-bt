@@ -26,6 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class BtService extends Service {
     static final String CHANNEL_SERVICE = "se_service";
+    static final String CHANNEL_SERVICE_MIN = "se_service_min";
     static final String CHANNEL_EVENTS = "se_events";
     private static final int ID_FOREGROUND = 1;
     private static final int ID_PROGRESS = 2;
@@ -34,6 +35,21 @@ public class BtService extends Service {
     private static volatile boolean running;
 
     static boolean isRunning() { return running; }
+
+    /** חיבורים נכנסים פתוחים לפי כתובת המכשיר (לשימוש חוזר, למשל לשליחת READ מהצ'אט). */
+    private static final ConcurrentHashMap<String, Session> BY_ADDRESS = new ConcurrentHashMap<String, Session>();
+
+    /** חיבור נכנס פתוח מהמכשיר הזה, או null. */
+    static Session openSession(String address) {
+        Session s = BY_ADDRESS.get(address);
+        return s != null && !s.isClosed() ? s : null;
+    }
+
+    /** מפעיל מחדש את השירות (נקרא מהחזית), כדי שההתראה הקבועה תיבנה מחדש. */
+    static void restart(Context c) {
+        stop(c);
+        start(c);
+    }
 
     /** מפעיל את השירות. חייבים לקרוא מהחזית (Activity גלוי), וכשיש הרשאת בלוטוס. */
     static void start(Context c) {
@@ -188,6 +204,7 @@ public class BtService extends Service {
             Session s = new Session(sock.getInputStream(), sock.getOutputStream(), sock,
                     Prefs.deviceId(this), Connector.myName(this), Connector.tmpDir(this), new Incoming(address, deviceName(dev)));
             sessions.put(s, Boolean.TRUE);
+            BY_ADDRESS.put(address, s);
             sessionStarted();
             s.start();
         } catch (IOException e) {
@@ -234,9 +251,14 @@ public class BtService extends Service {
 
         @Override
         public void onText(Session s, long msgId, String text) {
-            ChatStore.append(BtService.this, address, false, text, System.currentTimeMillis());
+            ChatStore.add(BtService.this, address, new ChatStore.Msg(System.currentTimeMillis(), false, ChatStore.T_TEXT, text, msgId, ChatStore.S_UNREAD));
             Events.post(Events.CHAT, address);
             notifyEvent(getString(R.string.rx_text, name()), text, address);
+        }
+
+        @Override
+        public void onRead(Session s, long msgId) {
+            if (ChatStore.markRead(BtService.this, address, msgId)) Events.post(Events.CHAT, address);
         }
 
         @Override
@@ -263,15 +285,29 @@ public class BtService extends Service {
                 // הודעה קולית: נשמרת בתיקייה פנימית ומופיעה בצ'אט, לא בתיקיית ההורדות
                 String stored = Storage.storeVoice(BtService.this, temp, f.name);
                 if (stored == null) return false;
-                ChatStore.add(BtService.this, address, new ChatStore.Msg(System.currentTimeMillis(), false, ChatStore.T_VOICE, stored));
+                ChatStore.add(BtService.this, address, new ChatStore.Msg(System.currentTimeMillis(), false, ChatStore.T_VOICE, stored, 0, ChatStore.S_UNREAD));
                 Events.post(Events.CHAT, address);
+                Events.post(Events.VOICE, address);
                 int secs = Storage.voiceSeconds(stored);
                 notifyEvent(getString(R.string.rx_voice, name()), getString(R.string.voice_label, (secs / 60) + ":" + (secs % 60 < 10 ? "0" : "") + (secs % 60)), address);
                 return true;
             }
+            boolean pic = Storage.isImageName(f.name);
+            // תמונה: עותק פנימי להצגה בצ'אט (בנוסף לפרסום בהורדות)
+            String stored = pic ? Storage.storeImage(BtService.this, temp, f.name) : null;
             String where = Storage.publish(BtService.this, temp, f.name);
-            if (where == null) return false;
-            ChatStore.add(BtService.this, address, new ChatStore.Msg(System.currentTimeMillis(), false, ChatStore.T_FILE, f.name));
+            if (where == null) {
+                if (stored != null) new File(Storage.imagesDir(BtService.this), stored).delete();
+                return false;
+            }
+            if (stored != null) {
+                ChatStore.add(BtService.this, address, new ChatStore.Msg(System.currentTimeMillis(), false, ChatStore.T_PIC, stored, 0, ChatStore.S_UNREAD));
+                Events.post(Events.CHAT, address);
+                Events.post(Events.RECEIVED, f.name);
+                notifyEvent(getString(R.string.rx_pic, name()), f.name, address);
+                return true;
+            }
+            ChatStore.add(BtService.this, address, new ChatStore.Msg(System.currentTimeMillis(), false, ChatStore.T_FILE, f.name, 0, ChatStore.S_UNREAD));
             Events.post(Events.CHAT, address);
             Events.post(Events.RECEIVED, f.name);
             notifyEvent(getString(R.string.rx_file, f.name), where, null);
@@ -286,6 +322,7 @@ public class BtService extends Service {
         @Override
         public void onClosed(Session s, Exception why) {
             sessions.remove(s);
+            BY_ADDRESS.remove(address, s);
             sessionEnded();
             cancelProgress();
         }
@@ -298,7 +335,11 @@ public class BtService extends Service {
             NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm == null) return;
             nm.createNotificationChannel(new NotificationChannel(CHANNEL_SERVICE, getString(R.string.channel_service), NotificationManager.IMPORTANCE_LOW));
-            nm.createNotificationChannel(new NotificationChannel(CHANNEL_EVENTS, getString(R.string.channel_events), NotificationManager.IMPORTANCE_DEFAULT));
+            // ערוץ שקט וממוזער (בלי אייקון בסטטוס בר) להתראה הקבועה כשהמשתמש בחר להסתיר אותה
+            nm.createNotificationChannel(new NotificationChannel(CHANNEL_SERVICE_MIN, getString(R.string.channel_service_min), NotificationManager.IMPORTANCE_MIN));
+            NotificationChannel ev = new NotificationChannel(CHANNEL_EVENTS, getString(R.string.channel_events), NotificationManager.IMPORTANCE_DEFAULT);
+            ev.enableVibration(true);
+            nm.createNotificationChannel(ev);
         }
     }
 
@@ -318,7 +359,10 @@ public class BtService extends Service {
 
     @SuppressWarnings("deprecation")
     private Notification buildServiceNotification() {
-        return builder(CHANNEL_SERVICE)
+        boolean show = Prefs.showServiceNotification(this);
+        Notification.Builder b = builder(show ? CHANNEL_SERVICE : CHANNEL_SERVICE_MIN);
+        if (!show && Build.VERSION.SDK_INT < 26) b.setPriority(Notification.PRIORITY_MIN);
+        return b
                 .setContentTitle(getString(R.string.notification_title))
                 .setContentText(getString(R.string.notification_ready))
                 .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
@@ -355,6 +399,7 @@ public class BtService extends Service {
                 .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
                 .setContentIntent(openMain(chatAddress))
                 .setAutoCancel(true)
+                .setDefaults(Notification.DEFAULT_ALL) // צליל ורטט ל-API פחות מ-26 (מ-26 הערוץ קובע)
                 .build();
         try { nm.notify(ID_EVENT_BASE + (eventCounter++ % 50), n); } catch (RuntimeException ignored) { }
     }

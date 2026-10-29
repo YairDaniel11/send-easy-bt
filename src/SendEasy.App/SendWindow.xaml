@@ -17,21 +17,26 @@
         <ui:TitleBar Grid.Row="0" Title="שליחה קלה - BT" FlowDirection="LeftToRight"/>
 
         <!-- מה שולחים -->
-        <Border Grid.Row="1" Margin="16,8,16,8" Padding="14,10" CornerRadius="8"
-                Background="{DynamicResource ControlFillColorDefaultBrush}">
-            <StackPanel>
-                <TextBlock x:Name="WhatText" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                <TextBlock x:Name="DetailText" Margin="0,2,0,0" Opacity="0.7" TextWrapping="Wrap"/>
-            </StackPanel>
-        </Border>
+        <StackPanel Grid.Row="1">
+            <Border Margin="16,8,16,6" Padding="14,10" CornerRadius="8"
+                    Background="{DynamicResource ControlFillColorDefaultBrush}">
+                <StackPanel>
+                    <TextBlock x:Name="WhatText" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock x:Name="DetailText" Margin="0,2,0,0" Opacity="0.7" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+            <ui:Button x:Name="AddBtn" Content="הוסף קבצים" HorizontalAlignment="Stretch" Margin="16,0,16,8"
+                       Height="30" Padding="0,0" Click="AddBtn_Click"/>
+        </StackPanel>
 
         <TextBlock x:Name="AutoText" Grid.Row="2" Visibility="Collapsed" FontSize="15" TextWrapping="Wrap"
                    HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" Margin="24"/>
 
         <ScrollViewer PanningMode="VerticalOnly" x:Name="DeviceScroll" Grid.Row="2" VerticalScrollBarVisibility="Auto" Padding="16,0,16,0">
             <StackPanel>
-                <TextBlock Text="מכשירים מצומדים (★ = מועדף)" FontWeight="SemiBold" Margin="2,4,0,6"/>
-                <ListBox x:Name="PairedList" SelectionChanged="PairedList_SelectionChanged"
+                <TextBlock Text="מכשירים מצומדים (★ = מועדף)" FontWeight="SemiBold" Margin="2,4,0,0"/>
+                <TextBlock Text="➤ שולח מיד למכשיר. סימון כמה מכשירים ולחיצה על &quot;שליחה מרובה&quot; שולחת לכולם. קליק ימני על מכשיר: אפשרויות." Opacity="0.6" FontSize="12" TextWrapping="Wrap" Margin="2,0,0,6"/>
+                <ListBox x:Name="PairedList" SelectionMode="Multiple" SelectionChanged="PairedList_SelectionChanged"
                          ScrollViewer.VerticalScrollBarVisibility="Disabled"
                          ItemTemplate="{DynamicResource DeviceTemplate}"/>
                 <TextBlock x:Name="NoPairedText" Text="אין מכשירים מצומדים. פתח את אפשרות החיפוש למטה."
@@ -48,7 +53,7 @@
                     <StackPanel>
                         <TextBlock Text="מכשיר לא מצומד יצומד אוטומטית בעת השליחה (יתכן שתתבקש לאשר)."
                                    Opacity="0.6" TextWrapping="Wrap" Margin="2,0,0,6"/>
-                        <ListBox x:Name="NearbyList" SelectionChanged="NearbyList_SelectionChanged"
+                        <ListBox x:Name="NearbyList" SelectionMode="Multiple" SelectionChanged="NearbyList_SelectionChanged"
                                  ScrollViewer.VerticalScrollBarVisibility="Disabled"
                                  ItemTemplate="{DynamicResource DeviceTemplate}"/>
                     </StackPanel>
@@ -64,14 +69,11 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <ui:Button x:Name="SendBtn" Content="שלח" Appearance="Primary" IsEnabled="False"
+                    <ui:Button x:Name="SendBtn" Content="שליחה מרובה" Appearance="Primary" IsEnabled="False"
                                HorizontalAlignment="Stretch" Height="38" Click="SendBtn_Click"/>
-                    <ui:Button x:Name="CancelBtn" Grid.Column="2" Content="בטל שליחה" Margin="8,0,0,0"
+                    <ui:Button x:Name="CancelBtn" Grid.Column="1" Content="בטל שליחה" Margin="8,0,0,0"
                                Height="38" Visibility="Collapsed" Click="CancelBtn_Click"/>
-                    <ui:Button x:Name="AddBtn" Grid.Column="1" Content="הוסף קבצים" Margin="8,0,0,0"
-                               Height="38" Click="AddBtn_Click"/>
                 </Grid>
             </StackPanel>
         </Border>
@@ -79,30 +81,28 @@
 
     <ui:FluentWindow.Resources>
         <DataTemplate x:Key="DeviceTemplate">
-            <Grid Margin="4,6">
+            <Grid Margin="4,6" Background="Transparent">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="40"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
+                <Grid.ContextMenu>
+                    <ContextMenu FlowDirection="RightToLeft">
+                        <MenuItem Header="{Binding FavMenuText}" Tag="{Binding}" Click="Star_Click"/>
+                        <MenuItem Header="שנה שם" Tag="{Binding}" Click="Rename_Click"/>
+                        <MenuItem Header="הסר צימוד" Tag="{Binding}" Click="Unpair_Click" Visibility="{Binding PairedVisibility}"/>
+                        <MenuItem Header="צמד" Tag="{Binding}" Click="Pair_Click" Visibility="{Binding UnpairedVisibility}"/>
+                    </ContextMenu>
+                </Grid.ContextMenu>
                 <TextBlock Text="{Binding Icon}" FontSize="22" VerticalAlignment="Center"/>
-                <Button Grid.Column="2" Content="{Binding Star}" Tag="{Binding}" Click="Star_Click"
-                        Background="Transparent" BorderThickness="0" FontSize="18" Padding="6,0"
-                        ToolTip="הוסף/הסר ממועדפים" Cursor="Hand"/>
-                <Button Grid.Column="4" Content="צמד" Tag="{Binding}" Click="Pair_Click" Visibility="{Binding UnpairedVisibility}"
-                        Padding="10,2" Margin="0,0,4,0" ToolTip="צמד את המכשיר" Cursor="Hand"/>
-                <Button Grid.Column="4" Content="✖" Tag="{Binding}" Click="Unpair_Click" Visibility="{Binding PairedVisibility}"
-                        Background="Transparent" BorderThickness="0" FontSize="13" Padding="6,0" Foreground="#C42B1C"
-                        ToolTip="הסר צימוד (המכשיר יוסר מהרשימה המוצמדת)" Cursor="Hand"/>
-                <Button Grid.Column="3" Content="✎" Tag="{Binding}" Click="Rename_Click"
-                        Background="Transparent" BorderThickness="0" FontSize="15" Padding="6,0"
-                        ToolTip="שנה שם למכשיר" Cursor="Hand"/>
-                <StackPanel Grid.Column="1">
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
                     <TextBlock Text="{Binding DisplayName}" FontSize="14" TextTrimming="CharacterEllipsis"/>
                     <TextBlock Text="{Binding Subtitle}" Opacity="0.65" FontSize="12"/>
                 </StackPanel>
+                <Button Grid.Column="2" Content="➤" Tag="{Binding}" Click="SendNow_Click"
+                        Width="40" Height="34" FontSize="15" Margin="6,0,0,0" Cursor="Hand"
+                        ToolTip="שלח מיד למכשיר הזה"/>
             </Grid>
         </DataTemplate>
     </ui:FluentWindow.Resources>

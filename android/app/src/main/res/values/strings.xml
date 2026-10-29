@@ -64,7 +64,27 @@
     <string name="style_wa">ווטסאפ</string>
     <string name="style_gc">גוגל צ\'אט</string>
     <string name="voice_record">הקלט הודעה קולית</string>
-    <string name="voice_recording">● מקליט  %1$s   אישור = שלח   חזרה = ביטול</string>
+    <string name="voice_recording">● מקליט  %1$s</string>
+    <string name="voice_paused">⏸ מושהה  %1$s</string>
+    <string name="voice_rec_hint">אישור = השהה / המשך   ·   תפריט = שלח   ·   חזרה = בטל</string>
+    <string name="cd_rec_pause">השהה או המשך הקלטה</string>
+    <string name="cd_rec_send">שלח הקלטה</string>
+    <string name="cd_rec_cancel">בטל הקלטה</string>
+    <string name="cd_attach">צרף תמונה</string>
+    <string name="unread_one">הודעה חדשה</string>
+    <string name="unread_n">%1$d חדשות</string>
+    <string name="rx_pic">תמונה מ-%1$s</string>
+    <string name="channel_service_min">התראה קבועה (שקטה)</string>
+    <string name="menu_svc_notif_shown">התראה קבועה בסטטוס בר: מוצגת</string>
+    <string name="menu_svc_notif_hidden">התראה קבועה בסטטוס בר: מוסתרת</string>
+    <string name="img_tap_again">לחץ שוב להגדלה</string>
+    <string name="img_viewer_hint">אישור = התאמה / 2x / 3x   ·   חצים = הזזה   ·   חזרה = סגירה</string>
+    <string name="img_viewer_hint_touch">צביטה = זום   ·   נגיעה כפולה = הגדלה / התאמה   ·   גרירה = הזזה</string>
+    <string name="img_open_failed">אי אפשר להציג את התמונה</string>
+    <string name="sending_pics">שולח תמונה %1$d מתוך %2$d…  %3$d%%   ·   ביטול: לחיצה כאן או מקש רך ימני</string>
+    <string name="sending_pics_busy">עדיין שולח תמונות</string>
+    <string name="pic_cancel">בטל</string>
+    <string name="browser_images_title">בחר תמונות</string>
     <string name="voice_label">הודעה קולית %1$s</string>
     <string name="voice_no_mic">אי אפשר להקליט: אין הרשאת מיקרופון או שהמיקרופון תפוס.</string>
     <string name="voice_too_short">ההקלטה קצרה מדי</string>
@@ -79,6 +99,19 @@
     <string name="rename_reset">אפס לשם המקורי</string>
     <string name="menu_check_update">בדוק עדכון עכשיו</string>
     <string name="upd_new">יש גרסה חדשה %1$s. לפתוח את דף ההורדה?</string>
+    <string name="upd_new_auto">יש גרסה חדשה %1$s. להוריד ולהתקין עכשיו?\n\nאם ההתקנה נכשלת, הסר את הגרסה הנוכחית והתקן מחדש.</string>
+    <string name="upd_install">הורדה והתקנה</string>
+    <string name="upd_bar">יש גרסה חדשה %1$s — לחץ אישור לעדכון</string>
+    <string name="upd_downloading">מוריד עדכון…</string>
+    <string name="upd_progress">%1$s מתוך %2$s (%3$d%%)</string>
+    <string name="upd_progress_unknown">הורדו %1$s</string>
+    <string name="upd_cancel">ביטול</string>
+    <string name="upd_err_net">ההורדה נכשלה. בדוק את החיבור לאינטרנט ונסה שוב.</string>
+    <string name="upd_err_size">הקובץ שהורד פגום (גודל שגוי). נסה שוב.</string>
+    <string name="upd_err_disk">לא ניתן לשמור את הקובץ. בדוק שיש מקום פנוי במכשיר.</string>
+    <string name="upd_allow_source">כדי להתקין את העדכון צריך לאפשר לאפליקציה זו להתקין אפליקציות. במסך שייפתח אפשר את ההרשאה וחזור לאפליקציה.</string>
+    <string name="upd_allow_denied">ההתקנה לא אושרה, העדכון לא הותקן.</string>
+    <string name="upd_install_failed">לא ניתן לפתוח את ההתקנה. ייתכן שצריך להפעיל בהגדרות את האפשרות \'מקורות לא ידועים\'. אם ההתקנה נכשלת, הסר את הגרסה הנוכחית והתקן מחדש.</string>
     <string name="upd_open">פתח</string>
     <string name="upd_later">אחר כך</string>
     <string name="upd_current">אתה מעודכן</string>

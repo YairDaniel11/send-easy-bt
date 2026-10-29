@@ -40,9 +40,10 @@ final class Connector {
     }
 
     /** מאזין לחיבור יוצא: לא מקבל קבצים (מחזיר "עסוק"), ולא עושה דבר עם שאר האירועים. */
-    static final class QuietListener implements Session.Listener {
+    static class QuietListener implements Session.Listener {
         @Override public void onHello(Session s) { }
         @Override public void onText(Session s, long msgId, String text) { }
+        @Override public void onRead(Session s, long msgId) { }
         @Override public int onFileOffer(Session s, Session.IncomingFile f) { return Protocol.REJECT_BUSY; }
         @Override public void onFileProgress(Session s, Session.IncomingFile f, long got) { }
         @Override public boolean onFileReceived(Session s, Session.IncomingFile f, File temp) { return false; }

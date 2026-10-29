@@ -17,6 +17,9 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!-- התקנת עדכון שהורד (API 26 ומעלה) -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <!-- הודעות קוליות -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
@@ -25,6 +28,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- רטט בהתראות ובהגעת הודעה קולית -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <!-- דפדפן הקבצים לשליחה (מכשירי מקשים) ושמירת קבצים נכנסים בתיקיית ההורדות עד אנדרואיד 9 -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
@@ -74,6 +79,18 @@
             android:configChanges="orientation|screenSize|screenLayout|keyboard|keyboardHidden|uiMode"
             android:exported="false"
             android:windowSoftInputMode="stateHidden|adjustResize" />
+
+        <activity
+            android:name=".ImageViewerActivity"
+            android:configChanges="orientation|screenSize|screenLayout|keyboard|keyboardHidden|uiMode"
+            android:exported="false" />
+
+        <!-- מספק את קובץ ה-APK של העדכון למתקין החבילות (רק cache/updates/update.apk, קריאה בלבד) -->
+        <provider
+            android:name=".ApkProvider"
+            android:authorities="${applicationId}.apkprovider"
+            android:exported="false"
+            android:grantUriPermissions="true" />
 
         <service
             android:name=".BtService"

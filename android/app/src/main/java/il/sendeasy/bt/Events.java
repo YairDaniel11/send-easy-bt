@@ -10,6 +10,7 @@ final class Events {
     private Events() {}
 
     static final String CHAT = "chat";         // arg = כתובת המכשיר
+    static final String VOICE = "voice";       // arg = כתובת המכשיר: הגיעה הודעה קולית
     static final String RECEIVED = "received"; // arg = שם הקובץ
     static final String PROGRESS = "progress"; // arg = "שם|אחוז"
     static final String STATE = "state";       // השירות התחיל/נעצר

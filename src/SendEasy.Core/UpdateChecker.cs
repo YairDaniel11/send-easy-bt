@@ -7,7 +7,7 @@ namespace SendEasy.Core;
 /// <summary>גרסה חדשה שנמצאה ב-GitHub Releases: הגרסה, דף ה-Release, וקובץ המתקין (אם קיים).</summary>
 public sealed record UpdateInfo(Version Version, string PageUrl, string? AssetUrl, long AssetSize, string? Sha256, string Notes);
 
-/// <summary>בדיקת עדכון מול GitHub Releases והורדת המתקין לתיקייה זמנית (עם בדיקת גודל ו-SHA-256 כשהם ידועים).</summary>
+/// <summary>בדיקת עדכון מול GitHub Releases והורדת קבצים (עם בדיקת גודל ו-SHA-256 כשהם ידועים).</summary>
 public static class UpdateChecker
 {
     const string InstallerName = "SendEasyBT-Setup.exe";
@@ -40,8 +40,7 @@ public static class UpdateChecker
                     if (a.GetProperty("name").GetString() != InstallerName) continue;
                     assetUrl = a.GetProperty("browser_download_url").GetString();
                     size = a.TryGetProperty("size", out var sz) ? sz.GetInt64() : 0;
-                    if (a.TryGetProperty("digest", out var dg) && dg.GetString() is { } d && d.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase))
-                        sha = d[7..];
+                    sha = DigestOf(a);
                     break;
                 }
             var notes = root.TryGetProperty("body", out var b) ? b.GetString() ?? "" : "";
@@ -57,6 +56,10 @@ public static class UpdateChecker
         return r == null ? null : (r.Version, r.PageUrl);
     }
 
+    static string? DigestOf(JsonElement asset) =>
+        asset.TryGetProperty("digest", out var dg) && dg.GetString() is { } d && d.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase)
+            ? d[7..] : null;
+
     static bool IsTrustedHost(Uri u) =>
         u.Scheme == Uri.UriSchemeHttps &&
         (u.Host == "github.com" || u.Host.EndsWith(".github.com") || u.Host.EndsWith(".githubusercontent.com"));
@@ -65,18 +68,50 @@ public static class UpdateChecker
     public static async Task<string> DownloadInstallerAsync(UpdateInfo info, IProgress<double>? progress, CancellationToken ct)
     {
         if (info.AssetUrl == null) throw new IOException("אין קובץ התקנה בגרסה זו");
-        if (!IsTrustedHost(new Uri(info.AssetUrl))) throw new IOException("כתובת ההורדה אינה מ-GitHub");
         var dir = Path.Combine(Path.GetTempPath(), "SendEasyBT", "update");
         Directory.CreateDirectory(dir);
         foreach (var old in Directory.GetFiles(dir)) try { File.Delete(old); } catch { }
         var dest = Path.Combine(dir, $"SendEasyBT-Setup-{info.Version}.exe");
+        await DownloadFileAsync(info.AssetUrl, info.AssetSize, info.Sha256, dest, progress, ct);
+        return dest;
+    }
+
+    /// <summary>מוריד את ה-APK האחרון של אפליקציית האנדרואיד (התגית android-v*) לתיקיית היעד. מחזיר נתיב וגרסה.</summary>
+    public static async Task<(string Path, string Version)> DownloadLatestAndroidAsync(string repo, string destDir, IProgress<double>? progress, CancellationToken ct)
+    {
+        using var http = NewClient(TimeSpan.FromSeconds(15));
+        var json = await http.GetStringAsync($"https://api.github.com/repos/{repo}/releases?per_page=20", ct);
+        using var doc = JsonDocument.Parse(json);
+        foreach (var rel in doc.RootElement.EnumerateArray())
+        {
+            var tag = rel.GetProperty("tag_name").GetString() ?? "";
+            if (!tag.StartsWith("android-v", StringComparison.OrdinalIgnoreCase) || !rel.TryGetProperty("assets", out var assets)) continue;
+            foreach (var a in assets.EnumerateArray())
+            {
+                var name = a.GetProperty("name").GetString() ?? "";
+                if (!name.EndsWith(".apk", StringComparison.OrdinalIgnoreCase)) continue;
+                var url = a.GetProperty("browser_download_url").GetString()!;
+                long size = a.TryGetProperty("size", out var sz) ? sz.GetInt64() : 0;
+                var dest = Path.Combine(destDir, name);
+                await DownloadFileAsync(url, size, DigestOf(a), dest, progress, ct);
+                return (dest, tag.Substring("android-v".Length));
+            }
+        }
+        throw new IOException("לא נמצאה גרסת אנדרואיד ב-GitHub");
+    }
+
+    /// <summary>מוריד קובץ מ-GitHub אל dest (דרך קובץ זמני), עם בדיקת גודל ו-SHA-256 כשידועים.</summary>
+    static async Task DownloadFileAsync(string url, long expectedSize, string? sha256, string dest, IProgress<double>? progress, CancellationToken ct)
+    {
+        if (!IsTrustedHost(new Uri(url))) throw new IOException("כתובת ההורדה אינה מ-GitHub");
+        Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
         var part = dest + ".part";
 
         using var http = NewClient(TimeSpan.FromMinutes(10));
-        using var resp = await http.GetAsync(info.AssetUrl, HttpCompletionOption.ResponseHeadersRead, ct);
+        using var resp = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
         resp.EnsureSuccessStatusCode();
         if (resp.RequestMessage?.RequestUri is { } final && !IsTrustedHost(final)) throw new IOException("ההורדה הופנתה לכתובת לא מוכרת");
-        long total = resp.Content.Headers.ContentLength ?? info.AssetSize;
+        long total = resp.Content.Headers.ContentLength ?? expectedSize;
         await using (var src = await resp.Content.ReadAsStreamAsync(ct))
         await using (var fs = new FileStream(part, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
         {
@@ -88,22 +123,21 @@ public static class UpdateChecker
                 if (total > 0) progress?.Report((double)got / total);
             }
         }
-        if (info.AssetSize > 0 && new FileInfo(part).Length != info.AssetSize)
+        if (expectedSize > 0 && new FileInfo(part).Length != expectedSize)
         {
             File.Delete(part);
             throw new IOException("ההורדה לא הושלמה (גודל לא תואם)");
         }
-        if (!string.IsNullOrEmpty(info.Sha256))
+        if (!string.IsNullOrEmpty(sha256))
         {
             using var s = File.OpenRead(part);
             var hash = Convert.ToHexString(await SHA256.HashDataAsync(s, ct));
-            if (!hash.Equals(info.Sha256, StringComparison.OrdinalIgnoreCase))
+            if (!hash.Equals(sha256, StringComparison.OrdinalIgnoreCase))
             {
                 File.Delete(part);
-                throw new IOException("קובץ ההתקנה פגום (SHA-256 לא תואם)");
+                throw new IOException("הקובץ פגום (SHA-256 לא תואם)");
             }
         }
         File.Move(part, dest, true);
-        return dest;
     }
 }

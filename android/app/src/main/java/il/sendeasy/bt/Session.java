@@ -49,6 +49,8 @@ final class Session {
     interface Listener {
         void onHello(Session s);
         void onText(Session s, long msgId, String text);
+        /** הצד השני סימן שהודעה (לפי msgId של ההודעה שלנו) הוצגה למשתמש. נקרא בשרשור הקריאה. */
+        void onRead(Session s, long msgId);
         /** 0 = לקבל, אחרת קוד סירוב (Protocol.REJECT_*). נקרא בשרשור הקריאה. */
         int onFileOffer(Session s, IncomingFile f);
         void onFileProgress(Session s, IncomingFile f, long got);
@@ -226,6 +228,9 @@ final class Session {
             case Protocol.T_TEXT: onText(p); break;
             case Protocol.T_ACK:
                 if (p.length >= 8) acks.offer(getLong(p, 0));
+                break;
+            case Protocol.T_READ:
+                if (p.length >= 8) listener.onRead(this, getLong(p, 0));
                 break;
             case Protocol.T_FILE_OFFER: onOffer(p); break;
             case Protocol.T_FILE_CHUNK: onChunk(p); break;
@@ -436,6 +441,11 @@ final class Session {
 
     /** שולח הודעת טקסט וממתין לאישור. מחזיר false אם לא התקבל אישור בזמן. */
     boolean sendText(String text) throws IOException, InterruptedException {
+        return sendTextWithId(text) != 0;
+    }
+
+    /** כמו sendText, אך מחזיר את msgId של ההודעה שנמסרה (לאישור קריאה), או 0 אם לא התקבל אישור בזמן. */
+    long sendTextWithId(String text) throws IOException, InterruptedException {
         byte[] t = text.getBytes(UTF8);
         if (t.length > Protocol.MAX_TEXT_BYTES) throw new IOException("ההודעה ארוכה מדי");
         long id = newId();
@@ -445,9 +455,14 @@ final class Session {
         while (System.currentTimeMillis() < end) {
             if (closed.get()) throw new IOException("החיבור נסגר");
             Long a = acks.poll(200, TimeUnit.MILLISECONDS);
-            if (a != null && a == id) return true;
+            if (a != null && a == id) return id;
         }
-        return false;
+        return 0;
+    }
+
+    /** מודיע שההודעה עם ה-msgId הזה הוצגה למשתמש (READ). */
+    void sendRead(long msgId) throws IOException {
+        send(Protocol.T_READ, longBytes(msgId), null, 0, 0);
     }
 
     private long[] waitEvent(long id, long timeoutMs, AtomicBoolean cancel) throws IOException, InterruptedException {

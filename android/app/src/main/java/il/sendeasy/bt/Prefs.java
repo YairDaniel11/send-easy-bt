@@ -40,6 +40,15 @@ final class Prefs {
         sp(c).edit().putBoolean(K_RECEIVE, on).apply();
     }
 
+    /** האם ההתראה הקבועה של שירות הקבלה מוצגת בסטטוס בר (ברירת מחדל כן). כבוי = מוצגת בצורה שקטה וממוזערת. */
+    static boolean showServiceNotification(Context c) {
+        return sp(c).getBoolean("showSvcNotif", true);
+    }
+
+    static void setShowServiceNotification(Context c, boolean on) {
+        sp(c).edit().putBoolean("showSvcNotif", on).apply();
+    }
+
     /** 0 = לפי המערכת, 1 = בהיר, 2 = כהה */
     static int theme(Context c) {
         return sp(c).getInt(K_THEME, 0);

@@ -18,6 +18,34 @@ final class FilePicker {
     static final int REQ_PICK = 11;
     static final int REQ_BROWSE = 12;
 
+    static final int REQ_PICK_IMG = 13;
+    static final int REQ_BROWSE_IMG = 14;
+
+    /** בחירת תמונות בלבד (כפתור הצירוף בצ'אט): בורר המערכת במגע, אחרת הדפדפן שלנו במצב תמונות. */
+    static void pickImages(Activity a) {
+        boolean touch = a.getPackageManager().hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN);
+        if (touch) {
+            Intent i = new Intent(Intent.ACTION_GET_CONTENT);
+            i.setType("image/*");
+            i.addCategory(Intent.CATEGORY_OPENABLE);
+            i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+            try {
+                a.startActivityForResult(Intent.createChooser(i, a.getString(R.string.cd_attach)), REQ_PICK_IMG);
+                return;
+            } catch (RuntimeException ignored) { }
+        }
+        Intent b = new Intent(a, FileBrowserActivity.class);
+        b.putExtra(FileBrowserActivity.EXTRA_IMAGES_ONLY, true);
+        a.startActivityForResult(b, REQ_BROWSE_IMG);
+    }
+
+    /** התמונות שנבחרו (ריק אם הבקשה אינה של בחירת תמונות). */
+    static ArrayList<Uri> imageResult(int req, Intent data) {
+        if (req == REQ_PICK_IMG) return result(REQ_PICK, data);
+        if (req == REQ_BROWSE_IMG) return result(REQ_BROWSE, data);
+        return new ArrayList<Uri>();
+    }
+
     static void pick(Activity a) {
         boolean touch = a.getPackageManager().hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN);
         if (touch) {

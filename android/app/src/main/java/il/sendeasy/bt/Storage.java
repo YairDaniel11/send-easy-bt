@@ -176,6 +176,53 @@ final class Storage {
             return null;
         }
     }
+
+    // ---- תמונות בצ'אט: עותק בתיקייה פנימית כדי שאפשר יהיה להציג אחרי השליחה/הקבלה ----
+
+    static boolean isImageName(String name) {
+        if (name == null) return false;
+        String n = name.toLowerCase(Locale.US);
+        return n.endsWith(".jpg") || n.endsWith(".jpeg") || n.endsWith(".png") || n.endsWith(".gif")
+                || n.endsWith(".webp") || n.endsWith(".bmp");
+    }
+
+    static File imagesDir(Context c) {
+        File d = new File(c.getFilesDir(), "images");
+        d.mkdirs();
+        return d;
+    }
+
+    /** מעתיק תמונה שהתקבלה לתיקייה הפנימית. מחזיר את שם הקובץ השמור או null. */
+    static String storeImage(Context c, File temp, String name) {
+        try {
+            File dest = uniqueFile(imagesDir(c), sanitize(name));
+            copyToFile(temp, dest);
+            return dest.getName();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** מעתיק תמונה לשליחה (מ-Uri) לתיקייה הפנימית. מחזיר את הקובץ או null. */
+    static File storeImage(Context c, Uri src, String name) {
+        File dest = null;
+        InputStream in = null;
+        try {
+            in = c.getContentResolver().openInputStream(src);
+            if (in == null) return null;
+            dest = uniqueFile(imagesDir(c), sanitize(name));
+            OutputStream out = new FileOutputStream(dest);
+            copy(in, out); // סוגר את שני הזרמים
+            in = null;
+            return dest;
+        } catch (Exception e) {
+            if (dest != null) dest.delete();
+            return null;
+        } finally {
+            if (in != null) { try { in.close(); } catch (IOException ignored) { } }
+        }
+    }
+
     static File uniqueFile(File dir, String name) {
         File f = new File(dir, name);
         if (!f.exists()) return f;

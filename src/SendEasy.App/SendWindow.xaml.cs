@@ -28,7 +28,8 @@ sealed class Dev
     public string? Alias { get; set; }
     public string OriginalName => Name.Length > 0 ? Name : "מכשיר ללא שם";
     public string DisplayName => string.IsNullOrWhiteSpace(Alias) ? OriginalName : Alias;
-    public string Subtitle => (Major == 1 ? "מחשב" : Major == 2 ? "טלפון" : "מכשיר") + (Connected ? " · מחובר" : "");
+    public string Subtitle => (IsFavorite ? "★ " : "") + (Major == 1 ? "מחשב" : Major == 2 ? "טלפון" : "מכשיר") + (Connected ? " · מחובר" : "");
+    public string FavMenuText => IsFavorite ? "הסר ממועדפים" : "הוסף למועדפים";
     public string Star => IsFavorite ? "★" : "☆";
     public Visibility PairedVisibility => Paired ? Visibility.Visible : Visibility.Collapsed;
     public Visibility UnpairedVisibility => Paired ? Visibility.Collapsed : Visibility.Visible;
@@ -75,12 +76,12 @@ public partial class SendWindow : Wpf.Ui.Controls.FluentWindow
         }
     }
 
-    Dev? Selected => (PairedList.SelectedItem ?? NearbyList.SelectedItem) as Dev;
+    List<Dev> SelectedDevs => PairedList.SelectedItems.Cast<Dev>().Concat(NearbyList.SelectedItems.Cast<Dev>()).ToList();
 
     void RefreshButtons()
     {
         if (_target != null) return;
-        SendBtn.IsEnabled = Selected != null && !_busy && _paths.Count > 0;
+        SendBtn.IsEnabled = SelectedDevs.Count > 0 && !_busy && _paths.Count > 0;
     }
 
     void UpdateSummary()
@@ -125,19 +126,9 @@ public partial class SendWindow : Wpf.Ui.Controls.FluentWindow
 
     // ---- בחירה ----
 
-    void PairedList_SelectionChanged(object s, SelectionChangedEventArgs e)
-    {
-        if (_syncing) return;
-        if (PairedList.SelectedItem != null) { _syncing = true; NearbyList.SelectedItem = null; _syncing = false; }
-        RefreshButtons();
-    }
+    void PairedList_SelectionChanged(object s, SelectionChangedEventArgs e) { if (!_syncing) RefreshButtons(); }
 
-    void NearbyList_SelectionChanged(object s, SelectionChangedEventArgs e)
-    {
-        if (_syncing) return;
-        if (NearbyList.SelectedItem != null) { _syncing = true; PairedList.SelectedItem = null; _syncing = false; }
-        RefreshButtons();
-    }
+    void NearbyList_SelectionChanged(object s, SelectionChangedEventArgs e) { if (!_syncing) RefreshButtons(); }
 
     // ---- צימוד והסרת צימוד ----
 
@@ -229,7 +220,7 @@ public partial class SendWindow : Wpf.Ui.Controls.FluentWindow
         _watcher.EnumerationCompleted += (_, _) => OnUi(() =>
         {
             Spinner.Visibility = Visibility.Collapsed;
-            StatusText.Text = _devs.Values.Any(d => d.Relevant) ? "בחר מכשיר ולחץ שלח" : "לא נמצאו מכשירים. ודא שהבלוטוס פועל במכשיר השני.";
+            StatusText.Text = _devs.Values.Any(d => d.Relevant) ? "לחץ ➤ ליד מכשיר לשליחה מיידית, או סמן כמה מכשירים ולחץ \"שליחה מרובה\"" : "לא נמצאו מכשירים. ודא שהבלוטוס פועל במכשיר השני.";
         });
         StatusText.Text = "מחפש מכשירים...";
         Spinner.Visibility = Visibility.Visible;
@@ -281,7 +272,7 @@ public partial class SendWindow : Wpf.Ui.Controls.FluentWindow
 
     void Rebuild()
     {
-        var selId = Selected?.Id;
+        var selIds = SelectedDevs.Select(d => d.Id).ToHashSet();
         _syncing = true;
         PairedList.Items.Clear(); NearbyList.Items.Clear();
         foreach (var d in _devs.Values.Where(d => d.Relevant))
@@ -293,7 +284,7 @@ public partial class SendWindow : Wpf.Ui.Controls.FluentWindow
         {
             var list = d.Paired ? PairedList : NearbyList;
             list.Items.Add(d);
-            if (d.Id == selId) list.SelectedItem = d;
+            if (selIds.Contains(d.Id)) list.SelectedItems.Add(d);
         }
         _syncing = false;
         NoPairedText.Visibility = PairedList.Items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -317,18 +308,35 @@ public partial class SendWindow : Wpf.Ui.Controls.FluentWindow
         return false;
     }
 
+    /// <summary>יעד שליחה: כתובת, שם להצגה, והכנה (צימוד אם צריך).</summary>
+    sealed record Target(ulong Address, string Name, Func<Task<bool>> Prepare);
+
+    Target TargetOf(Dev dev) => new(dev.Address, dev.DisplayName, async () =>
+    {
+        if (!await EnsurePairedAsync(dev)) return false;
+        StopWatcher(); // סריקה מאטה את החיבור בזמן העברה
+        Spinner.Visibility = Visibility.Collapsed;
+        return true;
+    });
+
+    /// <summary>שליחה מרובה: לכל המכשירים שסומנו (בזה אחר זה).</summary>
     async void SendBtn_Click(object sender, RoutedEventArgs e)
     {
         if (_target != null) { await SendDirectAsync(); return; }
-        if (Selected is not { } dev || _paths.Count == 0) return;
+        var devs = SelectedDevs;
+        if (devs.Count == 0 || _paths.Count == 0) return;
+        if (devs.Any(d => d.Address == 0)) { StatusText.Text = "לא התקבלה כתובת למכשיר, נסה שוב בעוד רגע"; return; }
+        await RunSendAsync(devs.Select(TargetOf).ToList());
+    }
+
+    /// <summary>שליחה מיידית למכשיר אחד: הכפתור ➤ בשורת המכשיר.</summary>
+    async void SendNow_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (((FrameworkElement)sender).Tag is not Dev dev || _busy) return;
+        if (_paths.Count == 0) { StatusText.Text = "בחר קבצים קודם: גרור לכאן או לחץ \"הוסף קבצים\""; return; }
         if (dev.Address == 0) { StatusText.Text = "לא התקבלה כתובת למכשיר, נסה שוב בעוד רגע"; return; }
-        await RunSendAsync(dev.Address, dev.DisplayName, async () =>
-        {
-            if (!await EnsurePairedAsync(dev)) return false;
-            StopWatcher(); // סריקה מאטה את החיבור בזמן העברה
-            Spinner.Visibility = Visibility.Collapsed;
-            return true;
-        });
+        await RunSendAsync(new List<Target> { TargetOf(dev) });
     }
 
     void CancelBtn_Click(object sender, RoutedEventArgs e)
@@ -338,52 +346,72 @@ public partial class SendWindow : Wpf.Ui.Controls.FluentWindow
         _cts?.Cancel();
     }
 
-    Task SendDirectAsync() => RunSendAsync(_target!.Address, _target.Name, () => Task.FromResult(true));
+    Task SendDirectAsync() => RunSendAsync(new List<Target> { new(_target!.Address, _target.Name, () => Task.FromResult(true)) });
 
-    async Task RunSendAsync(ulong address, string deviceName, Func<Task<bool>> prepare)
+    async Task RunSendAsync(List<Target> targets)
     {
-        if (_busy) return;
+        if (_busy || targets.Count == 0) return;
         _busy = true; var cts = _cts = new CancellationTokenSource();
         CancelBtn.Visibility = Visibility.Visible; CancelBtn.IsEnabled = true;
         SendBtn.IsEnabled = false; AddBtn.IsEnabled = false; PairedList.IsEnabled = false; NearbyList.IsEnabled = false;
         var prog = new Progress<double>(f => Bar.Value = Math.Clamp(f * 1000, 0, 1000));
-        var entry = new HistoryEntry
-        {
-            Sent = true, Device = deviceName,
-            Name = _paths.Count == 1 ? Path.GetFileName(_paths[0].TrimEnd('\\')) : $"{_paths.Count} פריטים",
-            Path = _paths.Count == 1 ? _paths[0] : Path.GetDirectoryName(_paths[0]),
-            Size = _paths.Sum(p => { try { return File.Exists(p) ? new FileInfo(p).Length : 0L; } catch { return 0L; } }),
-        };
-        bool ok = false;
+        var failures = new List<string>();
+        bool cancelled = false;
         try
         {
-            if (!await prepare()) { entry.Ok = false; entry.Note = "הצימוד נכשל"; return; }
-            await SendService.SendAsync(address, _paths, s => { StatusText.Text = s; if (_target != null) AutoText.Text = s; }, prog, _cts.Token);
-            Bar.Value = Bar.Maximum;
-            ok = true;
-            History.Add(entry);
-            await Task.Delay(1200);
-            Close();
-        }
-        catch (Exception) when (cts.IsCancellationRequested)
-        {
-            entry.Ok = false; entry.Note = "בוטל";
-            StatusText.Text = "השליחה בוטלה"; Bar.Value = 0;
-            if (_target != null) AutoText.Text = "השליחה בוטלה";
-            SendBtn.Content = _target != null ? "נסה שוב" : "שלח";
-        }
-        catch (Exception ex)
-        {
-            entry.Ok = false; entry.Note = ex.Message;
-            StatusText.Text = "נכשל: " + ex.Message + "\nודא שהמכשיר דלוק, קרוב, והבלוטוס פעיל בו.";
-            if (_target != null) AutoText.Text = "השליחה נכשלה";
-            Bar.Value = 0;
-            SendBtn.Content = "נסה שוב";
+            for (int i = 0; i < targets.Count && !cancelled; i++)
+            {
+                var t = targets[i];
+                string prefix = targets.Count > 1 ? $"[{i + 1}/{targets.Count}] {t.Name}: " : "";
+                var entry = new HistoryEntry
+                {
+                    Sent = true, Device = t.Name,
+                    Name = _paths.Count == 1 ? Path.GetFileName(_paths[0].TrimEnd('\\')) : $"{_paths.Count} פריטים",
+                    Path = _paths.Count == 1 ? _paths[0] : Path.GetDirectoryName(_paths[0]),
+                    Size = _paths.Sum(p => { try { return File.Exists(p) ? new FileInfo(p).Length : 0L; } catch { return 0L; } }),
+                };
+                Bar.Value = 0;
+                try
+                {
+                    if (!await t.Prepare()) { entry.Ok = false; entry.Note = "הצימוד נכשל"; failures.Add(t.Name + ": הצימוד נכשל"); continue; }
+                    await SendService.SendAsync(t.Address, _paths, s => { StatusText.Text = prefix + s; if (_target != null) AutoText.Text = s; }, prog, cts.Token);
+                    Bar.Value = Bar.Maximum;
+                }
+                catch (Exception) when (cts.IsCancellationRequested)
+                {
+                    entry.Ok = false; entry.Note = "בוטל"; cancelled = true;
+                }
+                catch (Exception ex)
+                {
+                    entry.Ok = false; entry.Note = ex.Message;
+                    failures.Add($"{t.Name}: {ex.Message}");
+                }
+                finally { History.Add(entry); }
+            }
+
+            if (cancelled)
+            {
+                StatusText.Text = "השליחה בוטלה"; Bar.Value = 0;
+                if (_target != null) AutoText.Text = "השליחה בוטלה";
+                SendBtn.Content = _target != null ? "נסה שוב" : "שליחה מרובה";
+            }
+            else if (failures.Count == 0)
+            {
+                Bar.Value = Bar.Maximum;
+                await Task.Delay(1200);
+                Close();
+            }
+            else
+            {
+                StatusText.Text = "נכשל:\n" + string.Join("\n", failures) + "\nודא שהמכשיר דלוק, קרוב, והבלוטוס פעיל בו.";
+                if (_target != null) AutoText.Text = "השליחה נכשלה";
+                Bar.Value = 0;
+                SendBtn.Content = "נסה שוב";
+            }
         }
         finally
         {
             _cts = null; _busy = false;
-            if (!ok) History.Add(entry);
             if (IsLoaded)
             {
                 CancelBtn.Visibility = Visibility.Collapsed;
@@ -392,5 +420,4 @@ public partial class SendWindow : Wpf.Ui.Controls.FluentWindow
                 if (_target == null && _watcher == null) StartWatcher();
             }
         }
-    }
-}
+    }}

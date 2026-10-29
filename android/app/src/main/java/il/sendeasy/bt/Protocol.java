@@ -21,6 +21,7 @@ final class Protocol {
     static final int T_PONG = 0x03;
     static final int T_TEXT = 0x10;
     static final int T_ACK = 0x11;
+    static final int T_READ = 0x12;
     static final int T_FILE_OFFER = 0x20;
     static final int T_FILE_ACCEPT = 0x21;
     static final int T_FILE_REJECT = 0x22;

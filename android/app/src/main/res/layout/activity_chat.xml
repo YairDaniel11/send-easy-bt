@@ -74,15 +74,100 @@
             android:textSize="16sp" />
     </FrameLayout>
 
-    <TextView
-        android:id="@+id/chatRec"
+    <LinearLayout
+        android:id="@+id/chatRecBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="#FFD64545"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="8dp"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/chatRec"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:paddingLeft="8dp"
+                android:paddingRight="8dp"
+                android:textColor="#FFFFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/chatRecHint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingLeft="8dp"
+                android:paddingRight="8dp"
+                android:textColor="#CCFFFFFF"
+                android:textSize="11sp"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/chatRecPause"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
+            android:layout_marginLeft="6dp"
+            android:contentDescription="@string/cd_rec_pause"
+            android:focusable="true"
+            android:gravity="center"
+            android:nextFocusDown="@+id/chatRecPause"
+            android:nextFocusLeft="@+id/chatRecSend"
+            android:nextFocusRight="@+id/chatRecCancel"
+            android:nextFocusUp="@+id/chatRecPause"
+            android:text="⏸"
+            android:textColor="#FFFFFFFF"
+            android:textSize="20sp" />
+
+        <TextView
+            android:id="@+id/chatRecSend"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
+            android:layout_marginLeft="6dp"
+            android:contentDescription="@string/cd_rec_send"
+            android:focusable="true"
+            android:gravity="center"
+            android:nextFocusDown="@+id/chatRecSend"
+            android:nextFocusLeft="@+id/chatRecCancel"
+            android:nextFocusRight="@+id/chatRecPause"
+            android:nextFocusUp="@+id/chatRecSend"
+            android:text="➤"
+            android:textColor="#FFFFFFFF"
+            android:textSize="20sp" />
+
+        <TextView
+            android:id="@+id/chatRecCancel"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
+            android:layout_marginLeft="6dp"
+            android:contentDescription="@string/cd_rec_cancel"
+            android:focusable="true"
+            android:gravity="center"
+            android:nextFocusDown="@+id/chatRecCancel"
+            android:nextFocusLeft="@+id/chatRecPause"
+            android:nextFocusRight="@+id/chatRecSend"
+            android:nextFocusUp="@+id/chatRecCancel"
+            android:text="🗑"
+            android:textColor="#FFFFFFFF"
+            android:textSize="20sp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/chatSendProgress"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
         android:gravity="center"
-        android:padding="10dp"
-        android:textColor="#FFFFFFFF"
-        android:textSize="15sp"
+        android:padding="8dp"
+        android:textSize="13sp"
         android:visibility="gone" />
 
     <LinearLayout
@@ -103,11 +188,26 @@
             android:inputType="textCapSentences|textMultiLine"
             android:maxLines="3"
             android:minHeight="44dp"
-            android:nextFocusRight="@+id/chatMic"
-            android:nextFocusUp="@id/chatList"
+            android:nextFocusRight="@+id/chatAttach"
+            android:nextFocusUp="@+id/chatList"
             android:paddingLeft="16dp"
             android:paddingRight="16dp"
             android:textSize="17sp" />
+
+        <TextView
+            android:id="@+id/chatAttach"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
+            android:layout_marginLeft="8dp"
+            android:contentDescription="@string/cd_attach"
+            android:focusable="true"
+            android:gravity="center"
+            android:nextFocusLeft="@+id/chatInput"
+            android:nextFocusRight="@+id/chatMic"
+            android:nextFocusUp="@+id/chatList"
+            android:text="📎"
+            android:textColor="#FFFFFFFF"
+            android:textSize="19sp" />
 
         <TextView
             android:id="@+id/chatMic"
@@ -116,9 +216,9 @@
             android:layout_marginLeft="8dp"
             android:focusable="true"
             android:gravity="center"
-            android:nextFocusLeft="@id/chatInput"
+            android:nextFocusLeft="@+id/chatAttach"
             android:nextFocusRight="@+id/chatSend"
-            android:nextFocusUp="@id/chatList"
+            android:nextFocusUp="@+id/chatList"
             android:text="🎤"
             android:textColor="#FFFFFFFF"
             android:textSize="19sp" />
@@ -130,8 +230,8 @@
             android:layout_marginLeft="8dp"
             android:focusable="true"
             android:gravity="center"
-            android:nextFocusLeft="@id/chatMic"
-            android:nextFocusUp="@id/chatList"
+            android:nextFocusLeft="@+id/chatAttach"
+            android:nextFocusUp="@+id/chatList"
             android:text="➤"
             android:textColor="#FFFFFFFF"
             android:textSize="19sp" />

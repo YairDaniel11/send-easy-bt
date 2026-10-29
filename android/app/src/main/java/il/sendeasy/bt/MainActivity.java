@@ -12,15 +12,21 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.BaseAdapter;
+import android.widget.Button;
+import android.widget.LinearLayout;
 import android.widget.ListView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -33,8 +39,11 @@ public class MainActivity extends Activity implements Events.Listener {
     private TextView status;
     private TextView empty;
     private TextView pickHint;
+    private TextView updateBar;
     private final List<BluetoothDevice> devices = new ArrayList<BluetoothDevice>();
     private DeviceAdapter adapter;
+    /** מספר הודעות שלא נקראו לכל מכשיר (לפי כתובת). מתעדכן ב-reload וב-Events.CHAT. */
+    private final java.util.HashMap<String, Integer> unreadMap = new java.util.HashMap<String, Integer>();
 
     /** קבצים שהגיעו משיתוף מאפליקציה אחרת וממתינים לבחירת מכשיר. */
     private ArrayList<Uri> pendingShare;
@@ -72,8 +81,34 @@ public class MainActivity extends Activity implements Events.Listener {
             @Override public boolean onItemLongClick(AdapterView<?> p, View v, int pos, long id) { onDevice(devices.get(pos)); return true; }
         });
 
+        updateBar = (TextView) findViewById(R.id.updateBar);
+        updateBar.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                if (available != null) showUpdateDialog(available);
+            }
+        });
+        updateBar.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+            @Override public void onFocusChange(View v, boolean has) {
+                int accent = UiKit.attr(MainActivity.this, R.attr.sbAccent);
+                updateBar.setBackgroundDrawable(has
+                        ? UiKit.rect(MainActivity.this, accent, 10, 0xFFFFFFFF, 3)
+                        : UiKit.rect(MainActivity.this, accent, 10));
+            }
+        });
+
         handleShare(getIntent());
         Perms.requestMissing(this);
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (downloader != null) downloader.cancel();
+        downloader = null;
+        if (progressDlg != null) {
+            try { progressDlg.dismiss(); } catch (RuntimeException ignored) { }
+            progressDlg = null;
+        }
+        super.onDestroy();
     }
 
     @Override
@@ -89,7 +124,15 @@ public class MainActivity extends Activity implements Events.Listener {
         Events.add(this);
         reload();
         startServiceIfNeeded();
-        checkUpdate(false);
+        refreshUpdateBar();
+        if (pendingInstall != null) {
+            File f = pendingInstall;
+            pendingInstall = null;
+            if (Build.VERSION.SDK_INT < 26 || getPackageManager().canRequestPackageInstalls()) launchInstall(f);
+            else Toast.makeText(this, R.string.upd_allow_denied, Toast.LENGTH_LONG).show();
+        } else {
+            checkUpdate(false);
+        }
     }
 
     @Override
@@ -101,6 +144,7 @@ public class MainActivity extends Activity implements Events.Listener {
     @Override
     public void onEvent(String kind, String arg) {
         if (Events.STATE.equals(kind)) updateStatus();
+        if (Events.CHAT.equals(kind)) { loadUnread(); adapter.notifyDataSetChanged(); }
         if (Events.RECEIVED.equals(kind)) status.setText(getString(R.string.rx_file, arg));
     }
 
@@ -158,12 +202,21 @@ public class MainActivity extends Activity implements Events.Listener {
             });
             if (devices.isEmpty()) showEmpty(getString(R.string.main_no_devices)); else empty.setVisibility(View.GONE);
         }
+        loadUnread();
         adapter.notifyDataSetChanged();
         if (!devices.isEmpty()) {
             list.requestFocus();
             if (list.getSelectedItemPosition() < 0) list.setSelection(0);
         }
         updateStatus();
+    }
+
+    private void loadUnread() {
+        unreadMap.clear();
+        for (BluetoothDevice d : devices) {
+            int n = ChatStore.unread(this, d.getAddress());
+            if (n > 0) unreadMap.put(d.getAddress(), n);
+        }
     }
 
     private void showEmpty(String msg) {
@@ -206,6 +259,15 @@ public class MainActivity extends Activity implements Events.Listener {
             ((TextView) v.findViewById(R.id.rowTitle)).setText(name);
             ((TextView) v.findViewById(R.id.rowSub)).setText(Fmt.ltr(d.getAddress()) + (isComputer(d) ? "  ·  מחשב" : ""));
             UiKit.avatar((TextView) v.findViewById(R.id.avatar), name, 48);
+            TextView badge = (TextView) v.findViewById(R.id.rowBadge);
+            Integer un = unreadMap.get(d.getAddress());
+            if (un != null && un > 0) {
+                badge.setText(un == 1 ? getString(R.string.unread_one) : getString(R.string.unread_n, un));
+                badge.setBackgroundDrawable(UiKit.rect(MainActivity.this, 0xFF1B9E4B, 12));
+                badge.setVisibility(View.VISIBLE);
+            } else {
+                badge.setVisibility(View.GONE);
+            }
             // כרטיס עגול; בניווט במקשים מסגרת בולטת סביב הפריט הנבחר
             boolean focused = list.hasFocus() && list.getSelectedItemPosition() == pos;
             int accent = UiKit.attr(MainActivity.this, R.attr.sbAccent);
@@ -269,24 +331,156 @@ public class MainActivity extends Activity implements Events.Listener {
     /** גרסה שהמשתמש בחר "אחר כך" לגביה בהפעלה הנוכחית של התהליך. */
     private static String dismissedVersion;
 
+    /** הגרסה החדשה האחרונה שנמצאה (ללא בקשת רשת נוספת). משמשת את הפס העליון. */
+    private static UpdateChecker.Info available;
+
+    private ApkDownloader downloader;
+    private AlertDialog progressDlg;
+    /** קובץ שמחכה לחזרה ממסך ההרשאה "התקנת אפליקציות לא מוכרות". */
+    private File pendingInstall;
+
+    private void refreshUpdateBar() {
+        UpdateChecker.Info i = available;
+        if (i == null) { updateBar.setVisibility(View.GONE); return; }
+        updateBar.setText(getString(R.string.upd_bar, Fmt.ltr(i.version)));
+        updateBar.setBackgroundDrawable(UiKit.rect(this, UiKit.attr(this, R.attr.sbAccent), 10));
+        updateBar.setVisibility(View.VISIBLE);
+    }
+
+    private void showUpdateDialog(final UpdateChecker.Info info) {
+        final boolean auto = info.apkUrl != null;
+        new AlertDialog.Builder(this)
+                .setMessage(getString(auto ? R.string.upd_new_auto : R.string.upd_new, Fmt.ltr(info.version)))
+                .setPositiveButton(auto ? R.string.upd_install : R.string.upd_open, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) {
+                        if (auto) { startDownload(info); return; }
+                        try {
+                            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(info.pageUrl)));
+                        } catch (RuntimeException ignored) { } // כולל ActivityNotFoundException
+                    }
+                })
+                .setNegativeButton(R.string.upd_later, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) { dismissedVersion = info.version; }
+                })
+                .show();
+    }
+
+    private void startDownload(UpdateChecker.Info info) {
+        if (downloader != null) return;
+        float dp = getResources().getDisplayMetrics().density;
+        int pad = (int) (20 * dp);
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(pad, pad, pad, pad / 2);
+        final ProgressBar bar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        bar.setMax(100);
+        bar.setIndeterminate(true);
+        final TextView txt = new TextView(this);
+        txt.setTextSize(15);
+        txt.setPadding(0, pad / 2, 0, 0);
+        txt.setText(R.string.upd_downloading);
+        box.addView(bar, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        box.addView(txt, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        progressDlg = new AlertDialog.Builder(this)
+                .setTitle(R.string.upd_downloading)
+                .setView(box)
+                .setNegativeButton(R.string.upd_cancel, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) { cancelDownload(); }
+                })
+                .setOnCancelListener(new DialogInterface.OnCancelListener() {
+                    @Override public void onCancel(DialogInterface d) { cancelDownload(); }
+                })
+                .create();
+        progressDlg.show();
+        Button cancel = progressDlg.getButton(DialogInterface.BUTTON_NEGATIVE);
+        if (cancel != null) cancel.requestFocus();
+
+        downloader = ApkDownloader.start(this, info.apkUrl, info.apkSize, new ApkDownloader.Listener() {
+            @Override public void onProgress(long done, long total) {
+                if (total > 0) {
+                    int p = (int) Math.min(100, done * 100 / total);
+                    bar.setIndeterminate(false);
+                    bar.setProgress(p);
+                    txt.setText(getString(R.string.upd_progress, Fmt.ltr(Fmt.size(done)), Fmt.ltr(Fmt.size(total)), p));
+                } else {
+                    txt.setText(getString(R.string.upd_progress_unknown, Fmt.ltr(Fmt.size(done))));
+                }
+            }
+            @Override public void onDone(File apk) {
+                closeProgress();
+                installApk(apk);
+            }
+            @Override public void onError(int code) {
+                closeProgress();
+                int msg = code == ApkDownloader.ERR_SIZE ? R.string.upd_err_size
+                        : code == ApkDownloader.ERR_DISK ? R.string.upd_err_disk : R.string.upd_err_net;
+                new AlertDialog.Builder(MainActivity.this).setMessage(msg).setPositiveButton(android.R.string.ok, null).show();
+            }
+        });
+    }
+
+    private void cancelDownload() {
+        if (downloader != null) downloader.cancel();
+        downloader = null;
+        progressDlg = null;
+    }
+
+    private void closeProgress() {
+        downloader = null;
+        AlertDialog d = progressDlg;
+        progressDlg = null;
+        if (d != null) {
+            try { d.dismiss(); } catch (RuntimeException ignored) { }
+        }
+    }
+
+    private void installApk(final File apk) {
+        if (isFinishing()) return;
+        if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
+            new AlertDialog.Builder(this)
+                    .setMessage(R.string.upd_allow_source)
+                    .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+                        @Override public void onClick(DialogInterface d, int w) {
+                            pendingInstall = apk;
+                            try {
+                                startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName())));
+                            } catch (RuntimeException e) {
+                                pendingInstall = null;
+                                Toast.makeText(MainActivity.this, R.string.upd_allow_denied, Toast.LENGTH_LONG).show();
+                            }
+                        }
+                    })
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show();
+            return;
+        }
+        launchInstall(apk);
+    }
+
+    private void launchInstall(File apk) {
+        try {
+            if (!apk.isFile()) throw new IllegalStateException();
+            Uri u = Build.VERSION.SDK_INT >= 24 ? ApkProvider.uri(this) : Uri.fromFile(apk);
+            Intent i = new Intent(Intent.ACTION_VIEW);
+            i.setDataAndType(u, "application/vnd.android.package-archive");
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(i);
+        } catch (RuntimeException e) { // כולל ActivityNotFoundException
+            new AlertDialog.Builder(this).setMessage(R.string.upd_install_failed)
+                    .setPositiveButton(android.R.string.ok, null).show();
+        }
+    }
+
     private void checkUpdate(final boolean manual) {
         UpdateChecker.check(this, manual, new UpdateChecker.Callback() {
-            @Override public void onResult(int status, final String version, final String url) {
+            @Override public void onResult(int status, UpdateChecker.Info info) {
+                if (status == UpdateChecker.UP_TO_DATE) { available = null; refreshUpdateBar(); }
                 if (status == UpdateChecker.NEWER) {
-                    if (!manual && version.equals(dismissedVersion)) return;
-                    new AlertDialog.Builder(MainActivity.this)
-                            .setMessage(getString(R.string.upd_new, Fmt.ltr(version)))
-                            .setPositiveButton(R.string.upd_open, new DialogInterface.OnClickListener() {
-                                @Override public void onClick(DialogInterface d, int w) {
-                                    try {
-                                        startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
-                                    } catch (RuntimeException ignored) { } // כולל ActivityNotFoundException
-                                }
-                            })
-                            .setNegativeButton(R.string.upd_later, new DialogInterface.OnClickListener() {
-                                @Override public void onClick(DialogInterface d, int w) { dismissedVersion = version; }
-                            })
-                            .show();
+                    available = info;
+                    refreshUpdateBar();
+                    if (!manual && info.version.equals(dismissedVersion)) return;
+                    showUpdateDialog(info);
                 } else if (manual) {
                     int msg = status == UpdateChecker.NO_NET ? R.string.upd_no_net
                             : status == UpdateChecker.UP_TO_DATE ? R.string.upd_current : R.string.upd_failed;
@@ -301,6 +495,7 @@ public class MainActivity extends Activity implements Events.Listener {
     private void showMenu() {
         final String[] items = {
                 getString(R.string.menu_toggle_receive),
+                getString(Prefs.showServiceNotification(this) ? R.string.menu_svc_notif_shown : R.string.menu_svc_notif_hidden),
                 getString(R.string.menu_receive_dir),
                 getString(R.string.menu_chat_style),
                 getString(R.string.menu_check_update),
@@ -314,16 +509,20 @@ public class MainActivity extends Activity implements Events.Listener {
                             if (on) BtService.start(MainActivity.this); else BtService.stop(MainActivity.this);
                             updateStatus();
                         } else if (which == 1) {
+                            Prefs.setShowServiceNotification(MainActivity.this, !Prefs.showServiceNotification(MainActivity.this));
+                            // הפעלה מחדש כדי שההתראה תיבנה בערוץ המתאים
+                            if (Prefs.receiveEnabled(MainActivity.this) && BtService.isRunning()) BtService.restart(MainActivity.this);
+                        } else if (which == 2) {
                             new AlertDialog.Builder(MainActivity.this)
                                     .setMessage(getString(R.string.main_receive_dir, Fmt.ltr(Storage.receiveDirLabel(MainActivity.this))))
                                     .setPositiveButton(android.R.string.ok, null).show();
-                        } else if (which == 2) {
+                        } else if (which == 3) {
                             new AlertDialog.Builder(MainActivity.this)
                                     .setTitle(R.string.menu_chat_style)
                                     .setSingleChoiceItems(new String[]{getString(R.string.style_wa), getString(R.string.style_gc)}, Prefs.chatStyle(MainActivity.this), new DialogInterface.OnClickListener() {
                                         @Override public void onClick(DialogInterface d, int w) { Prefs.setChatStyle(MainActivity.this, w); d.dismiss(); }
                                     }).show();
-                        } else if (which == 3) {
+                        } else if (which == 4) {
                             checkUpdate(true);
                         } else {
                             new AlertDialog.Builder(MainActivity.this)

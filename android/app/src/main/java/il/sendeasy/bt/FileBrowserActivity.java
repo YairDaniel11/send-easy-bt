@@ -28,6 +28,10 @@ import java.util.Set;
  */
 public class FileBrowserActivity extends Activity {
     static final String EXTRA_PATHS = "paths";
+    /** true = מציג תיקיות וקבצי תמונה בלבד (לכפתור הצירוף בצ'אט). */
+    static final String EXTRA_IMAGES_ONLY = "imagesOnly";
+
+    private boolean imagesOnly;
 
     private ListView list;
     private TextView pathT, countT, emptyT;
@@ -53,6 +57,8 @@ public class FileBrowserActivity extends Activity {
             @Override public void onItemClick(AdapterView<?> p, View v, int pos, long id) { onEntry(pos); }
         });
 
+        imagesOnly = getIntent().getBooleanExtra(EXTRA_IMAGES_ONLY, false);
+        if (imagesOnly) setTitle(R.string.browser_images_title);
         root = Environment.getExternalStorageDirectory();
         dir = root;
         if (!Perms.hasReadStorage(this)) {
@@ -78,7 +84,11 @@ public class FileBrowserActivity extends Activity {
                     return a.getName().compareToIgnoreCase(c.getName());
                 }
             });
-            for (File k : kids) if (!k.getName().startsWith(".")) entries.add(k);
+            for (File k : kids) {
+                if (k.getName().startsWith(".")) continue;
+                if (imagesOnly && !k.isDirectory() && !Storage.isImageName(k.getName())) continue;
+                entries.add(k);
+            }
         }
         pathT.setText(Fmt.ltr(dir.getPath()));
         emptyT.setVisibility(entries.isEmpty() ? View.VISIBLE : View.GONE);

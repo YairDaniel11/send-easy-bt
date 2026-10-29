@@ -28,7 +28,24 @@ final class UpdateChecker {
 
     static final int NO_NET = 0, FAILED = 1, UP_TO_DATE = 2, NEWER = 3;
 
-    interface Callback { void onResult(int status, String version, String url); }
+    /** פרטי הגרסה החדשה. apkUrl הוא null (וגודל 0) אם ב-Release אין קובץ APK. */
+    static final class Info {
+        final String version, pageUrl, apkUrl;
+        final long apkSize;
+        Info(String version, String pageUrl, String apkUrl, long apkSize) {
+            this.version = version; this.pageUrl = pageUrl; this.apkUrl = apkUrl; this.apkSize = apkSize;
+        }
+    }
+
+    interface Callback { void onResult(int status, Info info); }
+
+    /** הגדרות משותפות לחיבור HTTPS (TLS 1.2 ב-API קטן מ-21, זמני המתנה, זיהוי). */
+    static void configure(HttpsURLConnection c, int readTimeoutMs) {
+        if (Build.VERSION.SDK_INT < 21) c.setSSLSocketFactory(new Tls12Factory(HttpsURLConnection.getDefaultSSLSocketFactory()));
+        c.setConnectTimeout(10000);
+        c.setReadTimeout(readTimeoutMs);
+        c.setRequestProperty("User-Agent", "SendEasyBT-Android");
+    }
 
     private static final String API = "https://api.github.com/repos/YairDaniel11/send-easy-bt/releases?per_page=15";
     private static final String TAG_PREFIX = "android-v";
@@ -51,7 +68,7 @@ final class UpdateChecker {
     static void check(final Activity act, final boolean force, final Callback cb) {
         final Context app = act.getApplicationContext();
         if (!online(app)) {
-            if (force) cb.onResult(NO_NET, null, null);
+            if (force) cb.onResult(NO_NET, null);
             return;
         }
         long now = System.currentTimeMillis();
@@ -60,21 +77,21 @@ final class UpdateChecker {
         Prefs.setLastUpdateCheck(app, now);
         new Thread(new Runnable() {
             @Override public void run() {
-                String ver = null, url = null;
+                Info info = null;
                 int st = FAILED;
                 try {
-                    String[] r = fetchLatest();
+                    Info r = fetchLatest();
                     if (r != null) {
                         st = UP_TO_DATE;
-                        if (isNewer(r[0], installed(app))) { st = NEWER; ver = r[0]; url = r[1]; }
+                        if (isNewer(r.version, installed(app))) { st = NEWER; info = r; }
                     }
                 } catch (Throwable ignored) { }
                 if (!force && st != NEWER) return;
                 final int fs = st;
-                final String fv = ver, fu = url;
+                final Info fi = info;
                 act.runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        if (!act.isFinishing()) cb.onResult(fs, fv, fu);
+                        if (!act.isFinishing()) cb.onResult(fs, fi);
                     }
                 });
             }
@@ -85,14 +102,11 @@ final class UpdateChecker {
         return c.getPackageManager().getPackageInfo(c.getPackageName(), 0).versionName;
     }
 
-    /** מחזיר {גרסה, קישור} של ה-Release הראשון של האנדרואיד, או null. */
-    private static String[] fetchLatest() throws Exception {
+    /** מחזיר את פרטי ה-Release הראשון של האנדרואיד, או null. */
+    private static Info fetchLatest() throws Exception {
         HttpsURLConnection c = (HttpsURLConnection) new URL(API).openConnection();
         try {
-            if (Build.VERSION.SDK_INT < 21) c.setSSLSocketFactory(new Tls12Factory(HttpsURLConnection.getDefaultSSLSocketFactory()));
-            c.setConnectTimeout(10000);
-            c.setReadTimeout(10000);
-            c.setRequestProperty("User-Agent", "SendEasyBT-Android");
+            configure(c, 10000);
             c.setRequestProperty("Accept", "application/vnd.github+json");
             if (c.getResponseCode() != 200) return null;
             InputStream in = c.getInputStream();
@@ -110,7 +124,22 @@ final class UpdateChecker {
                 if (!tag.startsWith(TAG_PREFIX) || o.optBoolean("draft", false)) continue;
                 String ver = tag.substring(TAG_PREFIX.length());
                 String url = o.optString("html_url", "");
-                if (ver.length() > 0 && url.startsWith("https://")) return new String[]{ver, url};
+                if (ver.length() == 0 || !url.startsWith("https://")) continue;
+                String apk = null;
+                long size = 0;
+                JSONArray assets = o.optJSONArray("assets");
+                for (int k = 0; assets != null && k < assets.length(); k++) {
+                    JSONObject a = assets.optJSONObject(k);
+                    if (a == null) continue;
+                    String name = a.optString("name", "").toLowerCase(java.util.Locale.US);
+                    String dl = a.optString("browser_download_url", "");
+                    if (name.endsWith(".apk") && dl.startsWith("https://")) {
+                        apk = dl;
+                        size = a.optLong("size", 0);
+                        break;
+                    }
+                }
+                return new Info(ver, url, apk, apk == null || size < 0 ? 0 : size);
             }
             return null;
         } finally {
