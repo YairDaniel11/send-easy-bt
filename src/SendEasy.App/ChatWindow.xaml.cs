@@ -309,6 +309,15 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         else { MsgPanel.Children.Clear(); HeaderName.Text = "אין שיחות עדיין. הודעה מהטלפון או מכשיר מועדף יפתחו שיחה."; HeaderStatus.Text = ""; }
     }
 
+    /// <summary>צ'אט חדש: בחירת מכשיר מצומד ופתיחת השיחה איתו (גם אם כבר קיימת).</summary>
+    void NewChat_Click(object s, RoutedEventArgs e)
+    {
+        var dlg = new DevicePickerWindow(_settings) { Owner = this };
+        if (dlg.ShowDialog() != true || dlg.Chosen is not { } item) return;
+        Open(item.Address, item.Name);
+        Input.Focus();
+    }
+
     // ---- הודעות ----
 
     void RenderMessages()
@@ -841,7 +850,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         RecordLabel.Visibility = Visibility.Visible;
         RecordLabel.Text = "● מקליט  0:00   (⏸ להשהיה, ➤ לשליחה)";
         PauseBtn.Content = "⏸"; PauseBtn.ToolTip = "השהה את ההקלטה"; PauseBtn.Visibility = Visibility.Visible;
-        AttachBtn.Content = "🗑"; ActionBtn.Content = "➤"; ActionBtn.ToolTip = "שלח הודעה קולית";
+        AttachBtn.Content = "\uE74D"; ActionBtn.Content = "➤"; ActionBtn.ToolTip = "שלח הודעה קולית";
         _recTimer.Start();
     }
 
@@ -852,7 +861,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         PauseBtn.Visibility = Visibility.Collapsed;
         RecordLabel.Visibility = Visibility.Collapsed;
         Input.Visibility = Visibility.Visible;
-        AttachBtn.Content = "📎";
+        AttachBtn.Content = "\uE723";
         Input_TextChanged(this, null!);
         if (!send || conv == null) { await _voice.CancelAsync(); return; }
         var path = await _voice.StopAsync();
