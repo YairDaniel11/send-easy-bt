@@ -91,18 +91,18 @@ sealed class TrayApp : IDisposable
 
     public void OpenChat()
     {
-        if (_chat is { IsLoaded: true }) { _chat.Activate(); return; }
+        if (_chat is { IsLoaded: true }) { WindowFront.Bring(_chat); return; }
         _chat = new ChatWindow(_settings);
         _chat.Show();
-        _chat.Activate();
+        WindowFront.Bring(_chat);
     }
 
     public void OpenHistory()
     {
-        if (_history is { IsLoaded: true }) { _history.Activate(); return; }
+        if (_history is { IsLoaded: true }) { WindowFront.Bring(_history); return; }
         _history = new HistoryWindow();
         _history.Show();
-        _history.Activate();
+        WindowFront.Bring(_history);
     }
 
     public void ShowSettings()
@@ -297,7 +297,7 @@ sealed class TrayApp : IDisposable
             _pending.Clear(); _pendingTarget = null;
             var w = new SendWindow(items, _settings, tgt);
             w.Show();
-            w.Activate();
+            WindowFront.Bring(w);
         };
         _batchTimer.Start();
     }

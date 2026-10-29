@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -147,8 +147,12 @@ static class ShellServer
     public static void ScheduleExit() => _idle?.Change(TimeSpan.FromSeconds(8), Timeout.InfiniteTimeSpan);
 
     /// <summary>מפעיל את התוכנה הראשית עם הקבצים. בהרבה קבצים משתמשים בקובץ רשימה (מגבלת אורך שורת פקודה).</summary>
+    [DllImport("user32.dll")] static extern bool AllowSetForegroundWindow(int processId);
+
     public static void LaunchApp(List<string> paths)
     {
+        // התהליך הזה קיבל את הקליק מהמשתמש ולכן מותר לו להעביר את זכות החזית הלאה, אחרת החלון נפתח מאחורי האחרים
+        try { AllowSetForegroundWindow(-1); } catch { }
         var exe = Environment.ProcessPath!;
         var psi = new ProcessStartInfo(exe) { UseShellExecute = false };
         if (paths.Sum(p => p.Length + 3) < 20000)

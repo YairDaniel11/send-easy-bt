@@ -70,7 +70,7 @@ public static class SendService
             ct.ThrowIfCancellationRequested();
             try
             {
-                status("בודק אם האפליקציה מותקנת בטלפון...");
+                status("בודק אם האפליקציה שלנו מותקנת בטלפון (מאפשרת לשלוח כל סוג קובץ)...");
                 return await PeerClient.TryConnectAsync(address, ct);
             }
             catch (OperationCanceledException) { throw; }
