@@ -17,6 +17,11 @@ import java.util.HashSet;
 final class SafHelper {
     private SafHelper() {}
 
+    /** כתובת לפתיחת התיקייה שנבחרה באפליקציית קבצים. */
+    static Uri treeViewUri(Uri tree) {
+        return DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree));
+    }
+
     static String treeLabel(Uri tree) {
         try {
             String id = DocumentsContract.getTreeDocumentId(tree);

@@ -6,6 +6,12 @@ import java.util.Locale;
 final class Fmt {
     private Fmt() {}
 
+    /** הודעת שגיאה בעברית: שגיאות מערכת באנגלית (ניתוק, timeout) מוחלפות בהסבר כללי. */
+    static String heb(String msg) {
+        if (msg != null) for (int i = 0; i < msg.length(); i++) if (msg.charAt(i) >= '֐' && msg.charAt(i) <= '׿') return msg;
+        return "החיבור נותק או שהמכשיר השני לא ענה. נסה שוב";
+    }
+
     static String ltr(String s) {
         return "\u2066" + s + "\u2069";
     }

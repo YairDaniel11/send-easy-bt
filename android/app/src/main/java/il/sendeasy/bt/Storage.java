@@ -96,6 +96,24 @@ final class Storage {
         return f == null ? "" : new File(f, DIR_NAME).getPath();
     }
 
+    /** Intent לפתיחת תיקיית הקבצים שהתקבלו באפליקציית קבצים (לפי המקום שבו נשמר כרגע). */
+    static Intent folderIntent(Context c) {
+        Intent i = new Intent(Intent.ACTION_VIEW);
+        if (customUsable(c)) {
+            if (Build.VERSION.SDK_INT >= 21 && Prefs.saveTree(c) != null) {
+                i.setDataAndType(SafHelper.treeViewUri(Uri.parse(Prefs.saveTree(c))), "vnd.android.document/directory");
+            } else {
+                i.setDataAndType(Uri.fromFile(new File(Prefs.saveDir(c))), "resource/folder");
+            }
+        } else if (Build.VERSION.SDK_INT >= 29) {
+            i.setDataAndType(Uri.parse("content://com.android.externalstorage.documents/document/primary%3ADownload%2F" + DIR_NAME), "vnd.android.document/directory");
+        } else {
+            i.setDataAndType(Uri.fromFile(new File(defaultLabel(c))), "resource/folder");
+        }
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        return i;
+    }
+
     // ---- תיקיית שמירה מותאמת ----
 
     /** האם המשתמש הגדיר תיקייה מותאמת שרלוונטית לגרסת המכשיר (גם אם כרגע אין גישה אליה). */

@@ -731,6 +731,7 @@ public class MainActivity extends Activity implements Events.Listener {
         final String[] items = {
                 getString(R.string.menu_settings),
                 getString(R.string.menu_new_chat),
+                getString(R.string.menu_bt_devices),
                 getString(R.string.menu_check_update),
                 getString(R.string.menu_about)};
         new AlertDialog.Builder(this)
@@ -738,11 +739,21 @@ public class MainActivity extends Activity implements Events.Listener {
                     @Override public void onClick(DialogInterface dlg, int which) {
                         if (which == 0) showSettings();
                         else if (which == 1) showNewChat();
-                        else if (which == 2) checkUpdate(true);
+                        else if (which == 2) openBluetoothSettings();
+                        else if (which == 3) checkUpdate(true);
                         else showAbout();
                     }
                 })
                 .show();
+    }
+
+    /** הוספה, סריקה והסרה של מכשירי בלוטוס נעשות במסך ההגדרות של המערכת; הרשימה כאן מתרעננת בחזרה. */
+    private void openBluetoothSettings() {
+        try {
+            startActivity(new Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS));
+        } catch (RuntimeException e) {
+            Toast.makeText(this, R.string.bt_settings_failed, Toast.LENGTH_LONG).show();
+        }
     }
 
     /** צ'אט חדש עם המכשיר שהסמן עומד עליו ברשימה: פותח שיחה חדשה (ריקה), והקודמות נשארות זמינות מתוך הצ'אט. */

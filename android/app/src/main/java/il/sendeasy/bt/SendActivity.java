@@ -179,11 +179,11 @@ public class SendActivity extends Activity {
                 session = null;
             }
         } catch (IOException e) {
-            result = cancel.get() ? getString(R.string.send_cancelled) : getString(R.string.send_failed, String.valueOf(e.getMessage()));
+            result = cancel.get() ? getString(R.string.send_cancelled) : getString(R.string.send_failed, Fmt.heb(e.getMessage()));
         } catch (InterruptedException e) {
             result = getString(R.string.send_cancelled);
         } catch (RuntimeException e) {
-            result = getString(R.string.send_failed, String.valueOf(e.getMessage()));
+            result = getString(R.string.send_failed, Fmt.heb(e.getMessage()));
         }
         showResult(result, ok);
     }

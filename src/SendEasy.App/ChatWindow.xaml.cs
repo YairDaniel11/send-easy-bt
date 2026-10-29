@@ -293,7 +293,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         HeaderAvatar.Background = new SolidColorBrush(_cur.Color);
         var hdel = new MenuItem { Header = "מחק שיחה", Tag = _cur };
         hdel.Click += DeleteConv_Click;
-        HeaderBar.ContextMenu = new ContextMenu { FlowDirection = FlowDirection.RightToLeft, Items = { hdel } };
+        HeaderBar.ContextMenu = new ContextMenu { FlowDirection = FlowDirection.RightToLeft, Items = { BuildThreadsMenu(_cur), hdel } };
     }
 
     /// <summary>מחיקת שיחה (קליק ימני על שיחה ברשימה).</summary>
@@ -312,13 +312,47 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         else { MsgPanel.Children.Clear(); HeaderName.Text = "אין שיחות עדיין. הודעה מהטלפון או מכשיר מועדף יפתחו שיחה."; HeaderStatus.Text = ""; }
     }
 
-    /// <summary>צ'אט חדש: בחירת מכשיר מצומד ופתיחת השיחה איתו (גם אם כבר קיימת).</summary>
+    /// <summary>צ'אט חדש עם אותו מכשיר שבשיחה הנוכחית: שיחה חדשה וריקה; הקודמות נשארות זמינות מתפריט הכותרת.</summary>
     void NewChat_Click(object s, RoutedEventArgs e)
     {
-        var dlg = new DevicePickerWindow(_settings) { Owner = this };
-        if (dlg.ShowDialog() != true || dlg.Chosen is not { } item) return;
-        Open(item.Address, item.Name);
+        if (_cur == null)
+        {
+            var dlg = new DevicePickerWindow(_settings) { Owner = this };
+            if (dlg.ShowDialog() != true || dlg.Chosen is not { } item) return;
+            Open(item.Address, item.Name);
+            Input.Focus();
+            return;
+        }
+        StopPlayback();
+        if (!ChatLog.NewThread(_cur.Address))
+            ConfirmDialog.Tell(this, "צ'אט חדש", "הצ'אט הנוכחי עדיין ריק, אין צורך בצ'אט חדש.");
+        SwitchedThread();
+    }
+
+    void SwitchedThread()
+    {
+        Reload(_cur);
+        RebuildConvList();
+        ShowHeader();
+        RenderMessages();
         Input.Focus();
+    }
+
+    /// <summary>תת-תפריט "צ'אטים אחרים": כל השיחות עם המכשיר, עם תאריך תחילה ומספר הודעות.</summary>
+    MenuItem BuildThreadsMenu(Conv c)
+    {
+        var root = new MenuItem { Header = "עבור לצ'אטים אחרים עם המכשיר" };
+        int act = ChatLog.ActiveThread(c.Address);
+        foreach (var n in ChatLog.Threads(c.Address))
+        {
+            var l = ChatLog.LoadThread(c.Address, n);
+            var when = l.Count == 0 ? "ריק" : l[0].Time.ToString("dd/MM/yy HH:mm") + " · " + l.Count + " הודעות";
+            int num = n;
+            var it = new MenuItem { Header = $"צ'אט {n} · {when}", IsChecked = n == act };
+            it.Click += (_, _) => { StopPlayback(); ChatLog.SetActiveThread(c.Address, num); SwitchedThread(); };
+            root.Items.Add(it);
+        }
+        return root;
     }
 
     // ---- הודעות ----

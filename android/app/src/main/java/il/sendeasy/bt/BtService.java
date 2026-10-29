@@ -333,7 +333,8 @@ public class BtService extends Service {
                 Events.post(Events.CHAT, address);
             }
             Events.post(Events.RECEIVED, f.name);
-            notifyEvent(getString(R.string.rx_file, f.name), where, null);            return true;
+            notifyEvent(getString(R.string.rx_file, f.name), where, null, openFolder());
+            return true;
         }
 
         @Override
@@ -430,6 +431,22 @@ public class BtService extends Service {
 
     @SuppressWarnings("deprecation")
     private void notifyEvent(String title, String text, String chatAddress) {
+        notifyEvent(title, text, chatAddress, null);
+    }
+
+    /** לחיצה על ההתראה של קובץ שהתקבל פותחת את התיקייה שבה הוא נשמר; אם אין אפליקציית קבצים מתאימה - את מסך ההורדות, ואחרת את האפליקציה. */
+    private PendingIntent openFolder() {
+        int fl = PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0);
+        try {
+            Intent i = Storage.folderIntent(this);
+            if (getPackageManager().resolveActivity(i, 0) != null) return PendingIntent.getActivity(this, 7, i, fl);
+        } catch (RuntimeException ignored) { }
+        Intent d = new Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        if (getPackageManager().resolveActivity(d, 0) != null) return PendingIntent.getActivity(this, 8, d, fl);
+        return openMain(null);
+    }
+
+    private void notifyEvent(String title, String text, String chatAddress, PendingIntent target) {
         NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null || !Prefs.notifyEvents(this)) return;
         if (chatAddress != null && chatAddress.equals(ChatActivity.openAddress)) return; // הצ'אט פתוח בחזית
@@ -438,7 +455,7 @@ public class BtService extends Service {
                 .setContentTitle(title)
                 .setContentText(text)
                 .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
-                .setContentIntent(openMain(chatAddress))
+                .setContentIntent(target != null ? target : openMain(chatAddress))
                 .setAutoCancel(true)
                 .setDefaults(sound ? (Notification.DEFAULT_SOUND | Notification.DEFAULT_LIGHTS) : Notification.DEFAULT_LIGHTS) // צליל ורטט ל-API פחות מ-26 (מ-26 הערוץ קובע)
                 .build();

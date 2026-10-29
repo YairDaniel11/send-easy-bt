@@ -548,9 +548,9 @@ public class ChatActivity extends Activity implements Events.Listener {
                                     }
                                 });
                             } catch (IOException e) {
-                                err = String.valueOf(e.getMessage());
+                                err = Fmt.heb(e.getMessage());
                             } catch (RuntimeException e) {
-                                err = String.valueOf(e.getMessage());
+                                err = Fmt.heb(e.getMessage());
                             }
                             if (err == null) {
                                 ChatStore.markDelivered(app, address, copy.getName());
@@ -636,11 +636,11 @@ public class ChatActivity extends Activity implements Events.Listener {
                     msgId = trySendText(text);
                     if (msgId == 0) err = "לא התקבל אישור";
                 } catch (IOException e) {
-                    err = e.getMessage();
+                    err = Fmt.heb(e.getMessage());
                 } catch (InterruptedException e) {
                     return;
                 } catch (RuntimeException e) {
-                    err = String.valueOf(e.getMessage());
+                    err = Fmt.heb(e.getMessage());
                 }
                 if (err == null) {
                     ChatStore.add(app, address, new ChatStore.Msg(System.currentTimeMillis(), true, ChatStore.T_TEXT, text, msgId, ChatStore.S_DELIVERED));
@@ -767,11 +767,11 @@ public class ChatActivity extends Activity implements Events.Listener {
                         }
                     } : null);
                 } catch (IOException e) {
-                    err = e.getMessage();
+                    err = Fmt.heb(e.getMessage());
                 } catch (InterruptedException e) {
                     return;
                 } catch (RuntimeException e) {
-                    err = String.valueOf(e.getMessage());
+                    err = Fmt.heb(e.getMessage());
                 } finally {
                     if (track) {
                         picSending = false;
@@ -1159,7 +1159,10 @@ public class ChatActivity extends Activity implements Events.Listener {
         if (ChatStore.T_TEXT.equals(m.kind)) t.setText(Emoticons.render(this, m.text, t.getTextSize()));
         // הודעה בלי אותיות (רק אימוג'י/סימנים) נחשבת LTR ונדבקת שמאלה: מכריחים כיוון RTL כמו שאר הממשק
         if (android.os.Build.VERSION.SDK_INT >= 17 && !hasLetter(m.text)) t.setTextDirection(View.TEXT_DIRECTION_RTL);
-        t.setMaxWidth(UiKit.dp(this, 270));
+        // רוחב מפורש לפי הטקסט: במכשירים ישנים wrap_content בתוך בועה היה מצמצם את הטקסט למילה אחת
+        int maxW = Math.min(UiKit.dp(this, 270), getResources().getDisplayMetrics().widthPixels - UiKit.dp(this, 90));
+        int want = (int) Math.ceil(android.text.Layout.getDesiredWidth(t.getText(), t.getPaint())) + UiKit.dp(this, 4);
+        t.setLayoutParams(new LinearLayout.LayoutParams(Math.min(want, maxW), ViewGroup.LayoutParams.WRAP_CONTENT));
         return t;
     }
 

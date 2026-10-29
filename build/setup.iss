@@ -9,6 +9,7 @@
 AppId={{B1E2F7C4-3D5A-4F7E-9A21-6C0D8E5B7A10}
 AppName=שליחה קלה - BT
 AppVersion={#AppVersion}
+AppVerName=שליחה קלה - BT
 AppPublisher=שליחה קלה - BT
 DefaultDirName={localappdata}\Programs\SendEasyBT
 DisableProgramGroupPage=yes
@@ -33,6 +34,9 @@ Name: "modern"; Description: "הוסף פריט ברמה העליונה של ה�
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion; Excludes: "*.pdb"
+
+[Icons]
+Name: "{autoprograms}\שליחה קלה - BT"; Filename: "{app}\SendEasyBT.exe"
 
 [Run]
 ; הרישום עצמו (קליק ימני, "שלח אל", הפעלה עם Windows) נעשה על ידי התוכנה

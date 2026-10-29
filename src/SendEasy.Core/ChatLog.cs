@@ -47,7 +47,78 @@ public static class ChatLog
         return m.Success && int.TryParse(m.Groups[1].Value, out var s) ? s : 0;
     }
 
-    static string FileOf(ulong address) => System.IO.Path.Combine(Dir, address.ToString("x12") + ".jsonl");
+    static string ThreadFile(ulong address, int n) =>
+        System.IO.Path.Combine(Dir, address.ToString("x12") + (n <= 1 ? "" : "." + n) + ".jsonl");
+
+    static string ActiveFile(ulong address) => System.IO.Path.Combine(Dir, address.ToString("x12") + ".active");
+
+    /// <summary>מספר השיחה הפעילה עם המכשיר (1 = הקובץ המקורי). אליה נכנסות הודעות חדשות והיא מוצגת בצ'אט.</summary>
+    public static int ActiveThread(ulong address)
+    {
+        try { return int.TryParse(File.ReadAllText(ActiveFile(address)).Trim(), out var n) && n >= 1 ? n : 1; }
+        catch { return 1; }
+    }
+
+    public static void SetActiveThread(ulong address, int n)
+    {
+        try { lock (Gate) { Directory.CreateDirectory(Dir); File.WriteAllText(ActiveFile(address), n.ToString()); } }
+        catch { }
+    }
+
+    static string FileOf(ulong address) => ThreadFile(address, ActiveThread(address));
+
+    /// <summary>מספרי כל השיחות הקיימות עם המכשיר (כולל הפעילה), מהחדשה לישנה.</summary>
+    public static List<int> Threads(ulong address)
+    {
+        var res = new List<int>();
+        try
+        {
+            if (Directory.Exists(Dir))
+                foreach (var f in Directory.GetFiles(Dir, address.ToString("x12") + "*.jsonl"))
+                {
+                    var mid = System.IO.Path.GetFileNameWithoutExtension(f)[12..];
+                    if (mid.Length == 0) res.Add(1);
+                    else if (mid.StartsWith('.') && int.TryParse(mid[1..], out var n)) res.Add(n);
+                }
+        }
+        catch { }
+        var act = ActiveThread(address);
+        if (!res.Contains(act)) res.Add(act);
+        res.Sort((a, b) => b.CompareTo(a));
+        return res;
+    }
+
+    public static List<ChatEntry> LoadThread(ulong address, int n)
+    {
+        var list = new List<ChatEntry>();
+        try
+        {
+            lock (Gate)
+            {
+                var f = ThreadFile(address, n);
+                if (!File.Exists(f)) return list;
+                foreach (var line in File.ReadLines(f, System.Text.Encoding.UTF8))
+                {
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+                    try { var e = JsonSerializer.Deserialize<ChatEntry>(line); if (e != null) list.Add(e); } catch { }
+                }
+            }
+        }
+        catch { }
+        return list;
+    }
+
+    /// <summary>פותח שיחה חדשה עם המכשיר והופך אותה לפעילה. אם הפעילה עדיין ריקה נשארים בה (false).</summary>
+    public static bool NewThread(ulong address)
+    {
+        lock (Gate)
+        {
+            var f = FileOf(address);
+            if (!File.Exists(f) || new FileInfo(f).Length == 0) return false;
+            SetActiveThread(address, Threads(address).Max() + 1);
+            return true;
+        }
+    }
 
     public static void Add(ulong address, ChatEntry e)
     {
@@ -122,6 +193,9 @@ public static class ChatLog
                         try { File.Delete(e.Path); } catch { }
                 var f = FileOf(address);
                 if (File.Exists(f)) File.Delete(f);
+                var act = ActiveThread(address);
+                var prev = Threads(address).FirstOrDefault(n => n != act && File.Exists(ThreadFile(address, n)));
+                SetActiveThread(address, prev == 0 ? 1 : prev);
             }
         }
         catch { }
@@ -138,13 +212,19 @@ public static class ChatLog
         try
         {
             if (!Directory.Exists(Dir)) return res;
+            var addrs = new HashSet<ulong>();
             foreach (var f in Directory.GetFiles(Dir, "*.jsonl"))
             {
-                if (!ulong.TryParse(System.IO.Path.GetFileNameWithoutExtension(f), System.Globalization.NumberStyles.HexNumber, null, out var addr)) continue;
+                var nm = System.IO.Path.GetFileNameWithoutExtension(f);
+                if (nm.Length >= 12 && ulong.TryParse(nm[..12], System.Globalization.NumberStyles.HexNumber, null, out var a0)) addrs.Add(a0);
+            }
+            foreach (var addr in addrs)
+            {
                 var msgs = Load(addr, 50);
-                if (msgs.Count == 0) continue;
-                var name = msgs.AsEnumerable().Reverse().Select(m => m.Device).FirstOrDefault(d => !string.IsNullOrWhiteSpace(d)) ?? "";
-                res.Add((addr, name, msgs[^1].Time));
+                var named = msgs.Count > 0 ? msgs : Threads(addr).Select(n => LoadThread(addr, n)).FirstOrDefault(l => l.Count > 0) ?? msgs;
+                if (named.Count == 0) continue;
+                var name = named.AsEnumerable().Reverse().Select(m => m.Device).FirstOrDefault(d => !string.IsNullOrWhiteSpace(d)) ?? "";
+                res.Add((addr, name, msgs.Count > 0 ? msgs[^1].Time : named[^1].Time));
             }
         }
         catch { }
