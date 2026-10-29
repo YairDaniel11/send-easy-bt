@@ -322,17 +322,33 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         else { MsgPanel.Children.Clear(); HeaderName.Text = "אין שיחות עדיין. הודעה מהטלפון או מכשיר מועדף יפתחו שיחה."; HeaderStatus.Text = ""; }
     }
 
-    /// <summary>צ'אט חדש עם אותו מכשיר שבשיחה הנוכחית: שיחה חדשה וריקה; הקודמות נשארות זמינות מתפריט הכותרת.</summary>
+    /// <summary>
+    /// צ'אט חדש: תפריט קטן. "עם אותו מכשיר" פותח שיחה חדשה וריקה (הקודמות נשארות זמינות מתפריט הכותרת),
+    /// ו"עם מכשיר אחר" פותח בחירה של מכשיר מצומד, גם כזה שעוד לא דיברו איתו.
+    /// </summary>
     void NewChat_Click(object s, RoutedEventArgs e)
     {
-        if (_cur == null)
-        {
-            var dlg = new DevicePickerWindow(_settings) { Owner = this };
-            if (dlg.ShowDialog() != true || dlg.Chosen is not { } item) return;
-            Open(item.Address, item.Name);
-            Input.Focus();
-            return;
-        }
+        if (_cur == null) { PickOtherDevice(); return; }
+        var menu = new ContextMenu { FlowDirection = FlowDirection.RightToLeft, PlacementTarget = (UIElement)s, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
+        var same = new MenuItem { Header = "צ'אט חדש עם " + Disp(_cur.Name) };
+        same.Click += (_, _) => NewThreadSameDevice();
+        var other = new MenuItem { Header = "צ'אט עם מכשיר אחר..." };
+        other.Click += (_, _) => PickOtherDevice();
+        menu.Items.Add(same);
+        menu.Items.Add(other);
+        menu.IsOpen = true;
+    }
+
+    void PickOtherDevice()
+    {
+        var dlg = new DevicePickerWindow(_settings) { Owner = this };
+        if (dlg.ShowDialog() != true || dlg.Chosen is not { } item) return;
+        Open(item.Address, item.Name);
+        Input.Focus();
+    }
+
+    void NewThreadSameDevice()
+    {
         StopPlayback();
         if (ChatLog.NewThread(_cur.Address)) _ = PeerConnections.SendNewChatAsync(_cur.Address);
         else ConfirmDialog.Tell(this, "צ'אט חדש", "הצ'אט הנוכחי עדיין ריק, אין צורך בצ'אט חדש.");
