@@ -55,13 +55,33 @@ end;
 var
   DownloadPage: TDownloadWizardPage;
 
+{ גרסה ראשית של שם תיקייה/מפתח כמו "8.0.31" (0 אם לא תקין) }
+function MajorOf(const V: String): Integer;
+var P: Integer;
+begin
+  P := Pos('.', V);
+  if P = 0 then P := Length(V) + 1;
+  Result := StrToIntDef(Copy(V, 1, P - 1), 0);
+end;
+
+{ מותקן .NET Desktop Runtime בגרסה 8 ומעלה? בודקים גם את הרישום וגם את התיקייה בדיסק (לא כל התקנה כותבת לרישום) }
 function HasDesktopRuntime: Boolean;
-var Names: TArrayOfString; I: Integer;
+var Names: TArrayOfString; I: Integer; FR: TFindRec; Dir: String;
 begin
   Result := False;
   if RegGetValueNames(HKLM64, 'SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.WindowsDesktop.App', Names) then
     for I := 0 to GetArrayLength(Names) - 1 do
-      if Copy(Names[I], 1, 2) = '8.' then Result := True;
+      if MajorOf(Names[I]) >= 8 then Result := True;
+  if Result then Exit;
+  Dir := ExpandConstant('{commonpf64}') + '\dotnet\shared\Microsoft.WindowsDesktop.App\';
+  if FindFirst(Dir + '*', FR) then
+  try
+    repeat
+      if (FR.Attributes and 16 <> 0) and (MajorOf(FR.Name) >= 8) then Result := True;
+    until Result or not FindNext(FR);
+  finally
+    FindClose(FR);
+  end;
 end;
 
 procedure InitializeWizard;
