@@ -68,7 +68,7 @@
             </StackPanel>
         </ScrollViewer>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="22,10,22,16" HorizontalAlignment="Left">
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="22,10,22,16" HorizontalAlignment="Right">
             <ui:Button Content="ביטול" Click="Cancel_Click" Margin="0,0,8,0" MinWidth="80"/>
             <ui:Button Content="שמור" Appearance="Primary" Click="Save_Click" MinWidth="80"/>
         </StackPanel>

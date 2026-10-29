@@ -19,7 +19,7 @@
             <TextBlock x:Name="Status" Margin="0,16,0,6" TextWrapping="Wrap"/>
             <ProgressBar x:Name="Bar" Maximum="1000" Height="6" Visibility="Collapsed"/>
         </StackPanel>
-        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="26,10,26,20" HorizontalAlignment="Left">
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="26,10,26,20" HorizontalAlignment="Right">
             <ui:Button x:Name="LaterBtn" Content="אחר כך" MinWidth="90" Margin="0,0,8,0" Click="Later_Click"/>
             <ui:Button x:Name="InstallBtn" Content="הורד והתקן" Appearance="Primary" MinWidth="130" Click="Install_Click"/>
         </StackPanel>
