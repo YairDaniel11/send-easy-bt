@@ -57,6 +57,8 @@
                             <TextBlock x:Name="HeaderName" FontSize="16" FontWeight="SemiBold"/>
                             <TextBlock x:Name="HeaderStatus" FontSize="12" Opacity="0.7"/>
                         </StackPanel>
+                        <Button Grid.Column="2" x:Name="CancelSendBtn" Content="✖ בטל שליחה" Visibility="Collapsed"
+                                VerticalAlignment="Center" Padding="10,4" Click="CancelSend_Click"/>
                     </Grid>
                 </Border>
 

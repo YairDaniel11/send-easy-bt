@@ -41,6 +41,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
 
     readonly Settings _settings;
     readonly VoiceCapture _voice = new();
+    System.Threading.CancellationTokenSource? _sendCts;
     readonly DispatcherTimer _recTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     bool _recording;
     readonly System.Windows.Media.MediaPlayer _player = new();
@@ -528,6 +529,13 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         }
     }
 
+    void CancelSend_Click(object s, RoutedEventArgs e)
+    {
+        CancelSendBtn.IsEnabled = false;
+        _sendCts?.Cancel();
+        CancelSendBtn.IsEnabled = true;
+    }
+
     /// <summary>שולח לטלפון אישור קריאה על הודעות נכנסות שמוצגות עכשיו (הוא יראה וי ירוק).</summary>
     async void SendReadReceipts()
     {
@@ -590,26 +598,46 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
             var entry = new ChatEntry { Mine = true, Kind = "file", Text = name, Size = size, Path = path, Device = conv.Name };
             conv.Messages.Add(new Msg(true, "אני", entry.Time, MsgKind.File, name, Size: size, Status: MsgStatus.Sent, Path: path));
             Update(conv);
-            HeaderStatus.Text = "שולח " + name + "...";
-            bool ok = false; string err = "";
+            // התקדמות וביטול: קובץ כבד אפשר לעצור באמצע
+            var cts = _sendCts = new System.Threading.CancellationTokenSource();
+            CancelSendBtn.Visibility = Visibility.Visible;
+            var started = DateTime.Now;
+            var prog = new Progress<long>(b =>
+            {
+                int pct = size > 0 ? (int)(b * 100 / size) : 0;
+                double secs = Math.Max((DateTime.Now - started).TotalSeconds, 0.5);
+                HeaderStatus.Text = $"שולח {TrayApp.Ltr(name)}... {pct}%  ·  {TrayApp.Ltr(TrayApp.FormatSize((long)(b / secs)) + "/s")}";
+            });
+            bool ok = false, cancelled = false; string err = "";
             try
             {
-                var peer = await PeerConnections.GetAsync(conv.Address);
+                var peer = await PeerConnections.GetAsync(conv.Address, cts.Token);
                 if (peer == null) err = "האפליקציה לא פתוחה בטלפון";
                 else
                 {
                     await using var fs = new System.IO.FileStream(path, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, 64 * 1024, true);
-                    var r = await peer.SendFileAsync(fs, name, size, null, System.Threading.CancellationToken.None, fromChat: true);
+                    var r = await peer.SendFileAsync(fs, name, size, prog, cts.Token, fromChat: true);
                     ok = r == PeerSendResult.Ok;
-                    if (!ok) err = r == PeerSendResult.Rejected ? "הטלפון סירב לקבל את הקובץ" : "השליחה נכשלה";
+                    cancelled = r == PeerSendResult.Cancelled;
+                    if (!ok && !cancelled) err = r == PeerSendResult.Rejected ? "הטלפון סירב לקבל את הקובץ" : "השליחה נכשלה";
                 }
             }
+            catch (OperationCanceledException) { cancelled = true; }
             catch (Exception ex) { err = ex.Message; }
+            _sendCts = null;
+            CancelSendBtn.Visibility = Visibility.Collapsed;
+            if (cancelled)
+            {
+                // שליחה שבוטלה לא נשמרת בשיחה
+                Reload(conv);
+                Update(conv);
+                HeaderStatus.Text = "השליחה בוטלה";
+                break;
+            }
             entry.Status = ok ? "delivered" : "failed";
             ChatLog.Add(conv.Address, entry);
             Reload(conv);
-            Update(conv);
-            if (!ok) { ShowError(err); break; }
+            Update(conv);            if (!ok) { ShowError(err); break; }
         }
     }
 
