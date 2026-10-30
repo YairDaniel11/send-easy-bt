@@ -37,6 +37,7 @@ sealed class ImageViewWindow : Window
         _img.VerticalAlignment = VerticalAlignment.Center;
         _sv.Content = _img;
         Content = _sv;
+        SetFit(true);
 
         PreviewMouseWheel += (_, e) => { Zoom(e.Delta > 0 ? 1.15 : 1 / 1.15); e.Handled = true; };
         MouseLeftButtonDown += (_, e) =>
@@ -62,16 +63,30 @@ sealed class ImageViewWindow : Window
         };
     }
 
+    /// <summary>התאמה למסך: בלי פסי גלילה כדי שה-ScrollViewer יגביל את התמונה לחלון (אחרת Uniform לא משפיע והיא מוצגת בגודל מלא).</summary>
+    void SetFit(bool fit)
+    {
+        _fit = fit;
+        var vis = fit ? ScrollBarVisibility.Disabled : ScrollBarVisibility.Auto;
+        _sv.HorizontalScrollBarVisibility = vis;
+        _sv.VerticalScrollBarVisibility = vis;
+        _img.Stretch = fit ? Stretch.Uniform : Stretch.None;
+        _scale.ScaleX = _scale.ScaleY = 1;
+    }
+
     void Zoom(double f)
     {
-        if (_fit) { _fit = false; _img.Stretch = Stretch.None; _scale.ScaleX = _scale.ScaleY = 1; }
+        if (_fit)
+        {
+            // מתחילים מהגודל המותאם שמוצג עכשיו, ולא קופצים לגודל מלא
+            double cur = 1;
+            if (_img.Source is BitmapSource b && b.Width > 0 && b.Height > 0 && _sv.ViewportWidth > 0 && _sv.ViewportHeight > 0)
+                cur = Math.Min(_sv.ViewportWidth / b.Width, _sv.ViewportHeight / b.Height);
+            SetFit(false);
+            _scale.ScaleX = _scale.ScaleY = Math.Clamp(cur, 0.1, 8);
+        }
         _scale.ScaleX = _scale.ScaleY = Math.Clamp(_scale.ScaleX * f, 0.1, 8);
     }
 
-    void ToggleFit()
-    {
-        _fit = !_fit;
-        _img.Stretch = _fit ? Stretch.Uniform : Stretch.None;
-        _scale.ScaleX = _scale.ScaleY = 1;
-    }
+    void ToggleFit() => SetFit(!_fit);
 }
