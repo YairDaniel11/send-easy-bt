@@ -115,6 +115,7 @@ public class BtService extends Service {
         if (!alive) {
             alive = true;
             running = true;
+            startUpdateWatcher();
             acceptThread = new Thread(new Runnable() {
                 @Override public void run() { acceptLoop(); }
             }, "SE-Accept");
@@ -127,6 +128,34 @@ public class BtService extends Service {
 
     @Override
     public IBinder onBind(Intent intent) { return null; }
+
+    /** בדיקת עדכון ברקע (כל 6 שעות) והתראה פעם אחת לכל גרסה חדשה. לחיצה על ההתראה פותחת את האפליקציה עם חלון העדכון. */
+    private void startUpdateWatcher() {
+        Thread t = new Thread(new Runnable() {
+            @Override public void run() {
+                try {
+                    Thread.sleep(90 * 1000L);
+                    while (alive) {
+                        UpdateChecker.Info r = UpdateChecker.checkBlocking(getApplicationContext());
+                        if (r != null && !r.version.equals(Prefs.notifiedUpdate(BtService.this))) {
+                            Prefs.setNotifiedUpdate(BtService.this, r.version);
+                            Intent i = new Intent(BtService.this, MainActivity.class);
+                            i.putExtra(MainActivity.EXTRA_CHECK_UPDATE, true);
+                            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                            int fl = PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0);
+                            notifyEvent(getString(R.string.upd_notif_title), getString(R.string.upd_notif_text, r.version), null,
+                                    PendingIntent.getActivity(BtService.this, 9, i, fl));
+                        }
+                        Thread.sleep(6L * 60 * 60 * 1000);
+                    }
+                } catch (InterruptedException ignored) {
+                } catch (RuntimeException ignored) {
+                }
+            }
+        }, "SE-UpdateWatch");
+        t.setDaemon(true);
+        t.start();
+    }
 
     @Override
     public void onDestroy() {

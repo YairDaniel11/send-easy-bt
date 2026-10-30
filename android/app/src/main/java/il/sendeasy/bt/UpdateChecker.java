@@ -99,6 +99,17 @@ final class UpdateChecker {
         }, "update-check").start();
     }
 
+    /** בדיקה שקטה מתוך שירות הרקע (לא בשרשור הממשק, חוסמת). מחזירה את הגרסה החדשה, או null אם אין/אין רשת. */
+    static Info checkBlocking(Context c) {
+        try {
+            if (!online(c)) return null;
+            Info r = fetchLatest();
+            return r != null && isNewer(r.version, installed(c)) ? r : null;
+        } catch (Throwable e) {
+            return null;
+        }
+    }
+
     private static String installed(Context c) throws Exception {
         return c.getPackageManager().getPackageInfo(c.getPackageName(), 0).versionName;
     }

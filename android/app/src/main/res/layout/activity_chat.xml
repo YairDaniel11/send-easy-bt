@@ -249,6 +249,24 @@
                     android:nextFocusUp="@+id/chatInput"
                     android:textSize="30sp" />
             </FrameLayout>
+
+            <FrameLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1">
+
+                <il.sendeasy.bt.IconView
+                    android:id="@+id/chatKpMic"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@string/voice_record"
+                    android:focusable="true"
+                    android:nextFocusDown="@+id/chatKpMic"
+                    android:nextFocusLeft="@+id/chatKpMic"
+                    android:nextFocusRight="@+id/chatKpEmo"
+                    android:nextFocusUp="@+id/chatInput" />
+            </FrameLayout>
         </LinearLayout>
     </LinearLayout>
 

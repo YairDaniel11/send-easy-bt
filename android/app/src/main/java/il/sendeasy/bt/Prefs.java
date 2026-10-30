@@ -143,6 +143,15 @@ final class Prefs {
         sp(c).edit().remove("saveDir").remove("saveTree").apply();
     }
 
+    /** הגרסה האחרונה שעליה כבר נשלחה התראת עדכון (פעם אחת לכל גרסה). */
+    static String notifiedUpdate(Context c) {
+        return sp(c).getString("updNotified", "");
+    }
+
+    static void setNotifiedUpdate(Context c, String v) {
+        sp(c).edit().putString("updNotified", v).apply();
+    }
+
     static long lastUpdateCheck(Context c) {
         return sp(c).getLong("updCheck", 0L);
     }

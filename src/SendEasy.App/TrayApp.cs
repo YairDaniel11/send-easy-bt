@@ -65,8 +65,8 @@ sealed class TrayApp : IDisposable
         _hotkey.Pressed += OnHotkey;
         ApplyHotkeys();
         _ = CheckUpdateAsync();
-        // בדיקת עדכון אוטומטית כל 6 שעות כשהתוכנה פתוחה (ההתראה מוצגת פעם אחת לכל גרסה)
-        var updTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromHours(6) };
+        // בדיקת עדכון אוטומטית כל שעה כשהתוכנה פתוחה (ההתראה מוצגת פעם אחת לכל גרסה)
+        var updTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromHours(1) };
         updTimer.Tick += (_, _) => _ = CheckUpdateAsync();
         updTimer.Start();
     }
@@ -407,6 +407,7 @@ sealed class TrayApp : IDisposable
     // ---- עדכונים ----
 
     Version? _notifiedVersion;
+    MessageToast? _updToast;
 
     async Task CheckUpdateAsync()
     {
@@ -421,6 +422,10 @@ sealed class TrayApp : IDisposable
             _updateUrl = r.PageUrl;
             _tray.ShowBalloonTip(8000, "יש גרסה חדשה של שליחה קלה - BT",
                 $"גרסה {r.Version.ToString(3)}. לחץ כאן כדי להוריד ולהתקין.", ToolTipIcon.Info);
+            // בנוסף לבועת המגש (ש-Windows עלול להשתיק במצב "נא לא להפריע"): חלון קופץ משלנו שתמיד מופיע
+            try { _updToast?.Close(); } catch { }
+            _updToast = new MessageToast("יש גרסה חדשה", $"גרסה {r.Version.ToString(3)}. לחץ כאן כדי להוריד ולהתקין.", () => { _updateUrl = null; OpenUpdate(); });
+            _updToast.Show();
         });
     }
 

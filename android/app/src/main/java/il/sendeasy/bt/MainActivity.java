@@ -114,10 +114,14 @@ public class MainActivity extends Activity implements Events.Listener {
         super.onDestroy();
     }
 
+    static final String EXTRA_CHECK_UPDATE = "checkUpdate";
+    private boolean forceUpdateCheck;
+
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
+        if (intent != null && intent.getBooleanExtra(EXTRA_CHECK_UPDATE, false)) forceUpdateCheck = true;
         handleShare(intent);
     }
 
@@ -134,7 +138,11 @@ public class MainActivity extends Activity implements Events.Listener {
             if (Build.VERSION.SDK_INT < 26 || getPackageManager().canRequestPackageInstalls()) launchInstall(f);
             else Toast.makeText(this, R.string.upd_allow_denied, Toast.LENGTH_LONG).show();
         } else {
-            checkUpdate(false);
+            Intent in = getIntent();
+            if (in != null && in.getBooleanExtra(EXTRA_CHECK_UPDATE, false)) { forceUpdateCheck = true; in.removeExtra(EXTRA_CHECK_UPDATE); }
+            boolean force = forceUpdateCheck;
+            forceUpdateCheck = false;
+            checkUpdate(force); // לחיצה על התראת העדכון: בדיקה מיידית שמציגה את חלון העדכון
         }
     }
 

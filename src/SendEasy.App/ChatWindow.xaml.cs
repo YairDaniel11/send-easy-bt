@@ -301,7 +301,10 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
                 FontSize = 12.5, Foreground = B(_p.Sub), TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 2, 0, 0),
             };
             // תצוגה מקדימה: אימוג'י כתמונה צבעונית ולא כתו חד-גוני
-            Emoticons.Fill(prev, last == null ? "" : (last.Mine ? "את/ה: " : "") + (last.Kind == MsgKind.Text ? last.Text : Preview(last)), 12.5);
+            var prevText = last == null ? "" : (last.Mine ? "את/ה: " : "") + (last.Kind == MsgKind.Text ? last.Text : Preview(last));
+            // בסגנון "כתבן" הכל טקסט פשוט: קוד האימוטיקון (:( ) ולא תמונה צבעונית
+            if (Simple) prev.Text = Emoticons.ToCodes(prevText);
+            else Emoticons.Fill(prev, prevText, 12.5);
             sp.Children.Add(prev);
             g.Children.Add(sp);
             var item = new ListBoxItem { Content = g, Tag = c, HorizontalContentAlignment = HorizontalAlignment.Stretch };
@@ -313,12 +316,19 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         if (sel >= 0 && sel < ConvList.Items.Count) ConvList.SelectedIndex = sel;
     }
 
-    static string Preview(Msg m) => m.Kind switch
-    {
-        MsgKind.Voice => "🎤 הודעה קולית " + Fmt(m.Seconds),
-        MsgKind.File => "📄 " + m.Text,
-        _ => Emoticons.ToGlyphs(m.Text),
-    };
+    string Preview(Msg m) => Simple
+        ? m.Kind switch
+        {
+            MsgKind.Voice => "הקלטה " + Fmt(m.Seconds),
+            MsgKind.File => "קובץ: " + m.Text,
+            _ => m.Text,
+        }
+        : m.Kind switch
+        {
+            MsgKind.Voice => "🎤 הודעה קולית " + Fmt(m.Seconds),
+            MsgKind.File => "📄 " + m.Text,
+            _ => Emoticons.ToGlyphs(m.Text),
+        };
 
     void ConvList_SelectionChanged(object s, SelectionChangedEventArgs e)
     {

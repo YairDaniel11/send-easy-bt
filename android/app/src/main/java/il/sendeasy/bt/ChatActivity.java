@@ -100,7 +100,8 @@ public class ChatActivity extends Activity implements Events.Listener {
     // סגנון "טקסט פשוט" (style == 2)
     private View kpCompose, kpBar, kpCaret;
     private TextView kpWho, kpEmo;
-    private IconView kpAttach;
+    private IconView kpAttach, kpMic;
+    private TextView lblPause;
     private android.widget.FrameLayout kpField;
     private boolean kpCaretOn;
     /** סמן מהבהב קבוע בשורה הריקה כשהשדה לא בפוקוס, כדי שיהיה ברור שאפשר לכתוב. */
@@ -204,6 +205,7 @@ public class ChatActivity extends Activity implements Events.Listener {
         kpWho = (TextView) findViewById(R.id.chatKpWho);
         kpEmo = (TextView) findViewById(R.id.chatKpEmo);
         kpAttach = (IconView) findViewById(R.id.chatKpAttach);
+        kpMic = (IconView) findViewById(R.id.chatKpMic);
         kpField = (android.widget.FrameLayout) findViewById(R.id.chatKpField);
         if (Prefs.chatStyle(this) == 2) setupKp();
 
@@ -218,6 +220,7 @@ public class ChatActivity extends Activity implements Events.Listener {
                 ChatStore.Msg m = msgs.get(pos);
                 if (m.isVoice()) togglePlay(m);
                 else if (m.isPic()) { if (style == 2) openImage(m); else onPicClick(pos, m); }
+                else if (ChatStore.T_FILE.equals(m.kind)) openFileMessage(m);
             }
         });
         list.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -356,6 +359,12 @@ public class ChatActivity extends Activity implements Events.Listener {
         kpAttach.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { FilePicker.pick(ChatActivity.this); }
         });
+        kpMic.setIcon(IconView.MIC);
+        kpMic.setClickable(true);
+        kpMic.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { toggleRecording(); }
+        });
+        kpEmo.setNextFocusLeftId(R.id.chatKpMic);
         kpEmo.setText(Fmt.ltr(":)"));
         kpEmo.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { showKpSmileys(); }
@@ -403,10 +412,61 @@ public class ChatActivity extends Activity implements Events.Listener {
         input.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
         kpAttach.setIconColor(cText);
         kpAttach.setBackgroundDrawable(kpFocus());
+        kpMic.setIconColor(cText);
+        kpMic.setBackgroundDrawable(kpFocus());
+        styleRecBarKp();
         kpEmo.setTextColor(cText);
         kpEmo.setBackgroundDrawable(kpFocus());
         ui.removeCallbacks(kpBlink);
         ui.post(kpBlink);
+    }
+
+    /** תא של כפתור הקלטה: איקון עם תווית קצרה מתחתיו, כך שברור מה כל כפתור עושה. */
+    private LinearLayout recCell(IconView icon, TextView label) {
+        ViewGroup old = (ViewGroup) icon.getParent();
+        if (old != null) old.removeView(icon);
+        LinearLayout cell = new LinearLayout(this);
+        cell.setOrientation(LinearLayout.VERTICAL);
+        cell.setGravity(Gravity.CENTER_HORIZONTAL);
+        LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(UiKit.dp(this, 46), UiKit.dp(this, 46));
+        ip.gravity = Gravity.CENTER_HORIZONTAL;
+        icon.setLayoutParams(ip);
+        icon.setIconColor(cText);
+        icon.setBackgroundDrawable(kpFocus());
+        cell.addView(icon, ip);
+        label.setTextColor(cText);
+        label.setTextSize(13);
+        label.setGravity(Gravity.CENTER);
+        cell.addView(label, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        return cell;
+    }
+
+    /** פס ההקלטה בסגנון הפשוט: שורה אחת אחידה: ביטול, זמן, השהיה, שליחה. בלי צבעים, כל כפתור עם תווית. */
+    private void styleRecBarKp() {
+        LinearLayout bar = (LinearLayout) recBar;
+        View textCol = (View) recT.getParent();
+        ViewGroup tp = (ViewGroup) textCol.getParent();
+        if (tp != null) tp.removeView(textCol);
+        bar.removeAllViews();
+        bar.setBackgroundColor(0xFF686868);
+        bar.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setPadding(UiKit.dp(this, 6), UiKit.dp(this, 8), UiKit.dp(this, 6), UiKit.dp(this, 8));
+        recCancelBtn.setIcon(IconView.CLOSE);
+        recSendBtn.setIcon(IconView.SEND);
+        TextView lc = new TextView(this); lc.setText(R.string.rec_lbl_cancel);
+        lblPause = new TextView(this); lblPause.setText(R.string.rec_lbl_pause);
+        TextView ls = new TextView(this); ls.setText(R.string.rec_lbl_send);
+        LinearLayout.LayoutParams w1 = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        LinearLayout.LayoutParams w2 = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.4f);
+        bar.addView(recCell(recCancelBtn, lc), w1);
+        recT.setTextColor(cText);
+        recT.setTextSize(18);
+        recT.setGravity(Gravity.CENTER);
+        textCol.setLayoutParams(w2);
+        bar.addView(textCol, w2);
+        bar.addView(recCell(recPauseBtn, lblPause), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        bar.addView(recCell(recSendBtn, ls), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
     }
 
     /** בחירת סמיילי בסגנון הפשוט: שני סימנים בלבד, מוכנסים לשדה כטקסט רגיל. */
@@ -577,6 +637,23 @@ public class ChatActivity extends Activity implements Events.Listener {
             lastPicTime = now;
             Toast.makeText(this, R.string.img_tap_again, Toast.LENGTH_SHORT).show();
         }
+    }
+
+    /** לחיצה על קובץ בשיחה: קובץ שהתקבל פותח את התיקייה שבה נשמר; קובץ שנשלח מציג הודעה שנשלח. */
+    private void openFileMessage(ChatStore.Msg m) {
+        if (m.out) {
+            Toast.makeText(this, getString(R.string.chat_file_sent_toast, m.text), Toast.LENGTH_SHORT).show();
+            return;
+        }
+        try {
+            Intent i = Storage.folderIntent(this);
+            if (getPackageManager().resolveActivity(i, 0) != null) { startActivity(i); return; }
+        } catch (RuntimeException ignored) { }
+        try {
+            Intent d = new Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS);
+            if (getPackageManager().resolveActivity(d, 0) != null) { startActivity(d); return; }
+        } catch (RuntimeException ignored) { }
+        Toast.makeText(this, getString(R.string.chat_file_saved_toast, m.text, Storage.receiveDirLabel(this)), Toast.LENGTH_LONG).show();
     }
 
     private void openImage(ChatStore.Msg m) {
@@ -881,6 +958,7 @@ public class ChatActivity extends Activity implements Events.Listener {
         }
         recBar.setVisibility(View.VISIBLE);
         inputRow.setVisibility(View.GONE);
+        if (style == 2) { kpCompose.setVisibility(View.GONE); kpBar.setVisibility(View.GONE); }
         recPauseBtn.setVisibility(recorder.canPause() ? View.VISIBLE : View.GONE);
         updateRecUi();
         ui.postDelayed(recTick, 300);
@@ -891,6 +969,7 @@ public class ChatActivity extends Activity implements Events.Listener {
         boolean paused = recorder.isPaused();
         recT.setText(getString(paused ? R.string.voice_paused : R.string.voice_recording, mmss((int) (recorder.elapsedMs() / 1000))));
         recPauseBtn.setIcon(paused ? IconView.PLAY : IconView.PAUSE);
+        if (lblPause != null) lblPause.setText(paused ? R.string.rec_lbl_resume : R.string.rec_lbl_pause);
     }
 
     private void togglePause() {
@@ -902,7 +981,12 @@ public class ChatActivity extends Activity implements Events.Listener {
     private void endRecordingUi() {
         ui.removeCallbacks(recTick);
         recBar.setVisibility(View.GONE);
-        inputRow.setVisibility(View.VISIBLE);
+        if (style == 2) {
+            kpCompose.setVisibility(View.VISIBLE);
+            kpBar.setVisibility(View.VISIBLE);
+        } else {
+            inputRow.setVisibility(View.VISIBLE);
+        }
         input.requestFocus();
     }
 
