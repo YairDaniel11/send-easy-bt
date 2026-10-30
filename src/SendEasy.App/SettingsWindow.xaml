@@ -49,6 +49,7 @@
                 <TextBlock Text="עיצוב הצ&apos;אט" FontWeight="SemiBold" Margin="0,18,0,6"/>
                 <RadioButton x:Name="ChatWa" HorizontalAlignment="Left" GroupName="chatstyle" Content="ווטסאפ"/>
                 <RadioButton x:Name="ChatGc" HorizontalAlignment="Left" GroupName="chatstyle" Content="גוגל צ&apos;אט"/>
+                <RadioButton x:Name="ChatPaper" HorizontalAlignment="Left" GroupName="chatstyle" Content="כתבן"/>
 
                 <TextBlock Text="הודעות" FontWeight="SemiBold" Margin="0,18,0,6"/>
                 <CheckBox x:Name="PopupBox" Content="הצג חלון קטן בפינה בכל הודעה חדשה ממכשיר"/>

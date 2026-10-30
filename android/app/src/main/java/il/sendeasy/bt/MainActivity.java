@@ -820,7 +820,7 @@ public class MainActivity extends Activity implements Events.Listener {
                         } else if (which == 6) {
                             new AlertDialog.Builder(MainActivity.this)
                                     .setTitle(R.string.menu_chat_style)
-                                    .setSingleChoiceItems(new String[]{getString(R.string.style_wa), getString(R.string.style_gc)}, Prefs.chatStyle(MainActivity.this), new DialogInterface.OnClickListener() {
+                                    .setSingleChoiceItems(new String[]{getString(R.string.style_wa), getString(R.string.style_gc), getString(R.string.style_kp)}, Prefs.chatStyle(MainActivity.this), new DialogInterface.OnClickListener() {
                                         @Override public void onClick(DialogInterface d, int w) { Prefs.setChatStyle(MainActivity.this, w); d.dismiss(); }
                                     }).show();
                         } else if (which == 7) {

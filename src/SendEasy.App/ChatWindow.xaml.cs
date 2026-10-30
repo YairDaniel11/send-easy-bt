@@ -29,7 +29,7 @@ sealed class Conv
     public List<Msg> Messages { get; } = new();
 }
 
-/// <summary>חלון הצ'אט: הודעות וקבצים מול האפליקציה בטלפון, בשני סגנונות (ווטסאפ וגוגל צ'אט).</summary>
+/// <summary>חלון הצ'אט: הודעות וקבצים מול האפליקציה בטלפון, בשלושה סגנונות (ווטסאפ, גוגל צ'אט וכתבן).</summary>
 public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
 {
     sealed record Palette(string ChatBg, string Header, string Side, string Mine, string Theirs, string Text,
@@ -39,6 +39,8 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
     static readonly Palette WaDark = new("#0B141A", "#202C33", "#111B21", "#005C4B", "#202C33", "#E9EDEF", "#8696A0", "#00A884", "#2A3942", "#202C33", "#222D34");
     static readonly Palette GcLight = new("#FFFFFF", "#FFFFFF", "#F8FAFD", "#FFFFFF", "#FFFFFF", "#1F1F1F", "#5F6368", "#0B57D0", "#F0F4F9", "#FFFFFF", "#E3E3E3");
     static readonly Palette GcDark = new("#1F1F1F", "#1F1F1F", "#282A2C", "#1F1F1F", "#1F1F1F", "#E3E3E3", "#9AA0A6", "#A8C7FA", "#2D2F31", "#1F1F1F", "#3C4043");
+    // "כתבן": דף לבן על רקע אפור-בהיר, טקסט שחור (אותם צבעים בבהיר ובכהה)
+    static readonly Palette Paper = new("#EEEEEE", "#F7F7F7", "#F8F8F8", "#FFFFFF", "#FFFFFF", "#000000", "#666666", "#0B57D0", "#FFFFFF", "#EEEEEE", "#D0D0D0");
 
     readonly Settings _settings;
     readonly VoiceCapture _voice = new();
@@ -50,7 +52,16 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
     readonly List<Conv> _convs = new();
     Conv _cur = null!;
     bool _wa = true;
+    int _style;               // 0 ווטסאפ, 1 גוגל צ'אט, 2 כתבן
+    bool Simple => _style == 2;
     Palette _p = WaLight;
+
+    // מצב "כתבן": דף אחד, והכתיבה ממשיכה ישר בסופו
+    TextBox _sIn = null!;
+    Grid _sInHost = null!;
+    Rectangle _sCaret = null!;
+    StackPanel _pageBody = null!;
+    Border _page = null!;
 
     public ChatWindow(Settings settings)
     {
@@ -62,11 +73,13 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         tip.Setters.Add(new Setter(Control.FontFamilyProperty, new FontFamily("Segoe UI")));
         Resources[typeof(ToolTip)] = tip;
         LoadConversations();
-        _wa = _settings.ChatStyle == 0;
+        SetStyle();
+        BuildPaper();
         ActionBtn.Content = "\uE720";
         ActionBtn.ToolTip = "הקלטת הודעה קולית";
         Activated += (_, _) => SendReadReceipts();
         HookPaste();
+        PreviewKeyDown += Window_PreviewKeyDown;
         _recTimer.Tick += (_, _) => RecordLabel.Text = _voice.IsPaused
             ? $"⏸ מושהה  {Fmt(_voice.ElapsedSeconds)}   (כפתור ההשהיה: המשך, כפתור השליחה: שלח)"
             : $"● מקליט  {Fmt(_voice.ElapsedSeconds)}   (כפתור ההשהיה: השהה, כפתור השליחה: שלח)";
@@ -157,17 +170,23 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
     }
     // ---- עיצוב ----
 
-    /// <summary>הסגנון (ווטסאפ או גוגל צ'אט) נבחר בהגדרות. נקרא אחרי שמירת ההגדרות.</summary>
+    /// <summary>הסגנון (ווטסאפ, גוגל צ'אט או כתבן) נבחר בהגדרות. נקרא אחרי שמירת ההגדרות.</summary>
     public void ReloadStyle()
     {
-        _wa = _settings.ChatStyle == 0;
+        SetStyle();
         ApplyStyle();
+    }
+
+    void SetStyle()
+    {
+        _style = Math.Clamp(_settings.ChatStyle, 0, 2);
+        _wa = _style == 0;
     }
 
     void ApplyStyle()
     {
         bool dark = IsDark();
-        _p = _wa ? (dark ? WaDark : WaLight) : (dark ? GcDark : GcLight);
+        _p = Simple ? Paper : _wa ? (dark ? WaDark : WaLight) : (dark ? GcDark : GcLight);
         SidePane.Background = B(_p.Side);
         SidePane.BorderBrush = B(_p.Border);
         ChatPane.Background = B(_p.ChatBg);
@@ -185,9 +204,23 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         ActionBtn.Foreground = Brushes.White;
         ActionBtn.Template = RoundButton();
         AttachBtn.Foreground = B(_p.Sub);
-        ChatPane.Background = B(_p.ChatBg);
+        ChatPane.Background = Simple
+            ? new LinearGradientBrush(Color.FromRgb(0xF3, 0xF3, 0xF3), Color.FromRgb(0xE6, 0xE6, 0xE6), 90)
+            : B(_p.ChatBg);
+        Scroller.VerticalScrollBarVisibility = Simple ? ScrollBarVisibility.Hidden : ScrollBarVisibility.Auto;
+        MsgPanel.Margin = Simple ? new Thickness(0) : new Thickness(0, 10, 0, 10);
+        SAttachBtn.Foreground = B(_p.Text);
+        SEmojiBtn.Foreground = B(_p.Text);
+        ApplyComposerVisibility();
         RebuildConvList();
         if (_cur != null) { ShowHeader(); RenderMessages(); }
+    }
+
+    /// <summary>בכתבן אין תיבת הקלדה תחתונה: רק שני כפתורים. בזמן הקלטה מוצגים פקדי ההקלטה הרגילים.</summary>
+    void ApplyComposerVisibility()
+    {
+        Composer.Visibility = !Simple || _recording ? Visibility.Visible : Visibility.Collapsed;
+        SimpleBar.Visibility = Simple && !_recording ? Visibility.Visible : Visibility.Collapsed;
     }
 
     /// <summary>פריט ברשימת השיחות: רקע עדין בהעברת עכבר ובבחירה (במקום הצבע הכהה של ברירת המחדל).</summary>
@@ -302,6 +335,12 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         hdel.Click += DeleteConv_Click;
         var hmenu = new ContextMenu { FlowDirection = FlowDirection.RightToLeft };
         if (BuildThreadsMenu(_cur) is { } tm) hmenu.Items.Add(tm);
+        if (Simple)
+        {
+            var rec = new MenuItem { Header = "הקלטת הודעה קולית  (Ctrl+R)" };
+            rec.Click += (_, _) => { if (!_recording) _ = StartRecordingAsync(); };
+            hmenu.Items.Add(rec);
+        }
         hmenu.Items.Add(hdel);
         HeaderBar.ContextMenu = hmenu;
     }
@@ -344,7 +383,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         var dlg = new DevicePickerWindow(_settings) { Owner = this };
         if (dlg.ShowDialog() != true || dlg.Chosen is not { } item) return;
         Open(item.Address, item.Name);
-        Input.Focus();
+        FocusInput();
     }
 
     void NewThreadSameDevice()
@@ -361,7 +400,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         RebuildConvList();
         ShowHeader();
         RenderMessages();
-        Input.Focus();
+        FocusInput();
     }
 
     /// <summary>תת-תפריט "צ'אטים אחרים": כל השיחות עם המכשיר, עם תאריך תחילה ומספר הודעות.</summary>
@@ -386,13 +425,27 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
 
     void RenderMessages()
     {
+        bool refocus = Simple && _sIn.IsKeyboardFocused;
         MsgPanel.Children.Clear();
-        MsgPanel.Children.Add(DateChip("היום"));
-        Msg? prev = null;
-        foreach (var m in _cur.Messages)
+        _pageBody.Children.Clear(); // מנתק את שורת הכתיבה מהדף לפני בנייה מחדש
+        if (Simple)
         {
-            MsgPanel.Children.Add(_wa ? WaMessage(m) : GcMessage(m, prev));
-            prev = m;
+            foreach (var m in _cur.Messages) _pageBody.Children.Add(SimpleMessage(m));
+            _pageBody.Children.Add(_sInHost);
+            MsgPanel.Children.Add(_page);
+            FitPage();
+            if (refocus) Dispatcher.BeginInvoke(FocusInput, DispatcherPriority.Background);
+            UpdatePaperCaret();
+        }
+        else
+        {
+            MsgPanel.Children.Add(DateChip("היום"));
+            Msg? prev = null;
+            foreach (var m in _cur.Messages)
+            {
+                MsgPanel.Children.Add(_wa ? WaMessage(m) : GcMessage(m, prev));
+                prev = m;
+            }
         }
         Dispatcher.BeginInvoke(() => Scroller.ScrollToEnd(), DispatcherPriority.Background);
         SendReadReceipts();
@@ -407,6 +460,209 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
             Background = _wa ? B(_p.Header) : B(_p.Input),
             Child = new TextBlock { Text = text, FontSize = 12, Foreground = B(_p.Sub), FlowDirection = FlowDirection.RightToLeft },
         };
+    }
+
+    // ---- סגנון "כתבן": דף לבן, שורות בלי בועות, והכתיבה ממשיכה בסוף הדף ----
+
+    const string PaperFont = "Segoe UI, Arial";
+    const double PaperSize = 20;
+
+    void BuildPaper()
+    {
+        var tpl = new ControlTemplate(typeof(TextBox));
+        var host = new FrameworkElementFactory(typeof(ScrollViewer)) { Name = "PART_ContentHost" };
+        host.SetValue(UIElement.FocusableProperty, false);
+        host.SetValue(ScrollViewer.VerticalScrollBarVisibilityProperty, ScrollBarVisibility.Hidden);
+        host.SetValue(ScrollViewer.HorizontalScrollBarVisibilityProperty, ScrollBarVisibility.Disabled);
+        tpl.VisualTree = host;
+        _sIn = new TextBox
+        {
+            Template = tpl, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, Background = Brushes.Transparent,
+            BorderThickness = new Thickness(0), Padding = new Thickness(0), MinHeight = 30,
+            FontFamily = new FontFamily(PaperFont), FontSize = PaperSize, Foreground = Brushes.Black, CaretBrush = Brushes.Black,
+            SelectionBrush = new SolidColorBrush(Color.FromRgb(0xB3, 0xD4, 0xFC)),
+        };
+        // הסמן הרגיל של התיבה מהבהב רק כשיש בה פוקוס; כשאין, מציגים סמן מהבהב משלנו כדי שיהיה ברור שאפשר לכתוב
+        _sCaret = new Rectangle
+        {
+            Width = 2, Height = 26, Fill = Brushes.Black, HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 2, 0, 0), IsHitTestVisible = false,
+        };
+        var blink = new System.Windows.Media.Animation.DoubleAnimationUsingKeyFrames
+        {
+            Duration = TimeSpan.FromSeconds(1), RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever,
+        };
+        blink.KeyFrames.Add(new System.Windows.Media.Animation.DiscreteDoubleKeyFrame(1, TimeSpan.Zero));
+        blink.KeyFrames.Add(new System.Windows.Media.Animation.DiscreteDoubleKeyFrame(0, TimeSpan.FromSeconds(0.5)));
+        _sCaret.BeginAnimation(UIElement.OpacityProperty, blink);
+        _sInHost = new Grid();
+        _sInHost.Children.Add(_sIn);
+        _sInHost.Children.Add(_sCaret);
+        _pageBody = new StackPanel { FlowDirection = FlowDirection.RightToLeft };
+        _page = new Border
+        {
+            Background = Brushes.White, BorderBrush = B("#D0D0D0"), BorderThickness = new Thickness(1),
+            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Thickness(24), Padding = new Thickness(90), Child = _pageBody,
+            Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 14, ShadowDepth = 2, Opacity = 0.22, Color = Colors.Black },
+        };
+        _sIn.TextChanged += (_, _) => { UpdatePaperCaret(); Scroller.ScrollToEnd(); };
+        _sIn.GotKeyboardFocus += (_, _) => UpdatePaperCaret();
+        _sIn.LostKeyboardFocus += (_, _) => UpdatePaperCaret();
+        _sIn.PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Enter && !Keyboard.IsKeyDown(Key.LeftShift) && !Keyboard.IsKeyDown(Key.RightShift))
+            {
+                e.Handled = true;
+                SendText();
+            }
+        };
+        // הדבקת תמונה בדף נשלחת מיד; טקסט מודבק בלי עיצוב
+        DataObject.AddPastingHandler(_sIn, (_, e) =>
+        {
+            var data = e.DataObject;
+            string? path = null;
+            if (data.GetDataPresent(DataFormats.FileDrop) && data.GetData(DataFormats.FileDrop) is string[] files)
+                path = files.FirstOrDefault(IsImage);
+            else if (data.GetDataPresent(DataFormats.Bitmap) || Clipboard.ContainsImage())
+                path = SaveClipboardImage();
+            if (path == null) { e.FormatToApply = DataFormats.UnicodeText; return; }
+            e.CancelCommand();
+            if (_cur != null) _ = SendChatFileAsync(_cur, path);
+        });
+    }
+
+    void UpdatePaperCaret() =>
+        _sCaret.Visibility = Simple && _sIn.Text.Length == 0 && !_sIn.IsKeyboardFocused ? Visibility.Visible : Visibility.Collapsed;
+
+    /// <summary>מעביר פוקוס לשורת הכתיבה (בכתבן: בסוף הדף; בסגנונות האחרים: תיבת ההקלדה).</summary>
+    void FocusInput()
+    {
+        if (Simple) { _sIn.Focus(); _sIn.CaretIndex = _sIn.Text.Length; }
+        else Input.Focus();
+    }
+
+    /// <summary>רוחב קבוע לדף (עד 780px) וגובה מינימלי עד תחתית החלון.</summary>
+    void FitPage()
+    {
+        if (!Simple) return;
+        double vw = Scroller.ViewportWidth > 0 ? Scroller.ViewportWidth : Scroller.ActualWidth;
+        double vh = Scroller.ViewportHeight > 0 ? Scroller.ViewportHeight : Scroller.ActualHeight;
+        if (vw <= 0) return;
+        _page.Width = Math.Max(200, Math.Min(780, vw - 48));
+        _page.MinHeight = Math.Max(200, vh - 48);
+        _page.Padding = _page.Width >= 640 ? new Thickness(90) : new Thickness(28, 48, 28, 48);
+    }
+
+    void Scroller_SizeChanged(object s, SizeChangedEventArgs e) => FitPage();
+
+    /// <summary>לחיצה בכל מקום בדף מעבירה פוקוס לשורת הכתיבה (חוץ מקישור לפתיחת קובץ).</summary>
+    void Scroller_PreviewMouseLeftButtonUp(object s, MouseButtonEventArgs e)
+    {
+        if (!Simple || IsPaperAction(e.OriginalSource as DependencyObject)) return;
+        Dispatcher.BeginInvoke(FocusInput, DispatcherPriority.Input);
+    }
+
+    static bool IsPaperAction(DependencyObject? d)
+    {
+        while (d != null)
+        {
+            if (d is FrameworkElement { Tag: "act" }) return true;
+            d = d is Visual ? VisualTreeHelper.GetParent(d)
+                : d is ContentElement ce ? ContentOperations.GetParent(ce) : null;
+        }
+        return false;
+    }
+
+    void SimpleEmoji_Click(object s, RoutedEventArgs e)
+    {
+        var menu = new ContextMenu
+        {
+            FlowDirection = FlowDirection.LeftToRight, PlacementTarget = SEmojiBtn,
+            Placement = System.Windows.Controls.Primitives.PlacementMode.Top,
+        };
+        foreach (var code in new[] { ":)", ":(" })
+        {
+            var it = new MenuItem { Header = code, FontFamily = new FontFamily("Segoe UI"), FontSize = 20, MinWidth = 60 };
+            var c = code;
+            it.Click += (_, _) => { _sIn.SelectedText = c; _sIn.CaretIndex = _sIn.SelectionStart + _sIn.SelectionLength; FocusInput(); };
+            menu.Items.Add(it);
+        }
+        menu.IsOpen = true;
+    }
+
+    /// <summary>גלילה במקלדת כשהסמן בדף (אין פס גלילה), וקיצור Ctrl+R להקלטה קולית.</summary>
+    void Window_PreviewKeyDown(object s, KeyEventArgs e)
+    {
+        if (!Simple) return;
+        if (e.Key == Key.R && Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            e.Handled = true;
+            if (!_recording) _ = StartRecordingAsync();
+            return;
+        }
+        if (!ReferenceEquals(Keyboard.FocusedElement, _sIn)) return;
+        if (e.Key == Key.PageUp) { Scroller.PageUp(); e.Handled = true; }
+        else if (e.Key == Key.PageDown) { Scroller.PageDown(); e.Handled = true; }
+        else if (_sIn.Text.Length == 0 && e.Key == Key.Up) { for (int i = 0; i < 3; i++) Scroller.LineUp(); e.Handled = true; }
+        else if (_sIn.Text.Length == 0 && e.Key == Key.Down) { for (int i = 0; i < 3; i++) Scroller.LineDown(); e.Handled = true; }
+    }
+
+    /// <summary>הודעה כשורה בדף: "אני: טקסט" / "שם המכשיר: טקסט", בלי בועה, בלי קו ובלי הדגשה, ומרווח גדול אחריה.</summary>
+    FrameworkElement SimpleMessage(Msg m)
+    {
+        // הקידומת של הצד השני היא השם המוצג בשיחה (כולל כינוי שהמשתמש נתן), כמו בכותרת וברשימת השיחות
+        string who = m.Mine ? "אני" : Disp(_cur.Name);
+        var gap = new Thickness(0, 0, 0, 40);
+        TextBlock Line(string text) => new()
+        {
+            Text = text, TextWrapping = TextWrapping.Wrap, FontFamily = new FontFamily(PaperFont), FontSize = PaperSize, Foreground = Brushes.Black,
+        };
+        string tickText = m.Mine ? "  " + Ticks(m) : "";
+        Brush tickBrush = m.Status == MsgStatus.Failed ? B("#D64545") : m.Status == MsgStatus.Read ? B("#1B9E4B") : B("#888888");
+
+        if (m.Kind == MsgKind.Text)
+        {
+            var tb = Line(who + ": " + m.Text);
+            tb.Margin = gap;
+            if (m.Mine) tb.Inlines.Add(new Run(tickText) { FontSize = 13, Foreground = tickBrush });
+            return tb;
+        }
+
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = gap };
+        row.Children.Add(Line(who + ":"));
+        if (m.Kind == MsgKind.Voice)
+        {
+            var v = VoiceBubble(m, 0);
+            v.Margin = new Thickness(10, 0, 0, 0);
+            row.Children.Add(v);
+        }
+        else
+        {
+            var link = Line(IsImage(m.Text) ? "צורפה תמונה" : "צורף קובץ: " + m.Text);
+            link.Tag = "act";
+            link.TextDecorations = TextDecorations.Underline;
+            link.Cursor = Cursors.Hand;
+            link.Margin = new Thickness(8, 0, 0, 0);
+            var path = m.Path;
+            link.MouseLeftButtonUp += (_, _) => OpenAttachment(path);
+            row.Children.Add(link);
+        }
+        if (m.Mine)
+            row.Children.Add(new TextBlock { Text = tickText, FontSize = 13, Foreground = tickBrush, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 3) });
+        return row;
+    }
+
+    /// <summary>פותח קובץ מצורף: תמונה בחלון התצוגה שלנו, כל קובץ אחר בתוכנה ברירת המחדל של המערכת.</summary>
+    void OpenAttachment(string path)
+    {
+        if (string.IsNullOrEmpty(path) || !System.IO.File.Exists(path)) { ShowError("הקובץ לא נמצא"); return; }
+        try
+        {
+            if (IsImage(path)) new ImageViewWindow(path, this).Show();
+            else System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
+        }
+        catch (Exception ex) { ShowError(ex.Message); }
     }
 
     string Ticks(Msg m) => m.Status == MsgStatus.Failed ? "⚠ לא נשלח" : m.Status == MsgStatus.Sent ? "✓" : "✓✓";
@@ -608,6 +864,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
     /// <summary>הטקסט שבתיבה, כשכל אייקון מוחלף בקוד שלו (כך הוא נשלח ונשמר).</summary>
     string GetInputCodes()
     {
+        if (Simple) return _sIn.Text;
         var sb = new System.Text.StringBuilder();
         bool first = true;
         foreach (var block in Input.Document.Blocks.OfType<Paragraph>())
@@ -623,6 +880,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
 
     void ClearInput()
     {
+        if (Simple) { _sIn.Clear(); return; }
         Input.Document.Blocks.Clear();
         Input.Document.Blocks.Add(new Paragraph());
     }
@@ -926,6 +1184,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         PauseBtn.Content = "\uE769"; PauseBtn.ToolTip = "השהה את ההקלטה"; PauseBtn.Visibility = Visibility.Visible;
         AttachBtn.Content = "\uE74D"; ActionBtn.Content = "\uE724"; ActionBtn.ToolTip = "שלח הודעה קולית";
         _recTimer.Start();
+        ApplyComposerVisibility();
     }
 
     async Task EndRecordingAsync(bool send)
@@ -936,6 +1195,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         RecordLabel.Visibility = Visibility.Collapsed;
         Input.Visibility = Visibility.Visible;
         AttachBtn.Content = "\uE723";
+        ApplyComposerVisibility();
         Input_TextChanged(this, null!);
         if (!send || conv == null) { await _voice.CancelAsync(); return; }
         var path = await _voice.StopAsync();

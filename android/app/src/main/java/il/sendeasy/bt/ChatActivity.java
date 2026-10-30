@@ -26,6 +26,9 @@ import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.TextWatcher;
 import android.text.style.ForegroundColorSpan;
+import android.text.style.RelativeSizeSpan;
+import android.text.style.StyleSpan;
+import android.text.style.UnderlineSpan;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
@@ -94,6 +97,22 @@ public class ChatActivity extends Activity implements Events.Listener {
 
     // פלטת הצבעים של הסגנון הנוכחי
     private int style;
+    // סגנון "טקסט פשוט" (style == 2)
+    private View kpCompose, kpBar, kpCaret;
+    private TextView kpWho, kpEmo;
+    private IconView kpAttach;
+    private android.widget.FrameLayout kpField;
+    private boolean kpCaretOn;
+    /** סמן מהבהב קבוע בשורה הריקה כשהשדה לא בפוקוס, כדי שיהיה ברור שאפשר לכתוב. */
+    private final Runnable kpBlink = new Runnable() {
+        @Override public void run() {
+            if (style != 2 || destroyed || kpCaret == null) return;
+            boolean show = input.getText().length() == 0 && !input.hasFocus();
+            kpCaretOn = !kpCaretOn;
+            kpCaret.setVisibility(show && kpCaretOn ? View.VISIBLE : View.INVISIBLE);
+            ui.postDelayed(this, 530);
+        }
+    };
     private int cBg, cHeader, cHeaderText, cHeaderSub, cText, cSub, cMine, cTheirs, cAccent, cInput;
 
     private final VoiceRecorder recorder = new VoiceRecorder();
@@ -136,7 +155,7 @@ public class ChatActivity extends Activity implements Events.Listener {
 
         address = getIntent().getStringExtra(EXTRA_ADDRESS);
         final boolean announceNew = getIntent().getBooleanExtra(EXTRA_ANNOUNCE_NEW, false);
-        if (announceNew) announceNewChat();
+        if (announceNew && b == null) announceNewChat(); // אחרי recreate (החלפת סגנון) לא מכריזים שוב
         if (address == null) { finish(); return; }
         BluetoothAdapter bt = BluetoothAdapter.getDefaultAdapter();
         realName = address;
@@ -179,6 +198,14 @@ public class ChatActivity extends Activity implements Events.Listener {
         });
         sendBtn = (IconView) findViewById(R.id.chatSend);
         micBtn = (IconView) findViewById(R.id.chatMic);
+        kpCompose = findViewById(R.id.chatKpCompose);
+        kpBar = findViewById(R.id.chatKpBar);
+        kpCaret = findViewById(R.id.chatKpCaret);
+        kpWho = (TextView) findViewById(R.id.chatKpWho);
+        kpEmo = (TextView) findViewById(R.id.chatKpEmo);
+        kpAttach = (IconView) findViewById(R.id.chatKpAttach);
+        kpField = (android.widget.FrameLayout) findViewById(R.id.chatKpField);
+        if (Prefs.chatStyle(this) == 2) setupKp();
 
         titleT.setText(Fmt.ltr(deviceName));
         subT.setText(R.string.chat_sub);
@@ -190,7 +217,7 @@ public class ChatActivity extends Activity implements Events.Listener {
             @Override public void onItemClick(AdapterView<?> p, View v, int pos, long id) {
                 ChatStore.Msg m = msgs.get(pos);
                 if (m.isVoice()) togglePlay(m);
-                else if (m.isPic()) onPicClick(pos, m);
+                else if (m.isPic()) { if (style == 2) openImage(m); else onPicClick(pos, m); }
             }
         });
         list.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -235,7 +262,7 @@ public class ChatActivity extends Activity implements Events.Listener {
         input.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) { }
             @Override public void onTextChanged(CharSequence s, int a, int b, int c) { updateActionButtons(); }
-            @Override public void afterTextChanged(Editable s) { Emoticons.applyToEditable(ChatActivity.this, s, input.getTextSize()); }
+            @Override public void afterTextChanged(Editable s) { if (style != 2) Emoticons.applyToEditable(ChatActivity.this, s, input.getTextSize()); }
         });
         applyStyle();
         reload();
@@ -257,7 +284,7 @@ public class ChatActivity extends Activity implements Events.Listener {
             cTheirs = dark ? 0xFF202C33 : 0xFFFFFFFF;
             cAccent = 0xFF00A884;
             cInput = dark ? 0xFF2A3942 : 0xFFFFFFFF;
-        } else { // גוגל צ'אט
+        } else if (style == 1) { // גוגל צ'אט
             cBg = dark ? 0xFF1F1F1F : 0xFFFFFFFF;
             cHeader = dark ? 0xFF1F1F1F : 0xFFFFFFFF;
             cHeaderText = dark ? 0xFFE3E3E3 : 0xFF1F1F1F; cHeaderSub = dark ? 0xFF9AA0A6 : 0xFF5F6368;
@@ -267,6 +294,15 @@ public class ChatActivity extends Activity implements Events.Listener {
             cTheirs = dark ? 0xFF2D2F31 : 0xFFF0F4F9;
             cAccent = dark ? 0xFFA8C7FA : 0xFF0B57D0;
             cInput = dark ? 0xFF2D2F31 : 0xFFF0F4F9;
+        } else { // טקסט פשוט: אותה פלטה בכל ערכת נושא
+            cBg = 0xFF5C5C5C;
+            cHeader = 0xFF00BCD4;
+            cHeaderText = 0xFFFFFFFF; cHeaderSub = 0xFFFFFFFF;
+            cText = 0xFFF2F2F2;
+            cSub = 0xFFCFCFCF;
+            cMine = cBg; cTheirs = cBg;
+            cAccent = 0xFF00BCD4;
+            cInput = cBg;
         }
         root.setBackgroundColor(cBg);
         header.setBackgroundColor(cHeader);
@@ -301,7 +337,87 @@ public class ChatActivity extends Activity implements Events.Listener {
         sendProgressT.setTextColor(cText);
         sendProgressT.setBackgroundColor(cInput);
         updateActionButtons();
+        if (style == 2) applyKp();
         if (adapter != null) adapter.notifyDataSetChanged();
+    }
+
+    // ------------------------------------------------------------ סגנון "טקסט פשוט"
+
+    /** מעביר את שדה הכתיבה לשורת הכתיבה שבתוך השיחה, וקושר את שני כפתורי התחתית. נקרא רק כשהסגנון 2 פעיל ביצירה. */
+    private void setupKp() {
+        ViewGroup p = (ViewGroup) input.getParent();
+        if (p != null) p.removeView(input);
+        kpField.addView(input, new android.widget.FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        input.setNextFocusLeftId(R.id.chatInput);
+        input.setNextFocusRightId(R.id.chatInput);
+        input.setNextFocusDownId(R.id.chatKpAttach);
+        kpAttach.setIcon(IconView.ATTACH);
+        kpAttach.setClickable(true);
+        kpAttach.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { FilePicker.pick(ChatActivity.this); }
+        });
+        kpEmo.setText(Fmt.ltr(":)"));
+        kpEmo.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { showKpSmileys(); }
+        });
+        kpCompose.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                input.requestFocus();
+                android.view.inputmethod.InputMethodManager im = (android.view.inputmethod.InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                if (im != null && touch) im.showSoftInput(input, 0);
+            }
+        });
+    }
+
+    private StateListDrawable kpFocus() {
+        StateListDrawable sl = new StateListDrawable();
+        GradientDrawable focused = UiKit.rect(this, 0x22FFFFFF, 8);
+        focused.setStroke(UiKit.dp(this, 3), 0xFFFFFFFF);
+        sl.addState(new int[]{android.R.attr.state_focused}, focused);
+        sl.addState(new int[]{android.R.attr.state_pressed}, focused);
+        sl.addState(new int[]{}, UiKit.rect(this, 0x00000000, 8));
+        return sl;
+    }
+
+    private void applyKp() {
+        inputRow.setVisibility(View.GONE);
+        kpCompose.setVisibility(View.VISIBLE);
+        kpBar.setVisibility(View.VISIBLE);
+        kpBar.setBackgroundColor(0xFF686868);
+        avatarT.setVisibility(View.GONE);
+        subT.setVisibility(View.GONE);
+        titleT.setGravity(Gravity.CENTER);
+        titleT.setTextSize(22);
+        titleT.setTypeface(null, android.graphics.Typeface.NORMAL);
+        list.setVerticalScrollBarEnabled(false);
+        kpWho.setText(getString(R.string.chat_me) + ":");
+        kpWho.setTextColor(cText);
+        kpCaret.setBackgroundColor(0xFFFFFFFF);
+        input.setBackgroundDrawable(null);
+        input.setPadding(0, UiKit.dp(this, 4), 0, UiKit.dp(this, 4));
+        input.setMinHeight(0);
+        input.setTextSize(22);
+        input.setTextColor(cText);
+        input.setHint(R.string.chat_hint_kp);
+        input.setHintTextColor(0xFF9A9A9A);
+        input.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        kpAttach.setIconColor(cText);
+        kpAttach.setBackgroundDrawable(kpFocus());
+        kpEmo.setTextColor(cText);
+        kpEmo.setBackgroundDrawable(kpFocus());
+        ui.removeCallbacks(kpBlink);
+        ui.post(kpBlink);
+    }
+
+    /** בחירת סמיילי בסגנון הפשוט: שני סימנים בלבד, מוכנסים לשדה כטקסט רגיל. */
+    private void showKpSmileys() {
+        final String[] codes = {":)", ":("};
+        final String[] shown = {Fmt.ltr(":)"), Fmt.ltr(":(")};
+        new AlertDialog.Builder(this)
+                .setItems(shown, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int which) { insertEmoticon(codes[which]); }
+                })
+                .show();
     }
 
     /** עיגול צבעוני; בפוקוס (ניווט מקשים) נוספת טבעת בולטת. */
@@ -353,11 +469,13 @@ public class ChatActivity extends Activity implements Events.Listener {
         Events.add(this);
         reload();
         flushReads();
+        if (style == 2) { ui.removeCallbacks(kpBlink); ui.post(kpBlink); }
     }
 
     @Override
     protected void onPause() {
         if (address != null && address.equals(openAddress)) openAddress = null;
+        ui.removeCallbacks(kpBlink);
         Events.remove(this);
         super.onPause();
     }
@@ -1077,6 +1195,7 @@ public class ChatActivity extends Activity implements Events.Listener {
 
     /** דיאלוג בחירת אייקון רגש: חמש שורות (ציור ושם); בחירה מכניסה את הקוד בסמן. */
     private void showEmoticons() {
+        if (style == 2) { showKpSmileys(); return; }
         final String[] names = {getString(R.string.emo_happy), getString(R.string.emo_sad), getString(R.string.emo_like),
                 getString(R.string.emo_dislike), getString(R.string.emo_pray)};
         final int sz = UiKit.dp(this, 34);
@@ -1107,14 +1226,18 @@ public class ChatActivity extends Activity implements Events.Listener {
     }
 
     private void chooseStyle() {
-        final String[] names = {getString(R.string.style_wa), getString(R.string.style_gc)};
+        final String[] names = {getString(R.string.style_wa), getString(R.string.style_gc), getString(R.string.style_kp)};
         new AlertDialog.Builder(this)
                 .setTitle(R.string.chat_menu_style)
                 .setSingleChoiceItems(names, Prefs.chatStyle(this), new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int which) {
+                        int old = Prefs.chatStyle(ChatActivity.this);
                         Prefs.setChatStyle(ChatActivity.this, which);
                         d.dismiss();
-                        applyStyle();
+                        if (which == old) return;
+                        // לסגנון הפשוט (ומהסגנון הפשוט) עוברים בבנייה מחדש של המסך: שדה הכתיבה משנה מקום ב-layout
+                        if (which == 2 || old == 2) recreate();
+                        else applyStyle();
                     }
                 })
                 .show();
@@ -1327,6 +1450,53 @@ public class ChatActivity extends Activity implements Events.Listener {
         return row;
     }
 
+    /** שורת הודעה בסגנון "טקסט פשוט": "אני: טקסט" בכתב גדול, בלי בועה, עם קו דק מתחתיה. */
+    private View kpRow(ChatStore.Msg m, boolean sel) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.VERTICAL);
+        String who = (m.out ? getString(R.string.chat_me) : Fmt.ltr(deviceName)) + ": ";
+        SpannableStringBuilder sb = new SpannableStringBuilder(who);
+        sb.setSpan(new StyleSpan(android.graphics.Typeface.BOLD), 0, who.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        String body;
+        boolean underline = false;
+        if (m.isVoice()) {
+            body = getString(R.string.kp_voice, mmss(Storage.voiceSeconds(m.text))) + " - "
+                    + getString(m.text.equals(playingFile) ? R.string.kp_voice_stop : R.string.kp_voice_play);
+            underline = true;
+        } else if (m.isPic()) {
+            body = getString(R.string.kp_pic);
+            underline = true;
+        } else if (ChatStore.T_FILE.equals(m.kind)) {
+            body = getString(R.string.kp_file, m.text);
+        } else {
+            body = m.text;
+        }
+        int bs = sb.length();
+        sb.append(body);
+        if (underline) sb.setSpan(new UnderlineSpan(), bs, sb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        if (m.out) { // סימון קטן: ✓ אפור (נשלחה/נמסרה), ✓✓ ירוק (נקראה)
+            boolean read = ChatStore.S_READ.equals(m.status);
+            int ts = sb.length();
+            sb.append(read ? "  ✓✓" : "  ✓");
+            sb.setSpan(new ForegroundColorSpan(read ? 0xFF8CE9A8 : cSub), ts, sb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            sb.setSpan(new RelativeSizeSpan(0.65f), ts, sb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        TextView t = new TextView(this);
+        t.setText(sb);
+        t.setTextColor(cText);
+        t.setTextSize(22);
+        t.setGravity(Gravity.START);
+        t.setPadding(UiKit.dp(this, 14), UiKit.dp(this, 12), UiKit.dp(this, 14), UiKit.dp(this, 12));
+        if (android.os.Build.VERSION.SDK_INT >= 17) t.setTextDirection(View.TEXT_DIRECTION_RTL);
+        row.addView(t, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        View line = new View(this);
+        line.setBackgroundColor(0xFFA9A9A9);
+        row.addView(line, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1));
+        if (sel) row.setBackgroundDrawable(UiKit.rect(this, 0x00000000, 4, cAccent, 3));
+        row.setTag(m);
+        return row;
+    }
+
     private View gcRow(ChatStore.Msg m, ChatStore.Msg prev, boolean sel) {
         boolean grouped = prev != null && prev.out == m.out && (m.time - prev.time) < 6 * 60 * 1000;
         LinearLayout row = new LinearLayout(this);
@@ -1383,7 +1553,7 @@ public class ChatActivity extends Activity implements Events.Listener {
         @Override public View getView(int pos, View convert, ViewGroup parent) {
             ChatStore.Msg m = msgs.get(pos);
             boolean sel = (list.hasFocus() && list.getSelectedItemPosition() == pos) || pos == highlightPos;
-            return style == 0 ? waRow(m, sel) : gcRow(m, pos > 0 ? msgs.get(pos - 1) : null, sel);
+            return style == 0 ? waRow(m, sel) : style == 1 ? gcRow(m, pos > 0 ? msgs.get(pos - 1) : null, sel) : kpRow(m, sel);
         }
     }
 }

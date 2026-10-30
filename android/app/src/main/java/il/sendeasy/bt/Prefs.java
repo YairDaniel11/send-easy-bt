@@ -94,7 +94,7 @@ final class Prefs {
         sp(c).edit().putInt(K_THEME, t).apply();
     }
 
-    /** 0 = ווטסאפ, 1 = גוגל צ'אט */
+    /** 0 = ווטסאפ, 1 = גוגל צ'אט, 2 = טקסט פשוט */
     static int chatStyle(Context c) {
         return sp(c).getInt(K_CHAT_STYLE, 0);
     }

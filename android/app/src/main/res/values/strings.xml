@@ -65,6 +65,13 @@
     <string name="chat_menu_style">עיצוב הצ\'אט</string>
     <string name="style_wa">ווטסאפ</string>
     <string name="style_gc">גוגל צ\'אט</string>
+    <string name="style_kp">טקסט פשוט</string>
+    <string name="chat_hint_kp">הקלד כאן...</string>
+    <string name="kp_pic">צורפה תמונה</string>
+    <string name="kp_file">צורף קובץ: %1$s</string>
+    <string name="kp_voice">הקלטה %1$s</string>
+    <string name="kp_voice_play">לחץ להשמעה</string>
+    <string name="kp_voice_stop">מושמעת, לחץ לעצירה</string>
     <string name="voice_record">הקלט הודעה קולית</string>
     <string name="voice_recording">● מקליט  %1$s</string>
     <string name="voice_paused">⏸ מושהה  %1$s</string>

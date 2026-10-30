@@ -70,7 +70,8 @@
                     </Grid>
                 </Border>
 
-                <ScrollViewer PanningMode="VerticalOnly" x:Name="Scroller" Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                <ScrollViewer PanningMode="VerticalOnly" x:Name="Scroller" Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                              PreviewMouseLeftButtonUp="Scroller_PreviewMouseLeftButtonUp" SizeChanged="Scroller_SizeChanged">
                     <StackPanel x:Name="MsgPanel" FlowDirection="LeftToRight" Margin="0,10"/>
                 </ScrollViewer>
 
@@ -115,6 +116,18 @@
                     </Grid>
                     </StackPanel>
                 </Border>
+
+                <!-- סגנון "כתבן": בתחתית רק שני כפתורים שקופים (צירוף קובץ וסמיילי) -->
+                <Grid x:Name="SimpleBar" Grid.Row="2" Visibility="Collapsed" Margin="22,4,22,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Button x:Name="SAttachBtn" Grid.Column="0" Content="&#xE723;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="22"
+                            Width="56" Height="46" Background="Transparent" BorderThickness="0" Click="Attach_Click" ToolTip="צרף קובץ"/>
+                    <Button x:Name="SEmojiBtn" Grid.Column="1" Content=":)" FontFamily="Segoe UI" FontSize="26" FlowDirection="LeftToRight"
+                            HorizontalAlignment="Right" Width="56" Height="46" Background="Transparent" BorderThickness="0" Click="SimpleEmoji_Click" ToolTip="סמיילי"/>
+                </Grid>
             </Grid>
         </Grid>
     </Grid>

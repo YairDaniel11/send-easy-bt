@@ -158,6 +158,100 @@
         android:textSize="13sp"
         android:visibility="gone" />
 
+    <!-- סגנון "טקסט פשוט": שורת כתיבה בתוך השיחה (השדה chatInput מועבר לכאן בקוד) ושני כפתורים בתחתית -->
+    <LinearLayout
+        android:id="@+id/chatKpCompose"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingBottom="4dp"
+        android:paddingLeft="14dp"
+        android:paddingRight="14dp"
+        android:paddingTop="4dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/chatKpWho"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <View
+            android:id="@+id/chatKpCaret"
+            android:layout_width="2dp"
+            android:layout_height="26dp"
+            android:layout_marginLeft="8dp"
+            android:layout_marginRight="8dp" />
+
+        <FrameLayout
+            android:id="@+id/chatKpField"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/chatKpBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#FFA9A9A9" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="6dp">
+
+            <FrameLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1">
+
+                <il.sendeasy.bt.IconView
+                    android:id="@+id/chatKpAttach"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@string/cd_attach"
+                    android:focusable="true"
+                    android:nextFocusDown="@+id/chatKpAttach"
+                    android:nextFocusLeft="@+id/chatKpEmo"
+                    android:nextFocusRight="@+id/chatKpAttach"
+                    android:nextFocusUp="@+id/chatInput" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1">
+
+                <TextView
+                    android:id="@+id/chatKpEmo"
+                    android:layout_width="64dp"
+                    android:layout_height="48dp"
+                    android:layout_gravity="center"
+                    android:clickable="true"
+                    android:contentDescription="@string/cd_emoticons"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:nextFocusDown="@+id/chatKpEmo"
+                    android:nextFocusLeft="@+id/chatKpEmo"
+                    android:nextFocusRight="@+id/chatKpAttach"
+                    android:nextFocusUp="@+id/chatInput"
+                    android:textSize="30sp" />
+            </FrameLayout>
+        </LinearLayout>
+    </LinearLayout>
+
     <LinearLayout
         android:id="@+id/chatInputRow"
         android:layout_width="match_parent"

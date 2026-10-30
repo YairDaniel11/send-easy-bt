@@ -27,7 +27,7 @@ public partial class SettingsWindow : Wpf.Ui.Controls.FluentWindow
         Loaded += (_, _) => CheckLocalApk();
         ModeBox.SelectedIndex = (int)s.ReceiveMode;
         DirBox.Text = s.ReceiveDir;
-        (s.ChatStyle == 0 ? ChatWa : ChatGc).IsChecked = true;
+        (s.ChatStyle == 0 ? ChatWa : s.ChatStyle == 2 ? ChatPaper : ChatGc).IsChecked = true;
         PopupBox.IsChecked = s.NotifyPopup;
         SoundBox.IsChecked = s.NotifySound;
         OwnBox.IsChecked = s.ExtractOwnArchives;
@@ -207,7 +207,7 @@ public partial class SettingsWindow : Wpf.Ui.Controls.FluentWindow
 
         _s.ReceiveMode = (ReceiveMode)ModeBox.SelectedIndex;
         _s.ReceiveDir = DirBox.Text;
-        _s.ChatStyle = ChatWa.IsChecked == true ? 0 : 1;
+        _s.ChatStyle = ChatWa.IsChecked == true ? 0 : ChatPaper.IsChecked == true ? 2 : 1;
         _s.NotifyPopup = PopupBox.IsChecked == true;
         _s.NotifySound = SoundBox.IsChecked == true;
         _s.ExtractOwnArchives = OwnBox.IsChecked == true;
