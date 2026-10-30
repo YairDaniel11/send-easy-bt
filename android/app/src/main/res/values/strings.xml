@@ -72,7 +72,7 @@
     <string name="cd_rec_pause">השהה או המשך הקלטה</string>
     <string name="cd_rec_send">שלח הקלטה</string>
     <string name="cd_rec_cancel">בטל הקלטה</string>
-    <string name="cd_attach">צרף תמונה</string>
+    <string name="cd_attach">צרף קובץ</string>
     <string name="unread_one">הודעה חדשה</string>
     <string name="unread_n">%1$d חדשות</string>
     <string name="rx_pic">הודעה מ-%1$s</string>
@@ -83,8 +83,8 @@
     <string name="img_viewer_hint">אישור = התאמה / 2x / 3x   ·   חצים = הזזה   ·   חזרה = סגירה</string>
     <string name="img_viewer_hint_touch">צביטה = זום   ·   נגיעה כפולה = הגדלה / התאמה   ·   גרירה = הזזה</string>
     <string name="img_open_failed">אי אפשר להציג את התמונה</string>
-    <string name="sending_pics">שולח תמונה %1$d מתוך %2$d…  %3$d%%   ·   ביטול: לחיצה כאן או מקש רך ימני</string>
-    <string name="sending_pics_busy">עדיין שולח תמונות</string>
+    <string name="sending_pics">שולח קובץ %1$d מתוך %2$d…  %3$d%%   ·   ביטול: לחיצה כאן או מקש רך ימני</string>
+    <string name="sending_pics_busy">עדיין שולח קבצים</string>
     <string name="pic_cancel">בטל</string>
     <string name="browser_images_title">בחר תמונות</string>
     <string name="voice_label">הודעה קולית %1$s</string>
@@ -167,7 +167,8 @@
     <string name="emo_like">לייק</string>
     <string name="emo_dislike">דיסלייק</string>
     <string name="emo_pray">תודה</string>
-    <string name="chat_images_only">לא ניתן לשלוח קבצים מסוג זה דרך הצ\'אט - רק קבצי תמונה</string>
+    <string name="chat_file_too_big">הקובץ גדול מדי לשליחה בצ\'אט (עד 100MB): %1$s</string>
+    <string name="file_open_failed">אי אפשר לפתוח את הקובץ</string>
     <string name="chat_connect_failed">אי אפשר להתחבר למחשב. ודא שהתוכנה פתוחה במחשב והבלוטוס פועל</string>
     <string name="chat_menu_paste">הדבק תמונה מהלוח</string>
     <string name="paste_none">אין תמונה בלוח</string>

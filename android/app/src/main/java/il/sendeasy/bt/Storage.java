@@ -327,6 +327,28 @@ final class Storage {
         }
     }
 
+    /** מעתיק קובץ מצורף (מ-Uri) לתיקייה זמנית לשליחה. מחזיר את הקובץ או null. הקורא מוחק אותו אחרי השליחה. */
+    static File storeTemp(Context c, Uri src, String name) {
+        File dest = null;
+        InputStream in = null;
+        try {
+            in = c.getContentResolver().openInputStream(src);
+            if (in == null) return null;
+            File dir = new File(c.getCacheDir(), "chatsend");
+            dir.mkdirs();
+            dest = uniqueFile(dir, sanitize(name));
+            OutputStream out = new FileOutputStream(dest);
+            copy(in, out); // סוגר את שני הזרמים
+            in = null;
+            return dest;
+        } catch (Exception e) {
+            if (dest != null) dest.delete();
+            return null;
+        } finally {
+            if (in != null) { try { in.close(); } catch (IOException ignored) { } }
+        }
+    }
+
     static File uniqueFile(File dir, String name) {
         File f = new File(dir, name);
         if (!f.exists()) return f;

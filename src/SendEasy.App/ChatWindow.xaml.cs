@@ -759,17 +759,26 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         if (_recording) { await EndRecordingAsync(send: false); return; }
         var conv = _cur;
         if (conv == null) return;
-        var d = new Microsoft.Win32.OpenFileDialog { Title = "בחר תמונות לשליחה", Multiselect = true,
-            Filter = "תמונות|*.jpg;*.jpeg;*.png;*.gif;*.bmp;*.webp|כל הקבצים|*.*" };
+        var d = new Microsoft.Win32.OpenFileDialog { Title = "בחר קבצים לשליחה", Multiselect = true,
+            Filter = "כל הקבצים|*.*|תמונות|*.jpg;*.jpeg;*.png;*.gif;*.bmp;*.webp" };
         if (d.ShowDialog(this) != true) return;
-        var rejected = d.FileNames.Where(f => !IsImage(f)).ToList();
-        if (rejected.Count > 0)
-            ConfirmDialog.Tell(this, "לא ניתן לשלוח קבצים מסוג זה", "לא ניתן לשלוח קבצים מסוג זה דרך הצ'אט - רק קבצי תמונה.", warning: true);
-        foreach (var path in d.FileNames.Where(IsImage))
+        foreach (var path in d.FileNames)
+        {
+            long len = 0;
+            try { len = new System.IO.FileInfo(path).Length; } catch { }
+            if (len > MaxChatFileBytes)
+            {
+                ConfirmDialog.Tell(this, "הקובץ גדול מדי", $"הקובץ {System.IO.Path.GetFileName(path)} גדול מ-100MB ולא נשלח דרך הצ'אט. לשליחה של קובץ גדול השתמש בשליחה רגילה (קליק ימני על הקובץ, שלח אל).", warning: true);
+                continue;
+            }
             if (!await SendChatFileAsync(conv, path)) break;
+        }
     }
 
-    /// <summary>שולח תמונה אחת מהצ'אט, עם התקדמות וביטול. מחזיר false אם צריך לעצור (כשל או ביטול).</summary>
+    /// <summary>הגבלת גודל לקובץ מצורף בצ'אט. שליחה רגילה (קליק ימני, שלח אל) אינה מוגבלת.</summary>
+    const long MaxChatFileBytes = 100L * 1024 * 1024;
+
+    /// <summary>שולח קובץ אחד מהצ'אט, עם התקדמות וביטול. מחזיר false אם צריך לעצור (כשל או ביטול).</summary>
     async Task<bool> SendChatFileAsync(Conv conv, string path)
     {
         var name = System.IO.Path.GetFileName(path);

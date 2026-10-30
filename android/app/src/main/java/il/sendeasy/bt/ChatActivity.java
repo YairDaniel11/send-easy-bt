@@ -61,6 +61,8 @@ public class ChatActivity extends Activity implements Events.Listener {
     static final String EXTRA_ANNOUNCE_NEW = "announce_new";
     private static final int REQ_MIC = 4002;
     private static final long MAX_RECORD_MS = 5 * 60 * 1000;
+    /** הגבלת גודל לקובץ מצורף בצ'אט (שליחה רגילה ממסך השליחה אינה מוגבלת). */
+    private static final long MAX_ATTACH_BYTES = 100L * 1024 * 1024;
 
     private String address;
     private String deviceName;
@@ -208,7 +210,7 @@ public class ChatActivity extends Activity implements Events.Listener {
             @Override public void onClick(View v) { toggleRecording(); }
         });
         attachBtn.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { FilePicker.pickImages(ChatActivity.this); }
+            @Override public void onClick(View v) { FilePicker.pick(ChatActivity.this); }
         });
         recPauseBtn.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { togglePause(); }
@@ -465,6 +467,38 @@ public class ChatActivity extends Activity implements Events.Listener {
         startActivity(i);
     }
 
+    /** שם התצוגה של קובץ מצורף (כל סוג), או "file" אם אין. */
+    private String attachNameOf(Uri u) {
+        String name = null;
+        if ("file".equals(u.getScheme())) {
+            name = new File(u.getPath()).getName();
+        } else {
+            Cursor c = null;
+            try {
+                c = getContentResolver().query(u, new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null);
+                if (c != null && c.moveToFirst()) name = c.getString(0);
+            } catch (RuntimeException ignored) {
+            } finally {
+                if (c != null) c.close();
+            }
+        }
+        return name == null || name.length() == 0 ? "file" : name;
+    }
+
+    /** גודל הקובץ המצורף בבתים, או -1 אם לא ידוע. */
+    private long attachSizeOf(Uri u) {
+        if ("file".equals(u.getScheme())) return new File(u.getPath()).length();
+        Cursor c = null;
+        try {
+            c = getContentResolver().query(u, new String[]{OpenableColumns.SIZE}, null, null, null);
+            if (c != null && c.moveToFirst() && !c.isNull(0)) return c.getLong(0);
+        } catch (RuntimeException ignored) {
+        } finally {
+            if (c != null) c.close();
+        }
+        return -1;
+    }
+
     private String imageNameOf(Uri u) {
         String name = null;
         if ("file".equals(u.getScheme())) {
@@ -541,10 +575,23 @@ public class ChatActivity extends Activity implements Events.Listener {
                             final int idx = i + 1;
                             setPicProgress(idx, total, 0);
                             Uri u = uris.get(i);
-                            String name = imageNameOf(u);
-                            File copy = name == null ? null : Storage.storeImage(app, u, name);
-                            if (copy == null) { fail(getString(R.string.img_open_failed)); continue; }
-                            ChatStore.add(app, address, new ChatStore.Msg(System.currentTimeMillis(), true, ChatStore.T_PIC, copy.getName(), 0, ChatStore.S_SENT));
+                            String picName = imageNameOf(u);
+                            final boolean isPic = picName != null;
+                            String name = isPic ? picName : attachNameOf(u);
+                            long declared = attachSizeOf(u);
+                            if (declared > MAX_ATTACH_BYTES) { fail(getString(R.string.chat_file_too_big, name)); continue; }
+                            File copy;
+                            boolean temp = true; // עותק זמני שנמחק אחרי השליחה (קובץ מקורי לא נוגעים בו)
+                            if (isPic) copy = Storage.storeImage(app, u, name);
+                            else if ("file".equals(u.getScheme())) { copy = new File(u.getPath()); temp = false; }
+                            else copy = Storage.storeTemp(app, u, name);
+                            if (copy == null) { fail(getString(isPic ? R.string.img_open_failed : R.string.file_open_failed)); continue; }
+                            if (copy.length() > MAX_ATTACH_BYTES) {
+                                if (temp) copy.delete();
+                                fail(getString(R.string.chat_file_too_big, name));
+                                continue;
+                            }
+                            ChatStore.add(app, address, new ChatStore.Msg(System.currentTimeMillis(), true, isPic ? ChatStore.T_PIC : ChatStore.T_FILE, copy.getName(), 0, ChatStore.S_SENT));
                             Events.post(Events.CHAT, address);
                             String err = null;
                             try {
@@ -561,10 +608,11 @@ public class ChatActivity extends Activity implements Events.Listener {
                             }
                             if (err == null) {
                                 ChatStore.markDelivered(app, address, copy.getName());
-                                ChatStore.setMsgId(app, address, copy.getName(), session == null ? 0 : session.lastSentId);
+                                if (isPic) ChatStore.setMsgId(app, address, copy.getName(), session == null ? 0 : session.lastSentId);
+                                else if (temp) copy.delete();
                             } else {
                                 ChatStore.removeOut(app, address, copy.getName());
-                                copy.delete();
+                                if (isPic || temp) copy.delete();
                                 if (!picCancel.get()) fail(getString(R.string.chat_failed) + ": " + err);
                             }
                             Events.post(Events.CHAT, address);
@@ -1076,16 +1124,8 @@ public class ChatActivity extends Activity implements Events.Listener {
     protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
         if (res != RESULT_OK || data == null) return;
-        ArrayList<Uri> imgs = FilePicker.imageResult(req, data);
-        if (imgs.isEmpty()) return;
-        // בצ'אט נשלחות רק תמונות: בודקים לפי סיומת/MIME לפני כל חיבור
-        ArrayList<Uri> ok = new ArrayList<Uri>();
-        boolean rejected = false;
-        for (Uri u : imgs) {
-            if (imageNameOf(u) != null) ok.add(u); else rejected = true;
-        }
-        if (rejected) Toast.makeText(this, R.string.chat_images_only, Toast.LENGTH_LONG).show();
-        if (!ok.isEmpty()) sendImages(ok);
+        ArrayList<Uri> files = FilePicker.result(req, data);
+        if (!files.isEmpty()) sendImages(files);
     }
 
     @Override
