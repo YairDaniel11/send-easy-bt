@@ -768,7 +768,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
             try { len = new System.IO.FileInfo(path).Length; } catch { }
             if (len > MaxChatFileBytes)
             {
-                ConfirmDialog.Tell(this, "הקובץ גדול מדי", $"הקובץ {System.IO.Path.GetFileName(path)} גדול מ-100MB ולא נשלח דרך הצ'אט. לשליחה של קובץ גדול השתמש בשליחה רגילה (קליק ימני על הקובץ, שלח אל).", warning: true);
+                ConfirmDialog.Tell(this, "הקובץ גדול מדי", $"הקובץ {System.IO.Path.GetFileName(path)} גדול מ-100MB, לכן אי אפשר לשלוח אותו בצ'אט. שלח אותו באמצעות התוכנה: קליק ימני על הקובץ, ואז \"שלח אל\" ובחירת המכשיר.", warning: true);
                 continue;
             }
             if (!await SendChatFileAsync(conv, path)) break;

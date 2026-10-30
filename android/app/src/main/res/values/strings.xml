@@ -167,7 +167,7 @@
     <string name="emo_like">לייק</string>
     <string name="emo_dislike">דיסלייק</string>
     <string name="emo_pray">תודה</string>
-    <string name="chat_file_too_big">הקובץ גדול מדי לשליחה בצ\'אט (עד 100MB): %1$s</string>
+    <string name="chat_file_too_big">הקובץ %1$s גדול מ-100MB, לכן אי אפשר לשלוח אותו בצ\'אט. שלח אותו באמצעות האפליקציה: במסך הראשי, בחר מכשיר ולחץ על שליחת קובץ.</string>
     <string name="file_open_failed">אי אפשר לפתוח את הקובץ</string>
     <string name="chat_connect_failed">אי אפשר להתחבר למחשב. ודא שהתוכנה פתוחה במחשב והבלוטוס פועל</string>
     <string name="chat_menu_paste">הדבק תמונה מהלוח</string>
