@@ -613,8 +613,11 @@ public class MainActivity extends Activity implements Events.Listener {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(pad, pad, pad, pad);
+        box.setBackgroundColor(0xFFFFFFFF); // רקע בהיר מפורש, כדי שהטקסט יהיה קריא בכל ערכת נושא
         TextView t = new TextView(this);
         t.setTextSize(15);
+        t.setTextColor(0xFF111111);
+        t.setLinkTextColor(0xFF0B57D0);
         t.setText(getString(R.string.about_text, getString(R.string.app_name), Fmt.ltr(ver == null ? "" : ver), REPO_URL));
         android.text.util.Linkify.addLinks(t, android.text.util.Linkify.WEB_URLS);
         t.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
@@ -634,6 +637,15 @@ public class MainActivity extends Activity implements Events.Listener {
         });
         upd.setMinimumHeight(UiKit.dp(this, 44));
         upd.setMinHeight(UiKit.dp(this, 44));
+        // צבעי כפתורים מפורשים על הרקע הלבן של חלון האודות (בלי תלות בערכת הנושא)
+        for (TextView b : new TextView[]{close, upd}) {
+            b.setTextColor(0xFF111111);
+            android.graphics.drawable.StateListDrawable bg = new android.graphics.drawable.StateListDrawable();
+            bg.addState(new int[]{android.R.attr.state_focused}, UiKit.rect(this, 0xFFE3E3E3, 10, 0xFF0B57D0, 3));
+            bg.addState(new int[]{android.R.attr.state_pressed}, UiKit.rect(this, 0xFFD0D0D0, 10, 0xFF0B57D0, 3));
+            bg.addState(new int[]{}, UiKit.rect(this, 0xFFE3E3E3, 10));
+            b.setBackgroundDrawable(bg);
+        }
         LinearLayout btnRow = new LinearLayout(this);
         btnRow.setOrientation(LinearLayout.HORIZONTAL);
         btnRow.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
@@ -650,9 +662,11 @@ public class MainActivity extends Activity implements Events.Listener {
         box.addView(btnRow, bl);
         android.widget.ScrollView sv = new android.widget.ScrollView(this);
         sv.addView(box);
+        sv.setBackgroundColor(0xFFFFFFFF);
         AlertDialog d = new AlertDialog.Builder(this).setView(sv).create();
         holder[0] = d;
         d.show();
+        if (d.getWindow() != null) d.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0xFFFFFFFF));
         close.requestFocus();
     }
 

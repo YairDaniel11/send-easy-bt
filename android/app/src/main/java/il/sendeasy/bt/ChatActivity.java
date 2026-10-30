@@ -459,14 +459,22 @@ public class ChatActivity extends Activity implements Events.Listener {
         TextView ls = new TextView(this); ls.setText(R.string.rec_lbl_send);
         LinearLayout.LayoutParams w1 = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         LinearLayout.LayoutParams w2 = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.4f);
-        bar.addView(recCell(recCancelBtn, lc), w1);
+        // משמאל לימין, תמיד: שלח, השהה, זמן, בטל. "שלח" הכי שמאלי.
         recT.setTextColor(cText);
         recT.setTextSize(18);
         recT.setGravity(Gravity.CENTER);
+        bar.addView(recCell(recSendBtn, ls), w1);
+        bar.addView(recCell(recPauseBtn, lblPause), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         textCol.setLayoutParams(w2);
         bar.addView(textCol, w2);
-        bar.addView(recCell(recPauseBtn, lblPause), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        bar.addView(recCell(recSendBtn, ls), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        bar.addView(recCell(recCancelBtn, lc), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        // ניווט מקשים לפי הסדר הפיזי: חץ ימינה זז ימינה, חץ שמאלה זז שמאלה
+        recSendBtn.setNextFocusLeftId(recSendBtn.getId());
+        recSendBtn.setNextFocusRightId(recPauseBtn.getId());
+        recPauseBtn.setNextFocusLeftId(recSendBtn.getId());
+        recPauseBtn.setNextFocusRightId(recCancelBtn.getId());
+        recCancelBtn.setNextFocusLeftId(recPauseBtn.getId());
+        recCancelBtn.setNextFocusRightId(recCancelBtn.getId());
     }
 
     /** בחירת סמיילי בסגנון הפשוט: שני סימנים בלבד, מוכנסים לשדה כטקסט רגיל. */
