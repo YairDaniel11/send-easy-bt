@@ -98,13 +98,18 @@ public class BtService extends Service {
         boolean fg = false;
         try {
             createChannels();
-            Notification n = buildServiceNotification();
-            if (Build.VERSION.SDK_INT >= 29) {
+            // עד אנדרואיד 7 שירות רגיל (לא חזית) לא מוגבל ברקע, ולכן כשההתראה הקבועה מוסתרת לא מציבים אותה בכלל.
+            // בלי זה היא נשארת ברשימת ההתראות גם כשסמל הסטטוס בר מוסתר. מאנדרואיד 8 חובה התראה לשירות חזית.
+            if (Build.VERSION.SDK_INT < 26 && !Prefs.showServiceNotification(this)) {
+                fg = true;
+            } else if (Build.VERSION.SDK_INT >= 29) {
+                Notification n = buildServiceNotification();
                 startForeground(ID_FOREGROUND, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE);
+                fg = true;
             } else {
-                startForeground(ID_FOREGROUND, n);
+                startForeground(ID_FOREGROUND, buildServiceNotification());
+                fg = true;
             }
-            fg = true;
         } catch (RuntimeException e) {
             // כולל ForegroundServiceStartNotAllowedException (API 31+, תת-מחלקה של IllegalStateException)
         }

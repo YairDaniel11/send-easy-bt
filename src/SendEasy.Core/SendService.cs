@@ -85,7 +85,8 @@ public static class SendService
     static async Task<(PeerSession? Session, string? Why)> TryPeerAsync(ulong address, Action<string> status, CancellationToken ct)
     {
         string? why = null;
-        for (int i = 1; i <= 3; i++)
+        const int attempts = 5; // טלפון ברקע לוקח לפעמים כמה שניות להתעורר ולענות
+        for (int i = 1; i <= attempts; i++)
         {
             ct.ThrowIfCancellationRequested();
             try
@@ -98,10 +99,10 @@ public static class SendService
             catch (Exception ex)
             {
                 why = ex.Message;
-                if (i == 3) return (null, why);
-                status($"מתחבר לאפליקציה בטלפון... ניסיון {i + 1} מתוך 3 ({ex.Message})");
+                if (i == attempts) return (null, why);
+                status($"מתחבר לאפליקציה בטלפון... ניסיון {i + 1} מתוך {attempts} ({ex.Message})");
                 System.Diagnostics.Debug.WriteLine($"PeerClient attempt {i} failed: {ex.GetType().Name} 0x{ex.HResult:X8} {ex.Message}");
-                await Task.Delay(1500, ct);
+                await Task.Delay(2000, ct);
             }
         }
         return (null, why);

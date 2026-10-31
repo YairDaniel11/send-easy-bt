@@ -419,10 +419,7 @@ sealed class TrayApp : IDisposable
             UpdateState.Set(r);
             if (r.Version == _notifiedVersion) return; // התראה פעם אחת לכל גרסה, אבל הבאנר בחלונות נשאר
             _notifiedVersion = r.Version;
-            _updateUrl = r.PageUrl;
-            _tray.ShowBalloonTip(8000, "יש גרסה חדשה של שליחה קלה - BT",
-                $"גרסה {r.Version.ToString(3)}. לחץ כאן כדי להוריד ולהתקין.", ToolTipIcon.Info);
-            // בנוסף לבועת המגש (ש-Windows עלול להשתיק במצב "נא לא להפריע"): חלון קופץ משלנו שתמיד מופיע
+            // חלון קופץ משלנו בלבד (בועת המגש של Windows הייתה כפולה, והיא גם מושתקת במצב "נא לא להפריע")
             try { _updToast?.Close(); } catch { }
             _updToast = new MessageToast("יש גרסה חדשה", $"גרסה {r.Version.ToString(3)}. לחץ כאן כדי להוריד ולהתקין.", () => { _updateUrl = null; OpenUpdate(); }, _settings.ToastPosition);
             _updToast.Show();

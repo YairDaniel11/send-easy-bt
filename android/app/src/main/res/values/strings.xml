@@ -86,6 +86,9 @@
     <string name="channel_service_min">התראה קבועה (שקטה)</string>
     <string name="menu_svc_notif_shown">התראה קבועה בסטטוס בר: מוצגת</string>
     <string name="menu_svc_notif_hidden">התראה קבועה בסטטוס בר: מוסתרת</string>
+    <string name="svc_hide_title">הסתרת ההתראה הקבועה</string>
+    <string name="svc_hide_msg">באנדרואיד 8 ומעלה, אפליקציה שמקבלת קבצים ברקע חייבת להציג התראה, ואי אפשר להסתיר אותה לגמרי מתוך האפליקציה. עכשיו היא שקטה וממוזערת. כדי שלא תופיע בכלל: לחץ "פתח הגדרות" וכבה את ההתראות של הערוץ הזה (האפליקציה תמשיך לקבל קבצים כרגיל).</string>
+    <string name="svc_hide_open">פתח הגדרות</string>
     <string name="img_tap_again">לחץ שוב להגדלה</string>
     <string name="img_viewer_hint">אישור = התאמה / 2x / 3x   ·   חצים = הזזה   ·   חזרה = סגירה</string>
     <string name="img_viewer_hint_touch">צביטה = זום   ·   נגיעה כפולה = הגדלה / התאמה   ·   גרירה = הזזה</string>

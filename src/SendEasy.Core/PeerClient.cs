@@ -11,8 +11,10 @@ public static class PeerClient
     {
         var dev = await BluetoothDevice.FromBluetoothAddressAsync(address);
         if (dev == null) throw new IOException("Windows לא מצא את המכשיר");
-        var svcs = await dev.GetRfcommServicesForIdAsync(RfcommServiceId.FromUuid(PeerProtocol.ServiceUuid), BluetoothCacheMode.Uncached);
-        var svc = svcs.Services.FirstOrDefault();
+        var id = RfcommServiceId.FromUuid(PeerProtocol.ServiceUuid);
+        // טלפון שהאפליקציה בו רק ברקע (אין חיבור פעיל אליו): החיפוש החי נכשל לפעמים, ולכן מנסים גם מהמטמון של Windows
+        var svc = (await dev.GetRfcommServicesForIdAsync(id, BluetoothCacheMode.Uncached)).Services.FirstOrDefault();
+        svc ??= (await dev.GetRfcommServicesForIdAsync(id, BluetoothCacheMode.Cached)).Services.FirstOrDefault();
         if (svc == null) throw new IOException("האפליקציה בטלפון לא פעילה (שירות ההאזנה שלה לא נמצא). פתח אותה בטלפון ואשר שהיא פועלת ברקע");
 
         var sock = new StreamSocket();

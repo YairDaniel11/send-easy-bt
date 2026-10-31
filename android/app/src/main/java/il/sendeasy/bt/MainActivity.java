@@ -509,6 +509,27 @@ public class MainActivity extends Activity implements Events.Listener {
     private static final int REQ_SAVE_TREE = 21;
     private static final int REQ_SAVE_BROWSE = 22;
 
+    /** מאנדרואיד 8 שירות חזית חייב התראה, ואפליקציה לא יכולה להסתיר אותה לגמרי. רק המשתמש יכול, בהגדרות המערכת. */
+    private void offerHideInSystemSettings() {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.svc_hide_title)
+                .setMessage(R.string.svc_hide_msg)
+                .setPositiveButton(R.string.svc_hide_open, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) {
+                        try {
+                            Intent i = new Intent(android.provider.Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS);
+                            i.putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, getPackageName());
+                            i.putExtra(android.provider.Settings.EXTRA_CHANNEL_ID, BtService.CHANNEL_SERVICE_MIN);
+                            startActivity(i);
+                        } catch (RuntimeException e) {
+                            Toast.makeText(MainActivity.this, R.string.savedir_unsupported, Toast.LENGTH_LONG).show();
+                        }
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
     private void showSaveDirDialog() {
         float dp = getResources().getDisplayMetrics().density;
         int pad = (int) (16 * dp);
@@ -829,6 +850,7 @@ public class MainActivity extends Activity implements Events.Listener {
                             Prefs.setShowServiceNotification(MainActivity.this, !Prefs.showServiceNotification(MainActivity.this));
                             // הפעלה מחדש כדי שההתראה תיבנה בערוץ המתאים
                             if (Prefs.receiveEnabled(MainActivity.this) && BtService.isRunning()) BtService.restart(MainActivity.this);
+                            if (!Prefs.showServiceNotification(MainActivity.this) && Build.VERSION.SDK_INT >= 26) offerHideInSystemSettings();
                         } else if (which == 2) {
                             new AlertDialog.Builder(MainActivity.this)
                                     .setMessage(getString(R.string.main_receive_dir, Fmt.ltr(Storage.receiveDirLabel(MainActivity.this))))
