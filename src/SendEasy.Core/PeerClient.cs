@@ -10,10 +10,10 @@ public static class PeerClient
     public static async Task<PeerSession?> TryConnectAsync(ulong address, CancellationToken ct)
     {
         var dev = await BluetoothDevice.FromBluetoothAddressAsync(address);
-        if (dev == null) return null;
+        if (dev == null) throw new IOException("Windows לא מצא את המכשיר");
         var svcs = await dev.GetRfcommServicesForIdAsync(RfcommServiceId.FromUuid(PeerProtocol.ServiceUuid), BluetoothCacheMode.Uncached);
         var svc = svcs.Services.FirstOrDefault();
-        if (svc == null) return null;
+        if (svc == null) throw new IOException("האפליקציה בטלפון לא פעילה (שירות ההאזנה שלה לא נמצא). פתח אותה בטלפון ואשר שהיא פועלת ברקע");
 
         var sock = new StreamSocket();
         using var reg = ct.Register(() => sock.Dispose());

@@ -51,6 +51,17 @@ public class FileBrowserActivity extends Activity {
     protected void onCreate(Bundle b) {
         ThemeUtil.applyTheme(this);
         super.onCreate(b);
+        try {
+            init();
+        } catch (Throwable t) {
+            // במקום קריסה שקטה: מציגים מה נכשל, כדי שאפשר יהיה לתקן (במיוחד באנדרואיד 4.4)
+            Toast.makeText(this, "שגיאה בפתיחת הדפדפן: " + t, Toast.LENGTH_LONG).show();
+            setResult(RESULT_CANCELED);
+            finish();
+        }
+    }
+
+    private void init() {
         setContentView(R.layout.activity_browser);
         ThemeUtil.forceRtl(this);
         list = (ListView) findViewById(R.id.browserList);
@@ -94,6 +105,14 @@ public class FileBrowserActivity extends Activity {
     }
 
     private void load() {
+        try {
+            loadInner();
+        } catch (RuntimeException e) {
+            Toast.makeText(this, "שגיאה בטעינת התיקייה: " + e, Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void loadInner() {
         entries.clear();
         File[] kids = null;
         try { kids = dir.listFiles(); } catch (RuntimeException ignored) { }
@@ -111,7 +130,10 @@ public class FileBrowserActivity extends Activity {
                 entries.add(k);
             }
         }
-        pathT.setText(Fmt.ltr(dir.getPath()));
+        // ellipsize="start" עם עברית/כיווניות מעורבת קורס באנדרואיד 4.x, לכן מקצרים ידנית מההתחלה
+        String shown = dir.getPath();
+        if (shown.length() > 38) shown = "…" + shown.substring(shown.length() - 37);
+        pathT.setText(Fmt.ltr(shown));
         emptyT.setVisibility(entries.isEmpty() ? View.VISIBLE : View.GONE);
         adapter.notifyDataSetChanged();
         list.setSelection(0);

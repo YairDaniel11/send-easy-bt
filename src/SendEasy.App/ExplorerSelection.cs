@@ -38,21 +38,36 @@ static class ExplorerSelection
         // שולחן העבודה לא מופיע ברשימת חלונות הסייר: מעתיקים את הבחירה ללוח וקוראים משם
         var cls = new StringBuilder(64);
         GetClassName(fg, cls, cls.Capacity);
-        if (cls.ToString() is "Progman" or "WorkerW")
+        if (cls.ToString() is "Progman" or "WorkerW" || fg == GetShellWindow())
         {
             try
             {
+                // הקיצור עדיין לחוץ (למשל Ctrl+Alt+S): אם נשלח ^c עכשיו הוא יתפרש כ-Ctrl+Alt+C ולא יעתיק כלום
+                WaitModifiersReleased(TimeSpan.FromSeconds(2));
                 Clipboard.Clear();
                 SendKeys.SendWait("^c");
-                Thread.Sleep(250);
-                if (Clipboard.ContainsFileDropList())
-                    list.AddRange(Clipboard.GetFileDropList().Cast<string>());
+                for (int i = 0; i < 12 && list.Count == 0; i++)
+                {
+                    Thread.Sleep(100);
+                    if (Clipboard.ContainsFileDropList())
+                        list.AddRange(Clipboard.GetFileDropList().Cast<string>());
+                }
             }
             catch { }
         }
         return list;
     }
 
+    static void WaitModifiersReleased(TimeSpan max)
+    {
+        var end = DateTime.UtcNow + max;
+        // Shift, Ctrl, Alt, Win שמאל וימין
+        int[] keys = { 0x10, 0x11, 0x12, 0x5B, 0x5C };
+        while (DateTime.UtcNow < end && keys.Any(k => (GetAsyncKeyState(k) & 0x8000) != 0)) Thread.Sleep(20);
+    }
+
+    [DllImport("user32.dll")] static extern short GetAsyncKeyState(int vKey);
+    [DllImport("user32.dll")] static extern IntPtr GetShellWindow();
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr h, StringBuilder s, int n);
 }
