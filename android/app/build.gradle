@@ -11,6 +11,13 @@ android {
         targetSdk 34
         versionCode 1
         versionName "0.1.0"
+        // בנייה מקומית: הגרסה לפי התג האחרון בגיטאב (ב-CI השורה למעלה מוחלפת במספר הבנייה)
+        if (!System.getenv('GITHUB_ACTIONS')) {
+            try {
+                def tag = ['git', 'for-each-ref', '--sort=-v:refname', '--count=1', '--format=%(refname:short)', 'refs/tags'].execute().text.trim()
+                if (tag) versionName tag.replaceFirst('^v', '')
+            } catch (Exception ignored) { }
+        }
     }
 
     // חתימה קבועה (כדי שעדכונים יותקנו מעל הגרסה הקודמת): אם יש קובץ debug.keystore

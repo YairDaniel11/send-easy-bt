@@ -24,4 +24,19 @@
     <Resource Include="Assets\app.ico" />
     <Resource Include="Assets\emoji\*.png" />
   </ItemGroup>
+
+  <!-- בנייה מקומית: מספר הגרסה לפי התג האחרון בגיטאב (ב-CI מספר הגרסה נקבע בנפרד) -->
+  <Target Name="DevVersionFromGit" BeforeTargets="GenerateAssemblyInfo;GetAssemblyVersion;GetAssemblyAttributes" Condition="'$(GITHUB_ACTIONS)' != 'true'">
+    <Exec Command="git tag --sort=-v:refname" ConsoleToMSBuild="true" IgnoreExitCode="true" StandardOutputImportance="low" StandardErrorImportance="low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_DevTags" />
+    </Exec>
+    <PropertyGroup Condition="'$(_DevTags)' != ''">
+      <_DevTag>$([System.Text.RegularExpressions.Regex]::Match('$(_DevTags)', '^[^;]+').Value)</_DevTag>
+      <_DevVer>$(_DevTag.Trim().TrimStart('v'))</_DevVer>
+      <Version>$(_DevVer)</Version>
+      <AssemblyVersion>$(_DevVer)</AssemblyVersion>
+      <FileVersion>$(_DevVer)</FileVersion>
+      <InformationalVersion>$(_DevVer)-dev</InformationalVersion>
+    </PropertyGroup>
+  </Target>
 </Project>

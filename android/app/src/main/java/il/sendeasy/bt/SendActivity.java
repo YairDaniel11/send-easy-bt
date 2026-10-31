@@ -157,6 +157,7 @@ public class SendActivity extends Activity {
                         throw e;
                     }
                     if (r == Session.R_OK) {
+                        Usage.record(getApplicationContext(), address);
                         ChatStore.add(getApplicationContext(), address, copy != null
                                 ? new ChatStore.Msg(System.currentTimeMillis(), true, ChatStore.T_PIC, copy.getName())
                                 : new ChatStore.Msg(System.currentTimeMillis(), true, ChatStore.T_FILE, it.name));

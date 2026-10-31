@@ -1015,6 +1015,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         }
         catch (Exception ex) { err = ex.Message; }
 
+        if (ok) DeviceUsage.Record(conv.Address);
         entry.Status = ok ? "delivered" : "failed";
         ChatLog.Add(conv.Address, entry);
         Reload(conv);
@@ -1075,7 +1076,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
                 await using var fs = new System.IO.FileStream(path, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, 64 * 1024, true);
                 var r = await peer.SendFileAsync(fs, name, size, prog, cts.Token, fromChat: true);
                 ok = r == PeerSendResult.Ok;
-                if (ok) entry.MsgId = peer.LastSentId;
+                if (ok) { entry.MsgId = peer.LastSentId; DeviceUsage.Record(conv.Address); }
                 cancelled = r == PeerSendResult.Cancelled;
                 if (!ok && !cancelled) err = r == PeerSendResult.Rejected ? "הטלפון סירב לקבל את הקובץ" : "השליחה נכשלה";
             }
@@ -1225,7 +1226,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
                 await using var fs = new System.IO.FileStream(path, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, 64 * 1024, true);
                 var r = await peer.SendFileAsync(fs, name, size, null, System.Threading.CancellationToken.None, fromChat: true);
                 ok = r == PeerSendResult.Ok;
-                if (ok) entry.MsgId = peer.LastSentId;
+                if (ok) { entry.MsgId = peer.LastSentId; DeviceUsage.Record(conv.Address); }
                 if (!ok) err = "השליחה נכשלה";
             }
         }

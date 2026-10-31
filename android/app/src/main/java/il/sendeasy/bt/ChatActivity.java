@@ -215,6 +215,7 @@ public class ChatActivity extends Activity implements Events.Listener {
 
         adapter = new Adapter();
         list.setAdapter(adapter);
+        setupJumpButton();
         list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override public void onItemClick(AdapterView<?> p, View v, int pos, long id) {
                 ChatStore.Msg m = msgs.get(pos);
@@ -837,11 +838,70 @@ public class ChatActivity extends Activity implements Events.Listener {
     }
 
     private void reload() {
+        int before = msgs.size();
+        // גוללים לסוף רק אם המשתמש כבר היה בסוף, בטעינה הראשונה, או כשההודעה החדשה היא שלו.
+        // אחרת מי שדפדף אחורה היה מקבל קפיצה בכל הודעה שמגיעה או בכל שינוי
+        boolean follow = before == 0 || list.getLastVisiblePosition() >= before - 1;
         msgs.clear();
         msgs.addAll(ChatStore.load(this, address));
+        if (!follow && msgs.size() > before && msgs.get(msgs.size() - 1).out) follow = true;
         emptyT.setVisibility(msgs.isEmpty() ? View.VISIBLE : View.GONE);
         adapter.notifyDataSetChanged();
-        if (!msgs.isEmpty()) list.setSelection(msgs.size() - 1);
+        if (follow && !msgs.isEmpty()) list.setSelection(msgs.size() - 1);
+        updateJumpButton();
+    }
+
+    // ------------------------------------------------------------ חזרה להודעה האחרונה
+
+    private TextView jumpBtn;
+
+    /** כפתור עגול עם חץ למטה, למטה במרכז: מופיע כשמדפדפים אחורה וחוזר לסוף השיחה (גם במקשים: שמאלה = פוקוס, אישור = חזרה). */
+    private void setupJumpButton() {
+        jumpBtn = new TextView(this);
+        jumpBtn.setText("↓");
+        jumpBtn.setTextColor(0xFFFFFFFF);
+        jumpBtn.setTextSize(22);
+        jumpBtn.setGravity(android.view.Gravity.CENTER);
+        jumpBtn.setContentDescription(getString(R.string.cd_jump_last));
+        jumpBtn.setFocusable(true);
+        jumpBtn.setClickable(true);
+        android.graphics.drawable.StateListDrawable bg = new android.graphics.drawable.StateListDrawable();
+        bg.addState(new int[]{android.R.attr.state_focused}, UiKit.rect(this, 0xFF1B9E4B, 22, 0xFFFFFFFF, 3));
+        bg.addState(new int[]{android.R.attr.state_pressed}, UiKit.rect(this, 0xFF1B9E4B, 22));
+        bg.addState(new int[]{}, UiKit.rect(this, 0xEE455A64, 22, 0x55FFFFFF, 1));
+        jumpBtn.setBackgroundDrawable(bg);
+        jumpBtn.setVisibility(View.GONE);
+        jumpBtn.setNextFocusUpId(R.id.chatList);
+        jumpBtn.setNextFocusDownId(R.id.chatInput);
+        jumpBtn.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { jumpToLast(); }
+        });
+        int size = UiKit.dp(this, 44);
+        android.widget.FrameLayout.LayoutParams lp = new android.widget.FrameLayout.LayoutParams(size, size,
+                android.view.Gravity.BOTTOM | android.view.Gravity.CENTER_HORIZONTAL);
+        lp.bottomMargin = UiKit.dp(this, 10);
+        ((android.widget.FrameLayout) list.getParent()).addView(jumpBtn, lp);
+        list.setOnScrollListener(new android.widget.AbsListView.OnScrollListener() {
+            @Override public void onScrollStateChanged(android.widget.AbsListView v, int state) { }
+            @Override public void onScroll(android.widget.AbsListView v, int first, int visible, int total) { updateJumpButton(); }
+        });
+    }
+
+    private void updateJumpButton() {
+        if (jumpBtn == null) return;
+        boolean away = !msgs.isEmpty() && list.getLastVisiblePosition() < msgs.size() - 1;
+        int want = away ? View.VISIBLE : View.GONE;
+        if (jumpBtn.getVisibility() == want) return;
+        // הכפתור נעלם כשהממוקד בו: מחזירים את הפוקוס לרשימה, כדי שלא יאבד
+        if (!away && jumpBtn.hasFocus()) list.requestFocus();
+        jumpBtn.setVisibility(want);
+    }
+
+    private void jumpToLast() {
+        if (msgs.isEmpty()) return;
+        list.requestFocus();
+        list.setSelection(msgs.size() - 1);
+        updateJumpButton();
     }
 
     private static String mmss(int s) {
@@ -928,7 +988,9 @@ public class ChatActivity extends Activity implements Events.Listener {
         for (int attempt = 0; attempt < 2; attempt++) {
             Session s = ensureSession();
             try {
-                return s.sendTextWithId(text);
+                long id = s.sendTextWithId(text);
+                Usage.record(getApplicationContext(), address);
+                return id;
             } catch (IOException e) {
                 s.close();
                 session = null;
@@ -1074,7 +1136,7 @@ public class ChatActivity extends Activity implements Events.Listener {
                 } finally {
                     try { in.close(); } catch (IOException ignored) { }
                 }
-                if (r == Session.R_OK) return null;
+                if (r == Session.R_OK) { Usage.record(getApplicationContext(), address); return null; }
                 if (r == Session.R_REJECTED) return getString(R.string.send_rejected);
                 if (r == Session.R_CANCELLED) return getString(R.string.send_cancelled);
                 if (r == Session.R_HASH) return "הקובץ הגיע פגום";
@@ -1367,6 +1429,11 @@ public class ChatActivity extends Activity implements Events.Listener {
                     || code == KeyEvent.KEYCODE_DPAD_UP || code == KeyEvent.KEYCODE_DPAD_DOWN) {
                 return super.dispatchKeyEvent(e); // מעבר בין שלושת הכפתורים
             }
+            return true;
+        }
+        // דפדוף אחורה במקשים: שמאלה מהרשימה מעביר את הפוקוס לכפתור "חזרה לסוף", ואישור עליו חוזר להודעה האחרונה
+        if (code == KeyEvent.KEYCODE_DPAD_LEFT && jumpBtn != null && jumpBtn.getVisibility() == View.VISIBLE && list.hasFocus()) {
+            if (e.getAction() == KeyEvent.ACTION_DOWN) jumpBtn.requestFocus();
             return true;
         }
         if ((picSending || rxActive) && Keys.isBackAlt(code)) { // מקש רך ימני בזמן שליחה/קבלה = ביטול

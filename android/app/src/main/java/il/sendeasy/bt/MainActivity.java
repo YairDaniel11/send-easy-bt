@@ -205,8 +205,13 @@ public class MainActivity extends Activity implements Events.Listener {
                 Set<BluetoothDevice> bonded = bt.getBondedDevices();
                 if (bonded != null) devices.addAll(bonded);
             } catch (SecurityException ignored) { }
+            // קודם המכשירים שנשלח אליהם הכי הרבה ולאחרונה, אחר כך מחשבים, ובסוף לפי שם
+            final java.util.Map<String, Double> scores = new java.util.HashMap<String, Double>();
+            for (BluetoothDevice d : devices) scores.put(d.getAddress(), Usage.score(this, d.getAddress()));
             Collections.sort(devices, new Comparator<BluetoothDevice>() {
                 @Override public int compare(BluetoothDevice x, BluetoothDevice y) {
+                    int u = Double.compare(scores.get(y.getAddress()), scores.get(x.getAddress()));
+                    if (u != 0) return u;
                     int c = Boolean.valueOf(isComputer(y)).compareTo(isComputer(x));
                     return c != 0 ? c : DeviceNames.display(MainActivity.this, x).compareToIgnoreCase(DeviceNames.display(MainActivity.this, y));
                 }

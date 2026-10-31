@@ -280,7 +280,9 @@ public partial class SendWindow : Wpf.Ui.Controls.FluentWindow
             d.IsFavorite = _settings.Favorites.Any(f => f.Address == d.Address && d.Address != 0);
             d.Alias = _settings.Alias(d.Address);
         }
-        foreach (var d in _devs.Values.Where(d => d.Relevant).OrderByDescending(d => d.IsFavorite).ThenBy(d => d.DisplayName))
+        // מועדפים קודם, ואחריהם לפי שימוש (תדירות ועדכניות), ובסוף לפי שם
+        var score = DeviceUsage.Scores();
+        foreach (var d in _devs.Values.Where(d => d.Relevant).OrderByDescending(d => d.IsFavorite).ThenByDescending(d => score(d.Address)).ThenBy(d => d.DisplayName))
         {
             var list = d.Paired ? PairedList : NearbyList;
             list.Items.Add(d);
@@ -377,6 +379,7 @@ public partial class SendWindow : Wpf.Ui.Controls.FluentWindow
                     using var turn = await SendQueue.EnterAsync(s => { StatusText.Text = prefix + s; if (_target != null) AutoText.Text = s; }, cts.Token);
                     await SendService.SendAsync(t.Address, _paths, s => { StatusText.Text = prefix + s; if (_target != null) AutoText.Text = s.Split('\n')[0]; }, prog, cts.Token);
                     Bar.Value = Bar.Maximum;
+                    DeviceUsage.Record(t.Address);
                 }
                 catch (Exception) when (cts.IsCancellationRequested)
                 {

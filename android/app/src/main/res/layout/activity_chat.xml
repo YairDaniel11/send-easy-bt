@@ -61,7 +61,7 @@
             android:paddingBottom="6dp"
             android:paddingTop="6dp"
             android:stackFromBottom="true"
-            android:transcriptMode="alwaysScroll" />
+            android:transcriptMode="normal" />
 
         <TextView
             android:id="@+id/chatEmpty"

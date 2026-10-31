@@ -43,7 +43,8 @@ public partial class DevicePickerWindow : Wpf.Ui.Controls.FluentWindow
             }
         }
         catch (Exception ex) { Status.Text = "לא ניתן לטעון מכשירים: " + ex.Message; return; }
-        List.ItemsSource = items.OrderBy(x => x.Name).ToList();
+        var score = DeviceUsage.Scores();
+        List.ItemsSource = items.OrderByDescending(x => score(x.Address)).ThenBy(x => x.Name).ToList();
         Status.Visibility = items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         if (items.Count == 0) Status.Text = "אין מכשירים מצומדים. צמד מכשיר דרך חלון השליחה.";
     }
