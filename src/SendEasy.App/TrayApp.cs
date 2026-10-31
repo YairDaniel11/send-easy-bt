@@ -232,7 +232,7 @@ sealed class TrayApp : IDisposable
         if (_settings.NotifySound) System.Media.SystemSounds.Asterisk.Play();
         if (!_settings.NotifyPopup) return;
         try { _msgToast?.Close(); } catch { }
-        _msgToast = new MessageToast("הודעה מ-" + from, preview, () => OpenChat(addr, from));
+        _msgToast = new MessageToast("הודעה מ-" + from, preview, () => OpenChat(addr, from), _settings.ToastPosition);
         _msgToast.Show();
     }
 
@@ -292,7 +292,7 @@ sealed class TrayApp : IDisposable
         if (f.FromChat || ChatLog.IsVoiceName(f.Name)) return;
         if (!_toasts.TryGetValue(f, out var toast))
         {
-            toast = new ReceiveToast(f);
+            toast = new ReceiveToast(f, _settings.ToastPosition);
             _toasts[f] = toast;
             toast.Closed += (_, _) => _toasts.Remove(f);
             toast.Show();
@@ -424,7 +424,7 @@ sealed class TrayApp : IDisposable
                 $"גרסה {r.Version.ToString(3)}. לחץ כאן כדי להוריד ולהתקין.", ToolTipIcon.Info);
             // בנוסף לבועת המגש (ש-Windows עלול להשתיק במצב "נא לא להפריע"): חלון קופץ משלנו שתמיד מופיע
             try { _updToast?.Close(); } catch { }
-            _updToast = new MessageToast("יש גרסה חדשה", $"גרסה {r.Version.ToString(3)}. לחץ כאן כדי להוריד ולהתקין.", () => { _updateUrl = null; OpenUpdate(); });
+            _updToast = new MessageToast("יש גרסה חדשה", $"גרסה {r.Version.ToString(3)}. לחץ כאן כדי להוריד ולהתקין.", () => { _updateUrl = null; OpenUpdate(); }, _settings.ToastPosition);
             _updToast.Show();
         });
     }
@@ -459,6 +459,21 @@ sealed class TrayApp : IDisposable
         b >= 1 << 30 ? $"{b / (double)(1 << 30):0.0} GB" :
         b >= 1 << 20 ? $"{b / (double)(1 << 20):0.0} MB" :
         b >= 1 << 10 ? $"{b / 1024.0:0} KB" : $"{b} B";
+
+    /// <summary>מציב חלון קטן לפי המיקום שנבחר בהגדרות, 8 פיקסלים מקצה אזור העבודה (מעל שורת המשימות).</summary>
+    internal static void PlaceToast(Window w, ToastPosition pos)
+    {
+        var a = SystemParameters.WorkArea;
+        w.Left = pos switch
+        {
+            ToastPosition.BottomLeft or ToastPosition.TopLeft => a.Left + 8,
+            ToastPosition.BottomCenter or ToastPosition.TopCenter => a.Left + (a.Width - w.ActualWidth) / 2,
+            _ => a.Right - w.ActualWidth - 8,
+        };
+        w.Top = pos is ToastPosition.TopRight or ToastPosition.TopCenter or ToastPosition.TopLeft
+            ? a.Top + 8
+            : a.Bottom - w.ActualHeight - 8;
+    }
 
     public void Dispose() { _hotkey.Dispose(); _tray.Dispose(); _server.Dispose(); _peer.Dispose(); PeerConnections.CloseAll(); }
 }

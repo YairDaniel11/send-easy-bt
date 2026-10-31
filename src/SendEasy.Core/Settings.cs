@@ -4,6 +4,9 @@ namespace SendEasy.Core;
 
 public enum ReceiveMode { AskAlways, AutoFromPaired, AutoFromAll }
 
+/// <summary>מיקום החלונות הקטנים (הודעה חדשה, קבלת קובץ, עדכון) באזור העבודה של המסך.</summary>
+public enum ToastPosition { BottomRight, BottomCenter, BottomLeft, TopRight, TopCenter, TopLeft }
+
 /// <summary>מכשיר מועדף. לכל מכשיר אפשר קיצור מקשים משלו ששולח אליו ישירות.</summary>
 public sealed class FavoriteDevice
 {
@@ -42,6 +45,8 @@ public sealed class Settings
     public bool NotifyPopup { get; set; } = true;
     /// <summary>צליל בעת קבלת הודעה.</summary>
     public bool NotifySound { get; set; } = true;
+    /// <summary>היכן במסך מופיעים החלונות הקטנים. ברירת מחדל: למטה מימין, מעל המגש.</summary>
+    public ToastPosition ToastPosition { get; set; } = ToastPosition.BottomRight;
 
     public const string DefaultUpdateRepo = "YairDaniel11/send-easy-bt";
     public string UpdateRepo { get; set; } = DefaultUpdateRepo;
