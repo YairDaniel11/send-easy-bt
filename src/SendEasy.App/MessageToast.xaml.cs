@@ -2,6 +2,7 @@
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Threading;
+using SendEasy.Core;
 
 namespace SendEasy.App;
 
@@ -10,7 +11,7 @@ public partial class MessageToast : Window
 {
     readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(7) };
 
-    internal MessageToast(string title, string body, Action onClick)
+    internal MessageToast(string title, string body, Action onClick, ToastPosition pos)
     {
         InitializeComponent();
         TitleText.Text = title;
@@ -20,9 +21,7 @@ public partial class MessageToast : Window
         _timer.Tick += (_, _) => { _timer.Stop(); Close(); };
         Loaded += (_, _) =>
         {
-            var a = SystemParameters.WorkArea;
-            Left = a.Right - ActualWidth - 8;
-            Top = a.Bottom - ActualHeight - 8;
+            TrayApp.PlaceToast(this, pos);
             _timer.Start();
         };
     }

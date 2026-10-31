@@ -15,7 +15,7 @@ public partial class ReceiveToast : Window
     DateTime _lastUpdate = DateTime.Now;
     readonly DispatcherTimer _watchdog = new() { Interval = TimeSpan.FromSeconds(5) };
 
-    internal ReceiveToast(IncomingFile file)
+    internal ReceiveToast(IncomingFile file, ToastPosition pos)
     {
         _file = file;
         InitializeComponent();
@@ -26,9 +26,7 @@ public partial class ReceiveToast : Window
         Loaded += (_, _) =>
         {
             _watchdog.Start();
-            var a = SystemParameters.WorkArea;
-            Left = a.Right - ActualWidth - 8;
-            Top = a.Bottom - ActualHeight - 8;
+            TrayApp.PlaceToast(this, pos);
         };
     }
 
