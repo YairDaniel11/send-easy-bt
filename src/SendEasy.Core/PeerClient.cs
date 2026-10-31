@@ -13,15 +13,26 @@ public static class PeerClient
         if (dev == null) throw new IOException("Windows לא מצא את המכשיר");
         var id = RfcommServiceId.FromUuid(PeerProtocol.ServiceUuid);
         // טלפון שהאפליקציה בו רק ברקע (אין חיבור פעיל אליו): החיפוש החי נכשל לפעמים, ולכן מנסים גם מהמטמון של Windows
-        var svc = (await dev.GetRfcommServicesForIdAsync(id, BluetoothCacheMode.Uncached)).Services.FirstOrDefault();
-        svc ??= (await dev.GetRfcommServicesForIdAsync(id, BluetoothCacheMode.Cached)).Services.FirstOrDefault();
-        if (svc == null) throw new IOException("האפליקציה בטלפון לא פעילה (שירות ההאזנה שלה לא נמצא). פתח אותה בטלפון ואשר שהיא פועלת ברקע");
+        var live = await dev.GetRfcommServicesForIdAsync(id, BluetoothCacheMode.Uncached);
+        var svc = live.Services.FirstOrDefault();
+        var cachedRes = svc == null ? await dev.GetRfcommServicesForIdAsync(id, BluetoothCacheMode.Cached) : null;
+        svc ??= cachedRes!.Services.FirstOrDefault();
+
+        // חיפוש השירות נכשל (קורה בטלפון ישן או כשאין חיבור פעיל): מתחברים ישירות לפי כתובת ומזהה השירות
+        var host = svc?.ConnectionHostName
+            ?? new Windows.Networking.HostName("(" + string.Join(":", Enumerable.Range(0, 6).Select(i => ((address >> (40 - 8 * i)) & 0xFF).ToString("X2"))) + ")");
+        var service = svc?.ConnectionServiceName ?? "{" + PeerProtocol.ServiceUuid.ToString("D") + "}";
 
         var sock = new StreamSocket();
         using var reg = ct.Register(() => sock.Dispose());
         try
         {
-            await sock.ConnectAsync(svc.ConnectionHostName, svc.ConnectionServiceName, SocketProtectionLevel.BluetoothEncryptionWithAuthentication);
+            await sock.ConnectAsync(host, service, SocketProtectionLevel.BluetoothEncryptionWithAuthentication);
+        }
+        catch (Exception ex) when (svc == null)
+        {
+            sock.Dispose();
+            throw new IOException($"שירות האפליקציה לא נמצא בטלפון (חיפוש: {live.Error}, חיבור ישיר: 0x{ex.HResult:X8})");
         }
         catch { sock.Dispose(); throw; }
 

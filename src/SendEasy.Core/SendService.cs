@@ -36,7 +36,7 @@ public static class SendService
             string reason = $"האפליקציה בטלפון לא ענתה: {peerWhy ?? "לא ידוע"}";
             LogPeerFailure(address, reason);
             var plainStatus = status;
-            status = s => plainStatus(s + "\n(" + reason + " - נשלח בבלוטוס רגיל, הטלפון יבקש אישור)");
+            status = s => plainStatus(s + "\n(" + reason + " - נשלח בבלוטוס רגיל)");
             status("שולח בבלוטוס רגיל...");
             await Task.Delay(1500, ct);
             for (int i = 0; i < files.Count; i++)

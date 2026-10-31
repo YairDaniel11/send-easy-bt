@@ -375,7 +375,7 @@ public partial class SendWindow : Wpf.Ui.Controls.FluentWindow
                 {
                     if (!await t.Prepare()) { entry.Ok = false; entry.Note = "הצימוד נכשל"; failures.Add(t.Name + ": הצימוד נכשל"); continue; }
                     using var turn = await SendQueue.EnterAsync(s => { StatusText.Text = prefix + s; if (_target != null) AutoText.Text = s; }, cts.Token);
-                    await SendService.SendAsync(t.Address, _paths, s => { StatusText.Text = prefix + s; if (_target != null) AutoText.Text = s; }, prog, cts.Token);
+                    await SendService.SendAsync(t.Address, _paths, s => { StatusText.Text = prefix + s; if (_target != null) AutoText.Text = s.Split('\n')[0]; }, prog, cts.Token);
                     Bar.Value = Bar.Maximum;
                 }
                 catch (Exception) when (cts.IsCancellationRequested)
