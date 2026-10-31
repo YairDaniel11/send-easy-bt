@@ -5,6 +5,7 @@
         Title="שליחה קלה - BT" Width="400" SizeToContent="Height" ResizeMode="NoResize"
         WindowStyle="None" FlowDirection="RightToLeft" WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False" Background="{DynamicResource ApplicationBackgroundBrush}"
+        Foreground="{DynamicResource TextFillColorPrimaryBrush}"
         MouseLeftButtonDown="Drag">
     <Border BorderThickness="1" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}">
         <StackPanel Margin="24,22,24,18">

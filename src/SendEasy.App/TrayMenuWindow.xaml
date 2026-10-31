@@ -3,12 +3,14 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        Foreground="{DynamicResource TextFillColorPrimaryBrush}"
         ShowInTaskbar="False" Topmost="True" ResizeMode="NoResize" SizeToContent="WidthAndHeight"
         FlowDirection="RightToLeft" Deactivated="Window_Deactivated" KeyDown="Window_KeyDown">
     <Window.Resources>
         <!-- פריט תפריט שטוח: בלי מסגרת, רק הדגשה עדינה בריחוף -->
         <Style x:Key="MenuRow" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>

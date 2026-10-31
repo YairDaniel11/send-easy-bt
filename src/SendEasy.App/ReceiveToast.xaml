@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        Foreground="{DynamicResource TextFillColorPrimaryBrush}"
         ShowInTaskbar="False" Topmost="True" ResizeMode="NoResize" SizeToContent="Height" Width="360"
         ShowActivated="False" FlowDirection="RightToLeft">
     <Grid Margin="10" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
