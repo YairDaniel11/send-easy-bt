@@ -55,6 +55,10 @@ public class SendEasyMIDlet extends MIDlet implements CommandListener, Link.List
     protected void destroyApp(boolean unconditional) {
         Link l = link;
         if (l != null) l.close(null);
+        StreamConnectionNotifier n = notifier;
+        if (n != null) {
+            try { n.close(); } catch (java.io.IOException e) { }
+        }
     }
 
     // ---------------------------------------------------------------- מסכים
@@ -154,13 +158,34 @@ public class SendEasyMIDlet extends MIDlet implements CommandListener, Link.List
         }).start();
     }
 
-    /** האזנה לחיבורים שהמחשב פותח אל הנוקיה (בשביל הודעות שנשלחות מהמחשב). */
+    private volatile StreamConnectionNotifier notifier;
+
+    /**
+     * האזנה לחיבורים שהמחשב פותח אל הנוקיה (בשביל הודעות שנשלחות מהמחשב).
+     * הרשמת השירות נכשלת לפעמים (למשל כשמופע קודם של האפליקציה עוד רשום), ולכן מנסים כמה פעמים.
+     * אם לא הצליח, שליחה מהנוקיה למחשב ממשיכה לעבוד, ורק הודעות שנשלחות מהמחשב לא יגיעו.
+     */
     private void startServer() {
         new Thread(new Runnable() {
             public void run() {
+                StreamConnectionNotifier n = null;
+                for (int attempt = 1; attempt <= 3 && n == null; attempt++) {
+                    try {
+                        n = (StreamConnectionNotifier) Connector.open(Bt.serverUrl());
+                    } catch (Exception e) {
+                        log("האזנה נכשלה (ניסיון " + attempt + "): " + e);
+                        if (attempt < 3) {
+                            try { Thread.sleep(4000); } catch (InterruptedException ie) { return; }
+                        }
+                    }
+                }
+                if (n == null) {
+                    log("ההאזנה לא פעילה: הודעות מהמחשב לא יגיעו, אבל אפשר לשלוח מהנוקיה למחשב");
+                    return;
+                }
+                notifier = n;
+                log("מאזין לחיבורים מהמחשב");
                 try {
-                    StreamConnectionNotifier n = (StreamConnectionNotifier) Connector.open(Bt.serverUrl());
-                    log("מאזין לחיבורים מהמחשב");
                     while (true) {
                         StreamConnection sc = n.acceptAndOpen();
                         Link l = new Link(sc, SendEasyMIDlet.this, deviceId, Bt.myName());
@@ -171,7 +196,7 @@ public class SendEasyMIDlet extends MIDlet implements CommandListener, Link.List
                         l.start();
                     }
                 } catch (Exception e) {
-                    log("האזנה נכשלה: " + e);
+                    log("ההאזנה נסגרה: " + e);
                 }
             }
         }).start();
