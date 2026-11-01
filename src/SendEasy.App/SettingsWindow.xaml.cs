@@ -102,7 +102,7 @@ public partial class SettingsWindow : Wpf.Ui.Controls.FluentWindow
             var (path, ver) = await UpdateChecker.DownloadLatestAndroidAsync(_s.UpdateRepo, dir, prog, default);
             _apkLocal = path;
             ApkBtn.Content = "הצג את הקובץ בתיקייה";
-            ApkStatus.Text = $"הורדה הסתיימה (גרסה {TrayApp.Ltr(ver)}): {TrayApp.Ltr(path)}\nהעבר את האפליקצייה לטלפון באמצעות הבלוטוס או באמצעות כבל, והתקן אותו במכשיר.\n(במכשיר עם גישה לאינטרנט - תוכל לעדכן את האפליקצייה מתוך הגדרות האפליקצייה)";
+            ApkStatus.Text = $"ההורדה הסתיימה (גרסה {TrayApp.Ltr(ver)}): {TrayApp.Ltr(path)}\nהעבר את הקובץ לטלפון בבלוטוס או בכבל, והתקן אותו.\n(בטלפון עם חיבור לאינטרנט האפליקציה בודקת עדכונים בעצמה, ואפשר לבדוק גם במסך \"אודות\" שלה.)";
             System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{path}\"");
         }
         catch (Exception ex) { ApkStatus.Text = "ההורדה נכשלה: " + ex.Message; }

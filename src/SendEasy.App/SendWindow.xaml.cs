@@ -126,9 +126,17 @@ public partial class SendWindow : Wpf.Ui.Controls.FluentWindow
 
     // ---- בחירה ----
 
-    void PairedList_SelectionChanged(object s, SelectionChangedEventArgs e) { if (!_syncing) RefreshButtons(); }
+    void PairedList_SelectionChanged(object s, SelectionChangedEventArgs e) { if (!_syncing) { RefreshButtons(); UpdateSendLabel(); } }
 
-    void NearbyList_SelectionChanged(object s, SelectionChangedEventArgs e) { if (!_syncing) RefreshButtons(); }
+    void NearbyList_SelectionChanged(object s, SelectionChangedEventArgs e) { if (!_syncing) { RefreshButtons(); UpdateSendLabel(); } }
+
+    /// <summary>הכפתור הראשי שולח לכל המכשירים שסומנו: "שלח" למכשיר אחד, "שלח ל-N מכשירים" לכמה.</summary>
+    void UpdateSendLabel()
+    {
+        if (_target != null) return;
+        int n = SelectedDevs.Count;
+        SendBtn.Content = n > 1 ? $"שלח ל-{n} מכשירים" : "שלח";
+    }
 
     // ---- צימוד והסרת צימוד ----
 
@@ -148,7 +156,7 @@ public partial class SendWindow : Wpf.Ui.Controls.FluentWindow
     {
         e.Handled = true;
         if (((FrameworkElement)sender).Tag is not Dev d || !d.Paired || _busy) return;
-        if (!ConfirmDialog.Ask(this, "להסיר את הצימוד?", "המכשיר " + TrayApp.Ltr(d.DisplayName) + " יוסר מהרשימה המוצמדת, ותצטרך לצמד אותו שוב כדי לשלוח אליו.", "הסר צימוד", "ביטול")) return;
+        if (!ConfirmDialog.Ask(this, "להסיר את הצימוד?", "המכשיר " + TrayApp.Ltr(d.DisplayName) + " יוסר מרשימת המכשירים המצומדים, ותצטרך לצמד אותו שוב כדי לשלוח אליו.", "הסר צימוד", "ביטול")) return;
         try
         {
             var res = await d.Info.Pairing.UnpairAsync();
@@ -220,7 +228,7 @@ public partial class SendWindow : Wpf.Ui.Controls.FluentWindow
         _watcher.EnumerationCompleted += (_, _) => OnUi(() =>
         {
             Spinner.Visibility = Visibility.Collapsed;
-            StatusText.Text = _devs.Values.Any(d => d.Relevant) ? "לחץ ➤ ליד מכשיר לשליחה מיידית, או סמן כמה מכשירים ולחץ \"שליחה מרובה\"" : "לא נמצאו מכשירים. ודא שהבלוטוס פועל במכשיר השני.";
+            StatusText.Text = _devs.Values.Any(d => d.Relevant) ? "לחץ ➤ ליד מכשיר לשליחה מיידית, או סמן כמה מכשירים ושלח לכולם בכפתור שלמטה" : "לא נמצאו מכשירים. ודא שהבלוטוס פועל במכשיר השני.";
         });
         StatusText.Text = "מחפש מכשירים...";
         Spinner.Visibility = Visibility.Visible;
@@ -397,7 +405,7 @@ public partial class SendWindow : Wpf.Ui.Controls.FluentWindow
             {
                 StatusText.Text = "השליחה בוטלה"; Bar.Value = 0;
                 if (_target != null) AutoText.Text = "השליחה בוטלה";
-                SendBtn.Content = _target != null ? "נסה שוב" : "שליחה מרובה";
+                if (_target != null) SendBtn.Content = "נסה שוב"; else UpdateSendLabel();
             }
             else if (failures.Count == 0)
             {

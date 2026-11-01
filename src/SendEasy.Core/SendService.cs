@@ -33,7 +33,7 @@ public static class SendService
             }
 
             // הסיבה נשארת על המסך לאורך כל השליחה הרגילה (ובקובץ יומן), כדי שאפשר יהיה לדעת למה האפליקציה לא שימשה
-            string reason = $"האפליקציה בטלפון לא ענתה: {peerWhy ?? "לא ידוע"}";
+            string reason = $"שליחה קלה במכשיר השני לא ענתה: {peerWhy ?? "לא ידוע"}";
             LogPeerFailure(address, reason);
             var plainStatus = status;
             status = s => plainStatus(s + "\n(" + reason + " - נשלח בבלוטוס רגיל)");
@@ -91,7 +91,7 @@ public static class SendService
             ct.ThrowIfCancellationRequested();
             try
             {
-                status("בודק אם האפליקציה שלנו מותקנת בטלפון (מאפשרת לשלוח כל סוג קובץ)...");
+                status("בודק אם שליחה קלה מותקנת במכשיר השני (מאפשרת לשלוח כל סוג קובץ)...");
                 return (await PeerClient.TryConnectAsync(address, ct), null);
             }
             catch (OperationCanceledException) { throw; }
@@ -100,7 +100,7 @@ public static class SendService
             {
                 why = ex.Message;
                 if (i == attempts) return (null, why);
-                status($"מתחבר לאפליקציה בטלפון... ניסיון {i + 1} מתוך {attempts} ({ex.Message})");
+                status($"מתחבר לשליחה קלה במכשיר השני... ניסיון {i + 1} מתוך {attempts} ({ex.Message})");
                 System.Diagnostics.Debug.WriteLine($"PeerClient attempt {i} failed: {ex.GetType().Name} 0x{ex.HResult:X8} {ex.Message}");
                 await Task.Delay(2000, ct);
             }
@@ -115,14 +115,14 @@ public static class SendService
         {
             var f = files[i];
             string label = files.Count > 1 ? $"({i + 1}/{files.Count}) " : "";
-            status($"{label}שולח {Path.GetFileName(f)} (דרך האפליקציה)...");
+            status($"{label}שולח {Path.GetFileName(f)} (דרך שליחה קלה במכשיר השני)...");
             long size = new FileInfo(f).Length;
             int lastPct = -1;
             var p = new Progress<long>(b =>
             {
                 progress.Report(size > 0 ? (double)b / size : 1);
                 int pct = size > 0 ? (int)(b * 100 / size) : 100;
-                if (pct != lastPct) { lastPct = pct; status($"{label}שולח {Path.GetFileName(f)} (דרך האפליקציה)... {pct}%"); }
+                if (pct != lastPct) { lastPct = pct; status($"{label}שולח {Path.GetFileName(f)} (דרך שליחה קלה במכשיר השני)... {pct}%"); }
             });
             await using var fs = new FileStream(f, FileMode.Open, FileAccess.Read, FileShare.Read, 64 * 1024, true);
             var r = await peer.SendFileAsync(fs, Path.GetFileName(f), size, p, ct);
@@ -130,7 +130,7 @@ public static class SendService
             {
                 case PeerSendResult.Ok: break;
                 case PeerSendResult.Cancelled: throw new OperationCanceledException(ct);
-                case PeerSendResult.Rejected: throw new IOException("הטלפון סירב לקבל את הקובץ");
+                case PeerSendResult.Rejected: throw new IOException("המכשיר השני סירב לקבל את הקובץ");
                 case PeerSendResult.HashMismatch: throw new IOException("הקובץ הגיע פגום, נסה שוב");
                 default: throw new IOException("שגיאה בצד המקבל");
             }
