@@ -8,6 +8,9 @@ on:
       - '.github/workflows/j2me.yml'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   jar:
     runs-on: ubuntu-latest
@@ -34,3 +37,15 @@ jobs:
         with:
           name: SendEasyBT-jar
           path: j2me/dist/*.jar
+
+      # גרסת ניסוי להורדה: ה-JAR ארוז ב-ZIP (מסננים חוסמים לפעמים קובצי jar), בתגית j2me-test שאינה vX.Y.Z,
+      # ולכן התוכנה והאפליקציה לא רואות בה עדכון.
+      - name: פרסום גרסת ניסוי
+        if: github.ref_name == 'j2me-nokia'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd j2me/dist
+          zip "SendEasyBT-nokia-0.1.${{ github.run_number }}.zip" *.jar
+          gh release delete j2me-test --yes --cleanup-tag || true
+          gh release create j2me-test ./*.zip --prerelease --target "${{ github.sha }}"             --title "שליחה קלה - BT לנוקיה (ניסוי)"             --notes "גרסת ניסוי של אפליקציית ה-JAR למכשירי נוקיה, ארוזה ב-ZIP. הודעות טקסט בלבד."
