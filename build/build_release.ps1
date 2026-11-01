@@ -1,5 +1,5 @@
 ﻿# בונה את המתקין לתיקיית release:
-#   SendEasyBT-Setup.exe  מתקין יחיד: מזהה אם .NET 8 Desktop Runtime מותקן, ואם לא מוריד ומתקין אותו
+#   SendEasyBT-Setup-<גרסה>.exe  מתקין יחיד: מזהה אם .NET 8 Desktop Runtime מותקן, ואם לא מוריד ומתקין אותו
 # לא נוגע במערכת: Inno Setup נלקח מחבילת NuGet ולא מותקן.
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
@@ -14,6 +14,6 @@ if ($LASTEXITCODE -ne 0) { throw 'package failed' }
 Write-Host '== installers'
 $iscc = Get-ChildItem "$env:USERPROFILE\.nuget\packages\tools.innosetup\*\tools\ISCC.exe" | Sort-Object FullName | Select-Object -Last 1
 $iss = Join-Path $PSScriptRoot 'setup.iss'
-& $iscc.FullName "/DAppVersion=$version" "/DSourceDir=$dist" "/DSuffix=" $iss | Out-Null
+& $iscc.FullName "/DAppVersion=$version" "/DSourceDir=$dist" "/DSuffix=-$version" $iss | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'full setup failed' }
 Get-ChildItem (Join-Path $root 'release') -Filter *.exe | ForEach-Object { '{0}  {1:N1} MB' -f $_.Name, ($_.Length / 1MB) }

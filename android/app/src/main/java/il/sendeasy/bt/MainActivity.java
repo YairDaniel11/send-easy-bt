@@ -177,16 +177,44 @@ public class MainActivity extends Activity implements Events.Listener {
         if (in == null) return;
         String a = in.getAction();
         ArrayList<Uri> uris = new ArrayList<Uri>();
-        if (Intent.ACTION_SEND.equals(a)) {
-            Uri u = in.getParcelableExtra(Intent.EXTRA_STREAM);
-            if (u != null) uris.add(u);
-        } else if (Intent.ACTION_SEND_MULTIPLE.equals(a)) {
-            ArrayList<Uri> l = in.getParcelableArrayListExtra(Intent.EXTRA_STREAM);
-            if (l != null) uris.addAll(l);
-        }
+        if (Intent.ACTION_SEND.equals(a) || Intent.ACTION_SEND_MULTIPLE.equals(a)) sharedUris(in, uris);
         if (!uris.isEmpty()) pendingShare = uris;
         pickHint.setBackgroundDrawable(UiKit.rect(this, UiKit.attr(this, R.attr.sbAccent), 14));
         pickHint.setVisibility(pendingShare == null ? View.GONE : View.VISIBLE);
+    }
+
+    /**
+     * הקבצים שבשיתוף. מנהלי קבצים ישנים (אנדרואיד 4.4) שולחים לפעמים את הנתיב כמחרוזת, ב-ClipData או ב-data
+     * במקום Uri ב-EXTRA_STREAM, ולכן בודקים את כולם.
+     */
+    private static void sharedUris(Intent in, ArrayList<Uri> out) {
+        try {
+            Object o = in.getExtras() == null ? null : in.getExtras().get(Intent.EXTRA_STREAM);
+            if (o instanceof Uri) addShared(out, (Uri) o);
+            else if (o instanceof String) addShared(out, parseShared((String) o));
+            else if (o instanceof java.util.List) {
+                for (Object x : (java.util.List<?>) o) {
+                    if (x instanceof Uri) addShared(out, (Uri) x);
+                    else if (x instanceof String) addShared(out, parseShared((String) x));
+                }
+            }
+        } catch (RuntimeException ignored) { }
+        if (out.isEmpty()) {
+            ClipData cd = in.getClipData();
+            if (cd != null) {
+                for (int i = 0; i < cd.getItemCount(); i++) addShared(out, cd.getItemAt(i).getUri());
+            }
+        }
+        if (out.isEmpty()) addShared(out, in.getData());
+    }
+
+    private static Uri parseShared(String s) {
+        if (s == null || s.length() == 0) return null;
+        return s.startsWith("/") ? Uri.fromFile(new File(s)) : Uri.parse(s);
+    }
+
+    private static void addShared(ArrayList<Uri> out, Uri u) {
+        if (u != null && !out.contains(u)) out.add(u);
     }
 
     // ------------------------------------------------------------ רשימת מכשירים
@@ -203,7 +231,9 @@ public class MainActivity extends Activity implements Events.Listener {
         } else {
             try {
                 Set<BluetoothDevice> bonded = bt.getBondedDevices();
-                if (bonded != null) devices.addAll(bonded);
+                if (bonded != null) {
+                    for (BluetoothDevice d : bonded) if (!isAudio(d)) devices.add(d); // אוזניות ורמקולים לא רלוונטיים
+                }
             } catch (SecurityException ignored) { }
             // קודם המכשירים שנשלח אליהם הכי הרבה ולאחרונה, אחר כך מחשבים, ובסוף לפי שם
             final java.util.Map<String, Double> scores = new java.util.HashMap<String, Double>();
@@ -245,6 +275,18 @@ public class MainActivity extends Activity implements Events.Listener {
         String s = getString(on ? R.string.main_receiving_on : R.string.main_receiving_off);
         // מיקום השמירה מופיע בהגדרות ("תיקיית שמירה"), לא בכותרת
         status.setText(s);
+        status.setTextColor(on ? 0xFF4CD964 : 0xFFFF5252);
+        status.setTypeface(null, android.graphics.Typeface.BOLD);
+    }
+
+    /** אוזניות, דיבורית, רמקול ושאר התקני שמע. */
+    static boolean isAudio(BluetoothDevice d) {
+        try {
+            BluetoothClass c = d.getBluetoothClass();
+            return c != null && c.getMajorDeviceClass() == BluetoothClass.Device.Major.AUDIO_VIDEO;
+        } catch (SecurityException e) {
+            return false;
+        }
     }
 
     static boolean isComputer(BluetoothDevice d) {
@@ -301,6 +343,7 @@ public class MainActivity extends Activity implements Events.Listener {
         if (pendingShare != null) {
             startSend(d.getAddress(), pendingShare);
             pendingShare = null;
+            setIntent(new Intent(this, MainActivity.class)); // כדי שהשיתוף לא יופעל שוב בסיבוב מסך או בחזרה
             pickHint.setVisibility(View.GONE);
             return;
         }
@@ -783,7 +826,7 @@ public class MainActivity extends Activity implements Events.Listener {
                 .show();
     }
 
-    /** התפריט הראשי: הגדרות, צ'אט חדש, מכשירי בלוטוס, אודות (בדיקת העדכון נמצאת באודות ובהגדרות). */
+    /** התפריט הראשי: הגדרות, צ'אט חדש, מכשירי בלוטוס, אודות (בדיקת העדכון נמצאת באודות). */
     private void showMenu() {
         final String[] items = {
                 getString(R.string.menu_settings),
@@ -840,8 +883,7 @@ public class MainActivity extends Activity implements Events.Listener {
                 getString(R.string.menu_notify_alerts),
                 getString(R.string.menu_chat_style),
                 getString(R.string.menu_rename_device),
-                getString(R.string.menu_delete_chats),
-                getString(R.string.menu_check_update)};
+                getString(R.string.menu_delete_chats)};
         new AlertDialog.Builder(this)
                 .setTitle(R.string.menu_settings)
                 .setItems(items, new DialogInterface.OnClickListener() {
@@ -874,10 +916,8 @@ public class MainActivity extends Activity implements Events.Listener {
                                     }).show();
                         } else if (which == 7) {
                             showRenameDevice();
-                        } else if (which == 8) {
-                            showDeleteChats();
                         } else {
-                            checkUpdate(true);
+                            showDeleteChats();
                         }
                     }
                 })

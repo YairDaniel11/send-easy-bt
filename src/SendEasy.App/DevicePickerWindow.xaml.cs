@@ -36,6 +36,7 @@ public partial class DevicePickerWindow : Wpf.Ui.Controls.FluentWindow
             {
                 using var dev = await BluetoothDevice.FromIdAsync(i.Id);
                 if (dev == null || dev.BluetoothAddress == 0) continue;
+                if (dev.ClassOfDevice.MajorClass == BluetoothMajorClass.AudioVideo) continue; // אוזניות ורמקולים לא רלוונטיים
                 var name = _settings.DisplayName(dev.BluetoothAddress, string.IsNullOrWhiteSpace(dev.Name) ? "מכשיר ללא שם" : dev.Name);
                 var kind = dev.ClassOfDevice.MajorClass == BluetoothMajorClass.Computer ? "מחשב"
                          : dev.ClassOfDevice.MajorClass == BluetoothMajorClass.Phone ? "טלפון" : "מכשיר";

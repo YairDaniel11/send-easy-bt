@@ -29,14 +29,37 @@ public class PasteEditText extends EditText {
             ClipboardManager cm = (ClipboardManager) c.getSystemService(Context.CLIPBOARD_SERVICE);
             if (cm == null) return null;
             ClipData cd = cm.getPrimaryClip();
-            if (cd == null || cd.getItemCount() == 0) return null;
-            Uri u = cd.getItemAt(0).getUri();
-            if (u == null) return null;
+            if (cd == null) return null;
             ClipDescription desc = cd.getDescription();
-            if (desc != null && desc.hasMimeType("image/*")) return u;
-            String t = c.getContentResolver().getType(u);
-            if (t != null && t.startsWith("image/")) return u;
+            boolean imageMime = desc != null && desc.hasMimeType("image/*");
+            for (int i = 0; i < cd.getItemCount(); i++) {
+                Uri u = cd.getItemAt(i).getUri();
+                if (u == null) continue;
+                if (imageMime) return u;
+                String t = c.getContentResolver().getType(u);
+                if (t != null && t.startsWith("image/")) return u;
+            }
         } catch (RuntimeException ignored) { // כולל SecurityException על URI שפג
+        }
+        return null;
+    }
+
+    /** הטקסט שבלוח, או null אם אין. */
+    static CharSequence clipText(Context c) {
+        try {
+            ClipboardManager cm = (ClipboardManager) c.getSystemService(Context.CLIPBOARD_SERVICE);
+            if (cm == null) return null;
+            ClipData cd = cm.getPrimaryClip();
+            if (cd == null) return null;
+            for (int i = 0; i < cd.getItemCount(); i++) {
+                ClipData.Item it = cd.getItemAt(i);
+                if (it.getText() != null) return it.getText();
+                if (it.getUri() == null) {
+                    CharSequence s = it.coerceToText(c);
+                    if (s != null && s.length() > 0) return s;
+                }
+            }
+        } catch (RuntimeException ignored) {
         }
         return null;
     }

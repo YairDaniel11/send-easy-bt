@@ -10,7 +10,9 @@ public sealed record UpdateInfo(Version Version, string PageUrl, string? AssetUr
 /// <summary>בדיקת עדכון מול GitHub Releases והורדת קבצים (עם בדיקת גודל ו-SHA-256 כשהם ידועים).</summary>
 public static class UpdateChecker
 {
-    const string InstallerName = "SendEasyBT-Setup.exe";
+    // שם המתקין כולל את מספר הגרסה (SendEasyBT-Setup-0.1.N.exe); מזהים גם את השם הישן בלי גרסה
+    static bool IsInstallerName(string? n) =>
+        n != null && n.StartsWith("SendEasyBT-Setup", StringComparison.OrdinalIgnoreCase) && n.EndsWith(".exe", StringComparison.OrdinalIgnoreCase);
 
     static HttpClient NewClient(TimeSpan timeout)
     {
@@ -37,7 +39,7 @@ public static class UpdateChecker
             if (root.TryGetProperty("assets", out var assets))
                 foreach (var a in assets.EnumerateArray())
                 {
-                    if (a.GetProperty("name").GetString() != InstallerName) continue;
+                    if (!IsInstallerName(a.GetProperty("name").GetString())) continue;
                     assetUrl = a.GetProperty("browser_download_url").GetString();
                     size = a.TryGetProperty("size", out var sz) ? sz.GetInt64() : 0;
                     sha = DigestOf(a);

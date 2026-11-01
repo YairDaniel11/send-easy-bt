@@ -32,6 +32,17 @@ final class Prefs {
         return fromHex(hex);
     }
 
+    /** טיוטת הודעה שלא נשלחה (המכשיר השני לא היה זמין); נשלחת יחד עם ההודעה הבאה למכשיר. */
+    static String draft(Context c, String address) {
+        return sp(c).getString("draft_" + address, "");
+    }
+
+    static void setDraft(Context c, String address, String text) {
+        SharedPreferences.Editor e = sp(c).edit();
+        if (text == null || text.length() == 0) e.remove("draft_" + address); else e.putString("draft_" + address, text);
+        e.apply();
+    }
+
     static boolean receiveEnabled(Context c) {
         return sp(c).getBoolean(K_RECEIVE, true);
     }

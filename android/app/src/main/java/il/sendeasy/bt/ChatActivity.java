@@ -947,8 +947,11 @@ public class ChatActivity extends Activity implements Events.Listener {
     }
 
     private void send() {
-        final String text = input.getText().toString().trim();
-        if (text.length() == 0) return;
+        final String typed = input.getText().toString().trim();
+        if (typed.length() == 0) return;
+        // טיוטה שנשמרה קודם נשלחת יחד עם ההודעה הזו
+        final String saved = Prefs.draft(getApplicationContext(), address);
+        final String text = saved.length() == 0 ? typed : saved + "\n" + typed;
         input.setText("");
         input.requestFocus();
         final Context app = getApplicationContext();
@@ -967,20 +970,47 @@ public class ChatActivity extends Activity implements Events.Listener {
                     err = Fmt.heb(e.getMessage());
                 }
                 if (err == null) {
+                    Prefs.setDraft(app, address, "");
                     ChatStore.add(app, address, new ChatStore.Msg(System.currentTimeMillis(), true, ChatStore.T_TEXT, text, msgId, ChatStore.S_DELIVERED));
                     Events.post(Events.CHAT, address);
                 } else {
                     final String m = err;
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
-                            Toast.makeText(ChatActivity.this, getString(R.string.chat_failed) + ": " + m, Toast.LENGTH_LONG).show();
-                            input.setText(text);
-                            input.setSelection(text.length());
+                            if (destroyed) return;
+                            offerDraft(text, m);
                         }
                     });
                 }
             }
         });
+    }
+
+    /** ההודעה לא נשלחה: מציעים לשמור אותה כטיוטה שתישלח עם ההודעה הבאה. ביטול מחזיר את הטקסט לתיבה. */
+    private void offerDraft(final String text, String reason) {
+        AlertDialog d = new AlertDialog.Builder(this)
+                .setMessage(getString(R.string.chat_failed) + ": " + reason + "\n\n" + getString(R.string.draft_offer))
+                .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface x, int w) {
+                        Prefs.setDraft(getApplicationContext(), address, text);
+                        Toast.makeText(ChatActivity.this, R.string.draft_saved, Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface x, int w) { restoreText(text); }
+                })
+                .setOnCancelListener(new DialogInterface.OnCancelListener() {
+                    @Override public void onCancel(DialogInterface x) { restoreText(text); }
+                })
+                .create();
+        d.show();
+        android.widget.Button b = d.getButton(DialogInterface.BUTTON_POSITIVE);
+        if (b != null) b.requestFocus();
+    }
+
+    private void restoreText(String text) {
+        input.setText(text);
+        input.setSelection(text.length());
     }
 
     /** שולח, ובכשל מנסה פעם אחת חיבור חדש (החיבור הישן אולי נפל). */
@@ -1198,32 +1228,43 @@ public class ChatActivity extends Activity implements Events.Listener {
     // ------------------------------------------------------------ מקשים ותפריט
 
     private void showMenu() {
-        final String[] items = {getString(R.string.voice_record), getString(R.string.chat_menu_style), getString(R.string.chat_menu_emoticon), getString(R.string.chat_menu_paste), getString(R.string.chat_delete), getString(R.string.menu_new_chat), getString(R.string.menu_other_chats)};
+        final String[] items = {getString(R.string.chat_menu_style), getString(R.string.chat_menu_paste), getString(R.string.chat_delete), getString(R.string.menu_new_chat), getString(R.string.menu_other_chats)};
         new AlertDialog.Builder(this)
                 .setItems(items, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int which) {
-                        if (which == 2) {
-                            showEmoticons();
-                        } else if (which == 3) {
-                            Uri pu = PasteEditText.clipImage(ChatActivity.this);
-                            if (pu == null) Toast.makeText(ChatActivity.this, R.string.paste_none, Toast.LENGTH_SHORT).show();
-                            else onImagePasted(pu);
-                        } else if (which == 4) {
+                        if (which == 0) {
+                            chooseStyle();
+                        } else if (which == 1) {
+                            pasteFromClipboard();
+                        } else if (which == 2) {
                             ChatStore.confirmDelete(ChatActivity.this, address, deviceName, new Runnable() {
                                 @Override public void run() { stopPlay(); finish(); }
                             });
-                        } else if (which == 5) {
+                        } else if (which == 3) {
                             stopPlay();
                             if (ChatStore.newThread(getApplicationContext(), address)) announceNewChat();
                             else Toast.makeText(ChatActivity.this, R.string.chat_new_still_empty, Toast.LENGTH_SHORT).show();
                             reload();
-                        } else if (which == 6) {
+                        } else {
                             showOtherChats();
-                        } else if (which == 0) toggleRecording();
-                        else if (which == 1) chooseStyle();
+                        }
                     }
                 })
                 .show();
+    }
+
+    /** הדבקה כללית מהלוח: תמונה נשלחת (אחרי תצוגה מקדימה), וטקסט מוכנס בתיבת הכתיבה בסמן. */
+    private void pasteFromClipboard() {
+        Uri pu = PasteEditText.clipImage(this);
+        if (pu != null) { onImagePasted(pu); return; }
+        CharSequence t = PasteEditText.clipText(this);
+        if (t == null || t.length() == 0) {
+            Toast.makeText(this, R.string.paste_none, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        int s = Math.max(0, input.getSelectionStart()), e = Math.max(0, input.getSelectionEnd());
+        input.getText().replace(Math.min(s, e), Math.max(s, e), t);
+        input.requestFocus();
     }
 
     /** מודיע לצד השני (אם מחובר) שנפתח צ'אט חדש, כדי שגם אצלו ההודעות ייכנסו לשיחה חדשה. */

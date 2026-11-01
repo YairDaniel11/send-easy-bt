@@ -144,27 +144,12 @@ public class SendActivity extends Activity {
                     final String label = getString(R.string.send_file_of, i + 1, total, "");
                     final String name = it.name;
                     post(new Runnable() { @Override public void run() { statusT.setText(label.trim()); nameT.setText(name); bar.setProgress(0); infoT.setText(""); } });
-                    // תמונה: עותק פנימי לפני השליחה, כדי שאפשר יהיה להציג אותה בצ'אט גם אחרי
-                    File copy = Storage.isImageName(it.name) ? Storage.storeImage(getApplicationContext(), it.uri, it.name) : null;
-                    int r;
-                    try {
-                        r = sendOne(s, it);
-                    } catch (IOException e) {
-                        if (copy != null) copy.delete();
-                        throw e;
-                    } catch (InterruptedException e) {
-                        if (copy != null) copy.delete();
-                        throw e;
-                    }
+                    int r = sendOne(s, it);
+                    // שליחת קובץ רגילה לא נרשמת בצ'אט: רק מה שנשלח מתוך הצ'אט מופיע בשיחה
                     if (r == Session.R_OK) {
                         Usage.record(getApplicationContext(), address);
-                        ChatStore.add(getApplicationContext(), address, copy != null
-                                ? new ChatStore.Msg(System.currentTimeMillis(), true, ChatStore.T_PIC, copy.getName())
-                                : new ChatStore.Msg(System.currentTimeMillis(), true, ChatStore.T_FILE, it.name));
-                        Events.post(Events.CHAT, address);
                         continue;
                     }
-                    if (copy != null) copy.delete();
                     if (r == Session.R_CANCELLED) { result = getString(R.string.send_cancelled); break; }
                     if (r == Session.R_REJECTED) { result = getString(R.string.send_rejected); break; }
                     result = getString(R.string.send_failed, r == Session.R_HASH ? "הקובץ הגיע פגום" : "שגיאה בצד המקבל");

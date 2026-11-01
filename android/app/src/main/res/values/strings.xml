@@ -189,8 +189,10 @@
     <string name="chat_file_saved_toast">הקובץ %1$s נשמר בתיקייה: %2$s</string>
     <string name="file_open_failed">אי אפשר לפתוח את הקובץ</string>
     <string name="chat_connect_failed">אי אפשר להתחבר למחשב. ודא שהתוכנה פתוחה במחשב והבלוטוס פועל</string>
-    <string name="chat_menu_paste">הדבק תמונה מהלוח</string>
-    <string name="paste_none">אין תמונה בלוח</string>
+    <string name="chat_menu_paste">הדבק מהלוח</string>
+    <string name="paste_none">הלוח ריק</string>
+    <string name="draft_offer">לשמור את ההודעה כטיוטה? היא תישלח יחד עם ההודעה הבאה שתשלחו למכשיר הזה.</string>
+    <string name="draft_saved">ההודעה נשמרה כטיוטה</string>
     <string name="paste_failed">לא ניתן להדביק תמונה</string>
     <string name="paste_title">לשלוח את התמונה?</string>
     <string name="paste_send">שלח</string>

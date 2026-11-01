@@ -41,7 +41,7 @@ jobs:
         run: |
           changed=true
           tag=$(gh release list --limit 1 --json tagName -q '.[0].tagName' || true)
-          if [ -n "$tag" ] && gh release view "$tag" --json assets -q '.assets[].name' | grep -qx 'SendEasyBT.apk'; then
+          if [ -n "$tag" ] && gh release view "$tag" --json assets -q '.assets[].name' | grep -qE '^SendEasyBT(-[0-9.]+)?\.apk$'; then
             base=$(git rev-list -n1 "$tag" 2>/dev/null || true)
             if [ -n "$base" ] && git diff --quiet "$base" "${{ github.sha }}" -- android; then changed=false; fi
           fi
@@ -78,7 +78,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           tag="${{ steps.chg.outputs.tag }}"
-          gh release download "$tag" -p SendEasyBT.apk -D .
+          gh release download "$tag" -p 'SendEasyBT*.apk' -D .
           body=$(gh release view "$tag" --json body -q .body)
           v=$(printf '%s' "$body" | grep -o 'android-version: [0-9.]*' | head -1 | cut -d' ' -f2 || true)
           [ -n "$v" ] || v="${tag#v}"
@@ -89,11 +89,13 @@ jobs:
         run: |
           if [ "${{ steps.chg.outputs.changed }}" = "true" ]; then v="0.1.${{ github.run_number }}"; else v=$(cat apk-version.txt); fi
           echo "apkver=$v" >> "$GITHUB_OUTPUT"
+          f=$(ls SendEasyBT*.apk)
+          [ "$f" = "SendEasyBT-$v.apk" ] || mv "$f" "SendEasyBT-$v.apk"
 
       - uses: actions/upload-artifact@v4
         with:
           name: apk
-          path: android/SendEasyBT.apk
+          path: android/SendEasyBT-*.apk
 
   build:
     runs-on: windows-latest
@@ -138,7 +140,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: installer
-          path: release/SendEasyBT-Setup.exe
+          path: release/SendEasyBT-Setup-*.exe
 
   release:
     needs: [android, build]
@@ -155,9 +157,9 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           v="0.1.${{ github.run_number }}"
-          notes="גרסה $v. מתקין ה-Windows (SendEasyBT-Setup.exe) ואפליקציית האנדרואיד (SendEasyBT.apk, אנדרואיד 4.4 ומעלה, גרסת בדיקה debug). נבנה אוטומטית מהקוד של ${{ github.sha }}."
+          notes="גרסה $v. מתקין ה-Windows (SendEasyBT-Setup-$v.exe) ואפליקציית האנדרואיד (SendEasyBT-${{ needs.android.outputs.apkver }}.apk, אנדרואיד 4.4 ומעלה, גרסת בדיקה debug). נבנה אוטומטית מהקוד של ${{ github.sha }}."
           notes="$notes"$'\n\n'"android-version: ${{ needs.android.outputs.apkver }}"
-          gh release create "v$v" out/SendEasyBT-Setup.exe out/SendEasyBT.apk \
+          gh release create "v$v" out/SendEasyBT-Setup-$v.exe out/SendEasyBT-${{ needs.android.outputs.apkver }}.apk \
             --latest \
             --title "שליחה קלה - BT $v" \
             --notes "$notes"
