@@ -208,6 +208,12 @@ public class SendEasyMIDlet extends MIDlet implements CommandListener, Link.List
         log.append(s).append('\n');
     }
 
+    /** ב-CLDC אין Random.nextBytes. */
+    private static void randomize(byte[] b, long seed) {
+        Random r = new Random(seed);
+        for (int i = 0; i < b.length; i++) b[i] = (byte) r.nextInt();
+    }
+
     /** מזהה קבוע של המכשיר (16 בייט), נשמר ב-RMS. */
     private byte[] loadDeviceId() {
         byte[] id = new byte[16];
@@ -215,14 +221,14 @@ public class SendEasyMIDlet extends MIDlet implements CommandListener, Link.List
             RecordStore rs = RecordStore.openRecordStore("sendeasy", true);
             try {
                 if (rs.getNumRecords() > 0) return rs.getRecord(1);
-                new Random(System.currentTimeMillis() ^ (long) hashCode()).nextBytes(id);
+                randomize(id, System.currentTimeMillis() ^ (long) hashCode());
                 rs.addRecord(id, 0, id.length);
                 return id;
             } finally {
                 rs.closeRecordStore();
             }
         } catch (Exception e) {
-            new Random(System.currentTimeMillis()).nextBytes(id);
+            randomize(id, System.currentTimeMillis());
             return id;
         }
     }
