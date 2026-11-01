@@ -58,6 +58,8 @@ public sealed class PeerSession : IDisposable
     readonly CancellationTokenSource _cts = new();
     int _closed;
     long _lastRx = Environment.TickCount64;
+    // שרשור הקריאה ממתין לפעולה ארוכה (החלטת המשתמש על קובץ, העברת הקובץ ליעד): הפינגר לא סוגר בגלל שתיקה (כמו busy ב-Session.java)
+    volatile bool _busy;
     Active? _active;
 
     public byte[]? PeerId { get; private set; }
@@ -250,7 +252,10 @@ public sealed class PeerSession : IDisposable
         // בית אופציונלי אחרי השם: דגלים. ביט 0 = נשלח מתוך הצ'אט (גרסאות ישנות פשוט לא שולחות אותו)
         bool fromChat = p.Length > 18 + nl && (p[18 + nl] & 1) != 0;
         var file = new IncomingFile(PeerName, name, size, _paired) { FromChat = fromChat, Id = id };
-        int r = OfferHandler != null ? await OfferHandler(file) : 0;
+        int r;
+        _busy = true;
+        try { r = OfferHandler != null ? await OfferHandler(file) : 0; }
+        finally { Volatile.Write(ref _lastRx, Environment.TickCount64); _busy = false; }
         if (r != 0) { await RejectAsync(id, r); return; }
 
         Active a;
@@ -266,7 +271,9 @@ public sealed class PeerSession : IDisposable
             };
         }
         catch (Exception) { await RejectAsync(id, PeerProtocol.RejectStorage); return; }
-        _active = a;
+        Interlocked.Exchange(ref _active, a);
+        // החיבור נסגר בזמן שחיכינו להחלטה (למשל השולח התנתק): Close כבר רץ ולא ראה את הקובץ הזמני, ולכן מנקים כאן
+        if (IsClosed) { FailActive(); return; }
         await SendFrameAsync(PeerProtocol.FileAccept, Cat(Id8(id), Id8(0)), default);
     }
 
@@ -305,7 +312,9 @@ public sealed class PeerSession : IDisposable
         else
         {
             string? dest = null;
+            _busy = true;
             try { dest = FileReceived?.Invoke(a.File, a.Temp); } catch { }
+            finally { Volatile.Write(ref _lastRx, Environment.TickCount64); _busy = false; }
             status = dest != null ? PeerProtocol.DoneOk : PeerProtocol.DoneIo;
         }
         _active = null;
@@ -317,8 +326,7 @@ public sealed class PeerSession : IDisposable
 
     void FailActive()
     {
-        var a = _active;
-        _active = null;
+        var a = Interlocked.Exchange(ref _active, null);
         if (a == null) return;
         try { a.Out.Dispose(); } catch { }
         a.Hash.Dispose();
@@ -337,7 +345,7 @@ public sealed class PeerSession : IDisposable
             {
                 await Task.Delay(1000, _cts.Token);
                 long now = Environment.TickCount64;
-                if (now - Volatile.Read(ref _lastRx) > PeerProtocol.DeadAfterMs) { Close(new IOException("אין תקשורת מהצד השני")); return; }
+                if (!_busy && now - Volatile.Read(ref _lastRx) > PeerProtocol.DeadAfterMs) { Close(new IOException("אין תקשורת מהצד השני")); return; }
                 if (now - lastPing >= PeerProtocol.PingIntervalMs)
                 {
                     lastPing = now;

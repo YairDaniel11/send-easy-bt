@@ -173,6 +173,31 @@ public class PeerSessionTests : IDisposable
     }
 
     [Fact]
+    public async Task File_ClosedWhileUserDecides_LeavesNoTempFile()
+    {
+        var (a, b) = Pair();
+        var asked = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var decision = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        int failed = 0;
+        b.OfferHandler = _ => { asked.TrySetResult(); return decision.Task; };
+        b.Failed += _ => Interlocked.Increment(ref failed);
+        await StartBoth(a, b);
+
+        var data = RandomBytes(64 * 1024);
+        var send = a.SendFileAsync(new MemoryStream(data), "doc.pdf", data.Length, null, CancellationToken.None);
+        await asked.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        // החיבור נסגר בזמן שחלון "לקבל?" עדיין פתוח, והמשתמש מאשר רק אחרי זה
+        b.Close();
+        decision.SetResult(0);
+        await Assert.ThrowsAsync<IOException>(() => send);
+        await Task.Delay(500);
+
+        var rx = Path.Combine(_tmp, "b");
+        Assert.Empty(Directory.Exists(rx) ? Directory.GetFiles(rx) : Array.Empty<string>());
+        Assert.Equal(1, failed);
+    }
+
+    [Fact]
     public async Task File_NameIsSanitized_OnReceive()
     {
         var (a, b) = Pair();
