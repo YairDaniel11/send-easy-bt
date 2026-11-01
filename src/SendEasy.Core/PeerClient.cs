@@ -32,7 +32,7 @@ public static class PeerClient
         catch (Exception ex) when (svc == null)
         {
             sock.Dispose();
-            throw new IOException($"שירות האפליקציה לא נמצא בטלפון (חיפוש: {live.Error}, חיבור ישיר: 0x{ex.HResult:X8})");
+            throw new IOException($"שליחה קלה לא נמצאה במכשיר השני (חיפוש: {live.Error}, חיבור ישיר: 0x{ex.HResult:X8})");
         }
         catch { sock.Dispose(); throw; }
 
@@ -46,7 +46,7 @@ public static class PeerClient
         if (!await s.WaitHelloAsync(TimeSpan.FromSeconds(8)))
         {
             s.Close();
-            throw new IOException("האפליקציה בטלפון לא ענתה");
+            throw new IOException("שליחה קלה במכשיר השני לא ענתה");
         }
         return s;
     }

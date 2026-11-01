@@ -52,7 +52,7 @@
                 <RadioButton x:Name="ChatPaper" HorizontalAlignment="Left" GroupName="chatstyle" Content="כתבן"/>
 
                 <TextBlock Text="הודעות" FontWeight="SemiBold" Margin="0,18,0,6"/>
-                <CheckBox x:Name="PopupBox" Content="הצג חלון קטן בפינה בכל הודעה חדשה ממכשיר"/>
+                <CheckBox x:Name="PopupBox" Content="הצג חלון קטן בכל הודעה חדשה ממכשיר"/>
                 <CheckBox x:Name="SoundBox" Content="השמע צליל בעת קבלת הודעה"/>
                 <TextBlock Text="מיקום החלון הקטן במסך (הודעות, קבלת קבצים ועדכונים)" Margin="0,8,0,4"/>
                 <ComboBox x:Name="ToastPosBox" HorizontalAlignment="Stretch">

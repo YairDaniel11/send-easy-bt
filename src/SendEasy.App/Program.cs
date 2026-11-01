@@ -35,7 +35,7 @@ static class Program
                 if (install) Installer.Install(modern: args.Contains("--modern")); else Installer.Uninstall();
                 if (!args.Contains("--quiet"))
                     MessageBox.Show(install
-                        ? "התוכנה הותקנה. מעכשיו יופיע בקליק הימני על כל קובץ ותיקייה: \"שליחה קלה - BT\".\nב-Windows 11: תחת \"הצג אפשרויות נוספות\"."
+                        ? "התוכנה הותקנה. מעכשיו יופיע בקליק הימני על כל קובץ ותיקייה: \"שליחה קלה - BT (בלוטוס)\".\nב-Windows 11 הוא נמצא תחת \"הצג אפשרויות נוספות\", אלא אם נוסף לרמה העליונה של התפריט."
                         : "התוכנה הוסרה.",
                         Installer.AppName, MessageBoxButton.OK, MessageBoxImage.Information,
                         MessageBoxResult.OK, MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);

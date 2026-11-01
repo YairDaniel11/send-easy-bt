@@ -86,7 +86,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         ConvList.ItemContainerStyle = ConvItemStyle();
         ApplyStyle();
         if (_convs.Count > 0) ConvList.SelectedIndex = 0;
-        else HeaderName.Text = "אין שיחות עדיין. הודעה מהטלפון או מכשיר מועדף יפתחו שיחה.";
+        else HeaderName.Text = "אין שיחות עדיין. הודעה ממכשיר אחר תפתח כאן שיחה, או לחץ \"+ צ'אט חדש\".";
     }
 
     /// <summary>שם מכשיר לטיני (כמו Qin 1s+) נעטף כך שלא יתהפך בתוך ממשק עברי.</summary>
@@ -338,7 +338,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
     void ShowHeader()
     {
         HeaderName.Text = Disp(_cur.Name);
-        HeaderStatus.Text = PeerConnections.IsConnected(_cur.Address) ? "מחובר בבלוטוס" : "ההודעות נשלחות דרך האפליקציה בטלפון";
+        HeaderStatus.Text = PeerConnections.IsConnected(_cur.Address) ? "מחובר בבלוטוס" : "ההודעות נשלחות דרך שליחה קלה במכשיר השני";
         HeaderInitial.Text = _cur.Name.TrimStart('ה', '-', ' ').Substring(0, 1).ToUpperInvariant();
         HeaderAvatar.Background = new SolidColorBrush(_cur.Color);
         var hdel = new MenuItem { Header = "מחק שיחה", Tag = _cur };
@@ -368,7 +368,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         if (_cur == c) _cur = null!;
         RebuildConvList();
         if (_convs.Count > 0) ConvList.SelectedIndex = 0;
-        else { MsgPanel.Children.Clear(); HeaderName.Text = "אין שיחות עדיין. הודעה מהטלפון או מכשיר מועדף יפתחו שיחה."; HeaderStatus.Text = ""; }
+        else { MsgPanel.Children.Clear(); HeaderName.Text = "אין שיחות עדיין. הודעה ממכשיר אחר תפתח כאן שיחה, או לחץ \"+ צ'אט חדש\"."; HeaderStatus.Text = ""; }
     }
 
     /// <summary>
@@ -1009,9 +1009,9 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         try
         {
             var s = await PeerConnections.GetAsync(conv.Address);
-            if (s == null) err = "האפליקציה לא פתוחה בטלפון";
+            if (s == null) err = "אין חיבור לשליחה קלה במכשיר השני";
             else { var r = await s.SendTextWithIdAsync(text); ok = r.Ok; entry.MsgId = r.Id; }
-            if (!ok && err.Length == 0) err = "לא התקבל אישור מהטלפון";
+            if (!ok && err.Length == 0) err = "לא התקבל אישור מהמכשיר השני";
         }
         catch (Exception ex) { err = ex.Message; }
 
@@ -1037,7 +1037,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
             try { len = new System.IO.FileInfo(path).Length; } catch { }
             if (len > MaxChatFileBytes)
             {
-                ConfirmDialog.Tell(this, "הקובץ גדול מדי", $"הקובץ {System.IO.Path.GetFileName(path)} גדול מ-100MB, לכן אי אפשר לשלוח אותו בצ'אט. שלח אותו באמצעות התוכנה: קליק ימני על הקובץ, ואז \"שלח אל\" ובחירת המכשיר.", warning: true);
+                ConfirmDialog.Tell(this, "הקובץ גדול מדי", $"הקובץ {System.IO.Path.GetFileName(path)} גדול מ-100MB, לכן אי אפשר לשלוח אותו בצ'אט. שלח אותו בשליחה הרגילה: קליק ימני על הקובץ, \"שליחה קלה - BT (בלוטוס)\" ובחירת המכשיר.", warning: true);
                 continue;
             }
             if (!await SendChatFileAsync(conv, path)) break;
@@ -1070,7 +1070,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         try
         {
             var peer = await PeerConnections.GetAsync(conv.Address, cts.Token);
-            if (peer == null) err = "האפליקציה לא פתוחה בטלפון";
+            if (peer == null) err = "אין חיבור לשליחה קלה במכשיר השני";
             else
             {
                 await using var fs = new System.IO.FileStream(path, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, 64 * 1024, true);
@@ -1078,7 +1078,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
                 ok = r == PeerSendResult.Ok;
                 if (ok) { entry.MsgId = peer.LastSentId; DeviceUsage.Record(conv.Address); }
                 cancelled = r == PeerSendResult.Cancelled;
-                if (!ok && !cancelled) err = r == PeerSendResult.Rejected ? "הטלפון סירב לקבל את הקובץ" : "השליחה נכשלה";
+                if (!ok && !cancelled) err = r == PeerSendResult.Rejected ? "המכשיר השני סירב לקבל את הקובץ" : "השליחה נכשלה";
             }
         }
         catch (OperationCanceledException) { cancelled = true; }
@@ -1220,7 +1220,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         try
         {
             var peer = await PeerConnections.GetAsync(conv.Address);
-            if (peer == null) err = "האפליקציה לא פתוחה בטלפון";
+            if (peer == null) err = "אין חיבור לשליחה קלה במכשיר השני";
             else
             {
                 await using var fs = new System.IO.FileStream(path, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.Read, 64 * 1024, true);

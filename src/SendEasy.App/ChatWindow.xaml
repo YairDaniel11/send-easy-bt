@@ -108,7 +108,7 @@
                             </Grid>
                         </Border>
                         <Button Grid.Column="2" x:Name="EmojiBtn" Width="42" Height="42" FontSize="20" Margin="0,0,4,0"
-                                FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Background="Transparent" BorderThickness="0" Click="Emoji_Click" Content="&#xE76E;" ToolTip="הוסף אייקון"/>
+                                FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Background="Transparent" BorderThickness="0" Click="Emoji_Click" Content="&#xE76E;" ToolTip="הוסף סמיילי"/>
                         <Button Grid.Column="3" x:Name="PauseBtn" Width="44" Height="44" FontSize="16" Margin="0,0,4,0"
                                 FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" BorderThickness="0" Click="Pause_Click" Content="&#xE769;" ToolTip="השהה את ההקלטה" Visibility="Collapsed"/>
                         <Button Grid.Column="4" x:Name="ActionBtn" Width="44" Height="44" FontSize="18"
@@ -126,7 +126,7 @@
                     <Button x:Name="SAttachBtn" Grid.Column="0" Content="&#xE723;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="22"
                             Width="56" Height="46" Background="Transparent" BorderThickness="0" Click="Attach_Click" ToolTip="צרף קובץ"/>
                     <Button x:Name="SEmojiBtn" Grid.Column="1" Content=":)" FontFamily="Segoe UI" FontSize="26" FlowDirection="LeftToRight"
-                            HorizontalAlignment="Right" Width="56" Height="46" Background="Transparent" BorderThickness="0" Click="SimpleEmoji_Click" ToolTip="סמיילי"/>
+                            HorizontalAlignment="Right" Width="56" Height="46" Background="Transparent" BorderThickness="0" Click="SimpleEmoji_Click" ToolTip="הוסף סמיילי"/>
                 </Grid>
             </Grid>
         </Grid>

@@ -35,11 +35,11 @@
         <ScrollViewer PanningMode="VerticalOnly" x:Name="DeviceScroll" Grid.Row="2" VerticalScrollBarVisibility="Auto" Padding="16,0,16,0">
             <StackPanel>
                 <TextBlock Text="מכשירים מצומדים (★ = מועדף)" FontWeight="SemiBold" Margin="2,4,0,0"/>
-                <TextBlock Text="➤ שולח מיד למכשיר. סימון כמה מכשירים ולחיצה על &quot;שליחה מרובה&quot; שולחת לכולם. קליק ימני על מכשיר: אפשרויות." Opacity="0.6" FontSize="12" TextWrapping="Wrap" Margin="2,0,0,6"/>
+                <TextBlock Text="➤ שולח מיד למכשיר. אפשר גם לסמן כמה מכשירים ולשלוח לכולם בכפתור שלמטה. קליק ימני על מכשיר: אפשרויות." Opacity="0.6" FontSize="12" TextWrapping="Wrap" Margin="2,0,0,6"/>
                 <ListBox x:Name="PairedList" SelectionMode="Multiple" SelectionChanged="PairedList_SelectionChanged"
                          ScrollViewer.VerticalScrollBarVisibility="Disabled"
                          ItemTemplate="{DynamicResource DeviceTemplate}"/>
-                <TextBlock x:Name="NoPairedText" Text="אין מכשירים מצומדים. פתח את אפשרות החיפוש למטה."
+                <TextBlock x:Name="NoPairedText" Text="אין מכשירים מצומדים. פתח למטה את &quot;מכשירים נוספים בקרבת מקום&quot;."
                            Opacity="0.6" Margin="2,4,0,0" Visibility="Collapsed"/>
 
                 <Expander Margin="0,14,0,8" IsExpanded="False" HorizontalAlignment="Stretch">
@@ -51,7 +51,7 @@
                         </StackPanel>
                     </Expander.Header>
                     <StackPanel>
-                        <TextBlock Text="מכשיר לא מצומד יצומד אוטומטית בעת השליחה (יתכן שתתבקש לאשר)."
+                        <TextBlock Text="מכשיר לא מצומד יצומד אוטומטית בעת השליחה (ייתכן שתתבקש לאשר)."
                                    Opacity="0.6" TextWrapping="Wrap" Margin="2,0,0,6"/>
                         <ListBox x:Name="NearbyList" SelectionMode="Multiple" SelectionChanged="NearbyList_SelectionChanged"
                                  ScrollViewer.VerticalScrollBarVisibility="Disabled"
@@ -70,7 +70,7 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <ui:Button x:Name="SendBtn" Content="שליחה מרובה" Appearance="Primary" IsEnabled="False"
+                    <ui:Button x:Name="SendBtn" Content="שלח" Appearance="Primary" IsEnabled="False"
                                HorizontalAlignment="Stretch" Height="38" Click="SendBtn_Click"/>
                     <ui:Button x:Name="CancelBtn" Grid.Column="1" Content="בטל שליחה" Margin="8,0,0,0"
                                Height="38" Visibility="Collapsed" Click="CancelBtn_Click"/>

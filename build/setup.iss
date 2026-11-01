@@ -30,7 +30,7 @@ CloseApplications=force
 Name: "he"; MessagesFile: "compiler:Languages\Hebrew.isl"
 
 [Tasks]
-Name: "modern"; Description: "הוסף פריט ברמה העליונה של הקליק הימני ב-Windows 11 (יבקש אישור מנהל להוספת תעודה)"; Check: IsWindows11
+Name: "modern"; Description: "הצג את ""שליחה קלה - BT (בלוטוס)"" ישירות בתפריט הקליק הימני, בלי ""הצג אפשרויות נוספות"" (בהתקנה הראשונה יבקש אישור מנהל להוספת תעודה)"; Check: IsWindows11
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion; Excludes: "*.pdb"
@@ -119,7 +119,7 @@ begin
          or ((Code <> 0) and (Code <> 3010)) then
       begin
         Result := False;
-        MsgBox('התקנת רכיב .NET 8 לא הושלמה (קוד ' + IntToStr(Code) + ').', mbError, MB_OK);
+        MsgBox('התקנת רכיב .NET 8 לא הושלמה (קוד ' + IntToStr(Code) + ').' + #13#10 + 'אם הופיעה בקשה להרשאת מנהל, יש לאשר אותה ולנסות שוב.', mbError, MB_OK);
       end;
     end;
   end;
