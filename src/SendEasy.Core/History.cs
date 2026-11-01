@@ -59,6 +59,29 @@ public static class History
         return list;
     }
 
+    /// <summary>מסיר רשומה אחת מהרשימה (הקובץ עצמו לא נמחק).</summary>
+    public static void Remove(HistoryEntry e)
+    {
+        try
+        {
+            lock (Gate)
+            {
+                if (!File.Exists(FilePath)) return;
+                var keep = new List<string>();
+                var removed = false;
+                foreach (var line in File.ReadLines(FilePath))
+                {
+                    HistoryEntry? x = null;
+                    try { x = JsonSerializer.Deserialize<HistoryEntry>(line); } catch { }
+                    if (!removed && x != null && x.Time == e.Time && x.Name == e.Name && x.Device == e.Device && x.Sent == e.Sent) { removed = true; continue; }
+                    keep.Add(line);
+                }
+                File.WriteAllLines(FilePath, keep);
+            }
+        }
+        catch { }
+    }
+
     public static void Clear()
     {
         try { lock (Gate) { if (File.Exists(FilePath)) File.Delete(FilePath); } } catch { }

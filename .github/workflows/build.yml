@@ -78,7 +78,9 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           tag="${{ steps.chg.outputs.tag }}"
-          gh release download "$tag" -p 'SendEasyBT*.apk' -D .
+          # העותק עם הגרסה בשם; ב-Release ישנים יש רק SendEasyBT.apk
+          gh release download "$tag" -p 'SendEasyBT-[0-9]*.apk' -D . || true
+          ls SendEasyBT-[0-9]*.apk >/dev/null 2>&1 || gh release download "$tag" -p 'SendEasyBT.apk' -D .
           body=$(gh release view "$tag" --json body -q .body)
           v=$(printf '%s' "$body" | grep -o 'android-version: [0-9.]*' | head -1 | cut -d' ' -f2 || true)
           [ -n "$v" ] || v="${tag#v}"
@@ -159,7 +161,11 @@ jobs:
           v="0.1.${{ github.run_number }}"
           notes="גרסה $v. מתקין ה-Windows (SendEasyBT-Setup-$v.exe) ואפליקציית האנדרואיד (SendEasyBT-${{ needs.android.outputs.apkver }}.apk, אנדרואיד 4.4 ומעלה, גרסת בדיקה debug). נבנה אוטומטית מהקוד של ${{ github.sha }}."
           notes="$notes"$'\n\n'"android-version: ${{ needs.android.outputs.apkver }}"
+          # עותקים בשמות קבועים, בשביל קישורי הורדה קבועים (releases/latest/download/SendEasyBT-Setup.exe)
+          cp "out/SendEasyBT-Setup-$v.exe" out/SendEasyBT-Setup.exe
+          cp "out/SendEasyBT-${{ needs.android.outputs.apkver }}.apk" out/SendEasyBT.apk
           gh release create "v$v" out/SendEasyBT-Setup-$v.exe out/SendEasyBT-${{ needs.android.outputs.apkver }}.apk \
+            out/SendEasyBT-Setup.exe out/SendEasyBT.apk \
             --latest \
             --title "שליחה קלה - BT $v" \
             --notes "$notes"

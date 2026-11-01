@@ -66,7 +66,7 @@
             <Button Style="{StaticResource MenuRow}" Click="History_Click">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Style="{StaticResource Glyph}" Text="&#xE81C;"/>
-                    <TextBlock Text="היסטוריה" VerticalAlignment="Center"/>
+                    <TextBlock Text="קבצים" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
             <Button Style="{StaticResource MenuRow}" Click="Folder_Click">
