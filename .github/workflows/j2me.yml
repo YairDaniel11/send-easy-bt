@@ -1,0 +1,28 @@
+name: j2me
+
+# בונה את אפליקציית ה-JAR למכשירי נוקיה. רץ ידנית או כשקוד ה-J2ME משתנה, ומעלה את הקובץ כ-artifact (לא מפרסם Release).
+on:
+  push:
+    paths:
+      - 'j2me/**'
+      - '.github/workflows/j2me.yml'
+  workflow_dispatch:
+
+jobs:
+  jar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '8'
+
+      - name: בניית JAR
+        run: VERSION=0.1.${{ github.run_number }} bash j2me/build.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SendEasyBT-jar
+          path: j2me/dist/*.jar
