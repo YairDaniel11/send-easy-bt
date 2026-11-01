@@ -860,7 +860,7 @@ public class ChatActivity extends Activity implements Events.Listener {
         jumpBtn = new TextView(this);
         jumpBtn.setText("↓");
         jumpBtn.setTextColor(0xFFFFFFFF);
-        jumpBtn.setTextSize(22);
+        jumpBtn.setTextSize(18);
         jumpBtn.setGravity(android.view.Gravity.CENTER);
         jumpBtn.setContentDescription(getString(R.string.cd_jump_last));
         jumpBtn.setFocusable(true);
@@ -876,10 +876,10 @@ public class ChatActivity extends Activity implements Events.Listener {
         jumpBtn.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { jumpToLast(); }
         });
-        int size = UiKit.dp(this, 44);
+        int size = UiKit.dp(this, 36);
         android.widget.FrameLayout.LayoutParams lp = new android.widget.FrameLayout.LayoutParams(size, size,
                 android.view.Gravity.BOTTOM | android.view.Gravity.CENTER_HORIZONTAL);
-        lp.bottomMargin = UiKit.dp(this, 10);
+        lp.bottomMargin = UiKit.dp(this, 4);
         ((android.widget.FrameLayout) list.getParent()).addView(jumpBtn, lp);
         list.setOnScrollListener(new android.widget.AbsListView.OnScrollListener() {
             @Override public void onScrollStateChanged(android.widget.AbsListView v, int state) { }
