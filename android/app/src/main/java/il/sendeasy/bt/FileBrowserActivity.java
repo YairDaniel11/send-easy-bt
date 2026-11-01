@@ -42,7 +42,9 @@ public class FileBrowserActivity extends Activity {
     private ListView list;
     private TextView pathT, countT, emptyT;
     private File root;
-    private File dir;
+    private File dir; // null = רשימת האחסונים (כשיש יותר מאחד)
+    private final List<File> volumes = new ArrayList<File>();
+    private static final File CHOOSE = new File("<choose>");
     private final List<File> entries = new ArrayList<File>();
     private final Set<String> selected = new HashSet<String>();
     private Adapter adapter;
@@ -71,6 +73,7 @@ public class FileBrowserActivity extends Activity {
         // root/dir חייבים להיות מוגדרים לפני setAdapter: ב-4.4 הוא קורא מיד ל-getCount ← hasUp
         root = Environment.getExternalStorageDirectory();
         dir = root;
+        findVolumes();
         adapter = new Adapter();
         list.setAdapter(adapter);
         list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
@@ -88,7 +91,7 @@ public class FileBrowserActivity extends Activity {
                 String start = Prefs.saveDir(this);
                 if (start != null) {
                     File sf = new File(start);
-                    if (sf.isDirectory() && sf.getPath().startsWith(root.getPath())) dir = sf;
+                    if (sf.isDirectory() && volumeOf(sf) != null) dir = sf;
                 }
             } catch (RuntimeException ignored) { }
         }
@@ -116,6 +119,16 @@ public class FileBrowserActivity extends Activity {
     private void loadInner() {
         entries.clear();
         File[] kids = null;
+        if (dir == null) {
+            entries.addAll(volumes);
+            pathT.setText("אחסון");
+            emptyT.setVisibility(View.GONE);
+            adapter.notifyDataSetChanged();
+            list.setSelection(0);
+            list.requestFocus();
+            updateCount();
+            return;
+        }
         try { kids = dir.listFiles(); } catch (RuntimeException ignored) { }
         if (kids != null) {
             Arrays.sort(kids, new Comparator<File>() {
@@ -142,12 +155,84 @@ public class FileBrowserActivity extends Activity {
         updateCount();
     }
 
-    private boolean hasUp() {
-        return !dir.equals(root) && dir.getParentFile() != null;
+    private void addVolume(File f) {
+        try {
+            String c = f.getCanonicalPath();
+            for (File v : volumes) if (v.getCanonicalPath().equals(c)) return;
+            volumes.add(f);
+        } catch (java.io.IOException ignored) { }
     }
 
-    // שורה 0 היא ".." כשאפשר לעלות
+    // אחסון פנימי + כרטיס זיכרון / USB אם קיימים
+    private void findVolumes() {
+        volumes.clear();
+        addVolume(root);
+        try {
+            File[] fs = getExternalFilesDirs(null);
+            if (fs != null) for (File f : fs) {
+                if (f == null) continue;
+                String p = f.getAbsolutePath();
+                int i = p.indexOf("/Android/data");
+                if (i > 0) addVolume(new File(p.substring(0, i)));
+            }
+        } catch (RuntimeException ignored) { }
+        for (String base : new String[]{"/storage", "/mnt"}) {
+            try {
+                File[] kids = new File(base).listFiles();
+                if (kids == null) continue;
+                for (File k : kids) {
+                    String n = k.getName().toLowerCase(java.util.Locale.US);
+                    if (n.equals("emulated") || n.equals("self") || n.startsWith(".")) continue;
+                    if (base.equals("/mnt") && !(n.contains("sd") || n.contains("ext") || n.contains("usb") || n.contains("card"))) continue;
+                    File[] in = k.isDirectory() ? k.listFiles() : null;
+                    if (in != null && in.length > 0) addVolume(k);
+                }
+            } catch (RuntimeException ignored) { }
+        }
+    }
+
+    private File volumeOf(File f) {
+        try {
+            String p = f.getCanonicalPath();
+            for (File v : volumes) {
+                String vp = v.getCanonicalPath();
+                if (p.equals(vp) || p.startsWith(vp + "/")) return v;
+            }
+        } catch (java.io.IOException ignored) { }
+        return null;
+    }
+
+    private boolean isVolumeRoot(File f) {
+        try {
+            String p = f.getCanonicalPath();
+            for (File v : volumes) if (v.getCanonicalPath().equals(p)) return true;
+        } catch (java.io.IOException ignored) { }
+        return false;
+    }
+
+    private String volumeLabel(File v) {
+        try {
+            if (v.getCanonicalPath().equals(root.getCanonicalPath())) return "אחסון פנימי";
+        } catch (java.io.IOException ignored) { }
+        return "כרטיס זיכרון (" + v.getName() + ")";
+    }
+
+    private boolean hasChoose() {
+        return pickDir && dir != null;
+    }
+
+    private boolean hasUp() {
+        if (dir == null) return false;
+        if (isVolumeRoot(dir)) return volumes.size() > 1;
+        return dir.getParentFile() != null;
+    }
+
+    // שורה ראשונה: "בחר תיקייה זו" (בבחירת תיקייה), אחריה ".." כשאפשר לעלות
     private File entryAt(int pos) {
+        if (hasChoose()) {
+            if (pos == 0) return CHOOSE;
+            pos--;
+        }
         if (hasUp()) return pos == 0 ? null : entries.get(pos - 1);
         return entries.get(pos);
     }
@@ -155,6 +240,7 @@ public class FileBrowserActivity extends Activity {
     private void onEntry(int pos) {
         File f = entryAt(pos);
         if (f == null) { up(); return; }
+        if (f == CHOOSE) { done(); return; }
         if (f.isDirectory()) {
             dir = f;
             load();
@@ -169,10 +255,10 @@ public class FileBrowserActivity extends Activity {
     private void up() {
         if (hasUp()) {
             File prev = dir;
-            dir = dir.getParentFile();
+            dir = isVolumeRoot(dir) ? null : dir.getParentFile();
             load();
             int idx = entries.indexOf(prev);
-            if (idx >= 0) list.setSelection(idx + (hasUp() ? 1 : 0));
+            if (idx >= 0) list.setSelection(idx + (hasUp() ? 1 : 0) + (hasChoose() ? 1 : 0));
         } else {
             setResult(RESULT_CANCELED);
             finish();
@@ -211,6 +297,7 @@ public class FileBrowserActivity extends Activity {
 
     private void done() {
         if (pickDir) {
+            if (dir == null) return;
             Intent r = new Intent();
             r.putExtra(EXTRA_DIR, dir.getAbsolutePath());
             setResult(RESULT_OK, r);
@@ -251,7 +338,7 @@ public class FileBrowserActivity extends Activity {
     }
 
     private final class Adapter extends BaseAdapter {
-        @Override public int getCount() { return entries.size() + (hasUp() ? 1 : 0); }
+        @Override public int getCount() { return entries.size() + (hasUp() ? 1 : 0) + (hasChoose() ? 1 : 0); }
         @Override public Object getItem(int i) { return entryAt(i); }
         @Override public long getItemId(int i) { return i; }
         @Override public View getView(int pos, View convert, ViewGroup parent) {
@@ -260,14 +347,19 @@ public class FileBrowserActivity extends Activity {
             TextView name = (TextView) v.findViewById(R.id.fileName);
             TextView info = (TextView) v.findViewById(R.id.fileInfo);
             File f = entryAt(pos);
-            if (f == null) {
+            if (f == CHOOSE) {
+                mark.setText("✓");
+                name.setText("✓ שמור כאן (בחר תיקייה זו)");
+                info.setText(Fmt.ltr(dir.getPath()));
+            } else if (f == null) {
                 mark.setText("↑");
                 name.setText(R.string.browser_up);
                 info.setText("");
             } else if (f.isDirectory()) {
                 mark.setText("›");
-                name.setText(f.getName());
-                info.setText("תיקייה");
+                boolean vol = dir == null;
+                name.setText(vol ? volumeLabel(f) : f.getName());
+                info.setText(vol ? Fmt.ltr(f.getPath()) : "תיקייה");
             } else {
                 mark.setText(selected.contains(f.getAbsolutePath()) ? "[x]" : "[ ]");
                 name.setText(f.getName());

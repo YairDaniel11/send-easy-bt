@@ -142,8 +142,8 @@
     <string name="save_fallback">נשמר בתיקיית ברירת המחדל (התיקייה שנבחרה לא זמינה): %1$s</string>
     <string name="save_fallback_toast">התיקייה שנבחרה לא זמינה. הקובץ נשמר בתיקיית ברירת המחדל</string>
     <string name="browser_dir_title">בחר תיקיית שמירה</string>
-    <string name="browser_dir_hint">אישור = כניסה לתיקייה   ·   תפריט = בחר את התיקייה הנוכחית   ·   כוכבית = תיקייה חדשה   ·   חזרה = למעלה</string>
-    <string name="browser_dir_choose">תפריט = בחר את התיקייה הנוכחית</string>
+    <string name="browser_dir_hint">כדי לשמור בתיקייה: היכנס אליה ובחר בשורה העליונה "✓ שמור כאן" (או תפריט)   ·   אישור = כניסה   ·   כוכבית = תיקייה חדשה   ·   חזרה = למעלה</string>
+    <string name="browser_dir_choose">שורה עליונה "✓ שמור כאן" או תפריט = בחר את התיקייה הזו</string>
     <string name="browser_new_folder">תיקייה חדשה</string>
     <string name="browser_new_folder_fail">יצירת התיקייה נכשלה</string>
     <string name="chat_delete">מחק את השיחה</string>
