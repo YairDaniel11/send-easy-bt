@@ -12,7 +12,7 @@ fetch() { [ -f "libs/$2" ] || curl -sfL "$M2/$1" -o "libs/$2"; }
 fetch org/microemu/cldcapi11/2.0.4/cldcapi11-2.0.4.jar cldc.jar
 fetch org/microemu/midpapi20/2.0.4/midpapi20-2.0.4.jar midp.jar
 fetch net/sf/bluecove/bluecove/2.1.0/bluecove-2.1.0.jar bluecove.jar
-fetch com/guardsquare/proguard-base/7.4.2/proguard-base-7.4.2.jar proguard.jar
+fetch net/sf/proguard/proguard-base/6.2.2/proguard-base-6.2.2.jar proguard.jar
 
 javac -encoding UTF-8 -source 1.3 -target 1.3 -nowarn \
   -bootclasspath libs/cldc.jar:libs/midp.jar -classpath libs/bluecove.jar \
