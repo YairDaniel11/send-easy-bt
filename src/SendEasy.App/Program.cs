@@ -51,6 +51,9 @@ static class Program
         using var mutex = new Mutex(true, "SendEasyBT.SingleInstance", out bool first);
         if (!first)
         {
+            // הפעלה ברקע בלי קבצים (למשל בסוף ההתקנה, שמפעילה את התוכנה פעמיים) כשהיא כבר רצה: אין מה להעביר,
+            // ורשימה ריקה הייתה פותחת במופע הרץ חלון שליחה ריק
+            if (paths.Count == 0 && args.Contains("--background")) return;
             // כבר רץ: מעבירים לו את הנתיבים ויוצאים
             try
             {
