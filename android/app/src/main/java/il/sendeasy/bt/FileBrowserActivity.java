@@ -68,6 +68,9 @@ public class FileBrowserActivity extends Activity {
         pathT = (TextView) findViewById(R.id.browserPath);
         countT = (TextView) findViewById(R.id.browserCount);
         emptyT = (TextView) findViewById(R.id.browserEmpty);
+        // root/dir חייבים להיות מוגדרים לפני setAdapter: ב-4.4 הוא קורא מיד ל-getCount ← hasUp
+        root = Environment.getExternalStorageDirectory();
+        dir = root;
         adapter = new Adapter();
         list.setAdapter(adapter);
         list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
@@ -77,8 +80,6 @@ public class FileBrowserActivity extends Activity {
         imagesOnly = getIntent().getBooleanExtra(EXTRA_IMAGES_ONLY, false);
         pickDir = getIntent().getBooleanExtra(EXTRA_PICK_DIR, false);
         if (imagesOnly) setTitle(R.string.browser_images_title);
-        root = Environment.getExternalStorageDirectory();
-        dir = root;
         if (pickDir) {
             setTitle(R.string.browser_dir_title);
             TextView hint = (TextView) findViewById(R.id.browserHint);
