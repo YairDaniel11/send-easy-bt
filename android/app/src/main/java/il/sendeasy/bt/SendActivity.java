@@ -137,14 +137,29 @@ public class SendActivity extends Activity {
                 @Override public boolean cancelled() { return cancel.get(); }
             }, canceller);
             session = s;
+            Session wifi = null;
+            Connector.Hot hot = null;
             try {
+                long totalBytes = 0;
+                for (Item x : items) totalBytes += x.size;
+                if (totalBytes >= Connector.WIFI_MIN_BYTES) {
+                    setStatus(getString(R.string.send_try_wifi));
+                    wifi = Connector.tryWifi(this, s, new Connector.QuietListener());
+                    if (wifi == null && totalBytes >= Connector.HOTSPOT_MIN_BYTES) {
+                        setStatus(getString(R.string.send_try_hotspot));
+                        hot = Connector.tryHotspot(this, s, new Connector.QuietListener());
+                        if (hot != null) wifi = hot.wifi;
+                    }
+                    if (wifi != null) session = wifi;
+                }
+                final Session out = wifi != null ? wifi : s;
                 int total = items.size();
                 for (int i = 0; i < total && !cancel.get(); i++) {
                     Item it = items.get(i);
                     final String label = getString(R.string.send_file_of, i + 1, total, "");
                     final String name = it.name;
                     post(new Runnable() { @Override public void run() { statusT.setText(label.trim()); nameT.setText(name); bar.setProgress(0); infoT.setText(""); } });
-                    int r = sendOne(s, it);
+                    int r = sendOne(out, it);
                     // שליחת קובץ רגילה לא נרשמת בצ'אט: רק מה שנשלח מתוך הצ'אט מופיע בשיחה
                     if (r == Session.R_OK) {
                         Usage.record(getApplicationContext(), address);
@@ -161,6 +176,8 @@ public class SendActivity extends Activity {
                 }
             } finally {
                 // סגירה רק אחרי שהכל אושר (FILE_DONE), כדי שלא יאבדו נתונים בחיץ
+                if (wifi != null) wifi.close();
+                if (hot != null) hot.end.run();
                 s.close();
                 session = null;
             }

@@ -68,6 +68,63 @@ final class Connector {
         return d;
     }
 
+    /** קבצים מעל הגודל הזה מנסים לעבור בוויפי (אם שני המכשירים ברשת משותפת). */
+    static final long WIFI_MIN_BYTES = 512 * 1024;
+
+    /** מבקש מהמחשב קישור וויפי מוצפן ומתחבר אליו. null אם אין רשת משותפת, ואז ממשיכים בבלוטוס. לא לקרוא משרשור הממשק. */
+    static Session tryWifi(Context ctx, Session bt, Session.Listener l) {
+        try {
+            WifiLink.Offer o = bt.requestWifi(6000);
+            if (o == null) return null;
+            java.net.Socket sock = WifiLink.connect(o, 3000);
+            if (sock == null) return null;
+            WifiLink.Channel ch = new WifiLink.Channel(sock, o.key, true);
+            Session s = new Session(ch.in, ch.out, sock, Prefs.deviceId(ctx), myName(ctx), tmpDir(ctx), l);
+            s.start();
+            if (!s.awaitHello(5000)) { s.close(); return null; }
+            return s;
+        } catch (IOException e) {
+            return null;
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /** העברה מעל הגודל הזה בלי רשת משותפת: הטלפון פותח נקודה חמה זמנית והמחשב מתחבר אליה. */
+    static final long HOTSPOT_MIN_BYTES = 3L * 1024 * 1024;
+
+    /** קישור וויפי דרך נקודה חמה זמנית. {@code end} סוגר אותה (קוראים אחרי סגירת {@code wifi}). */
+    static final class Hot {
+        Session wifi;
+        Runnable end;
+    }
+
+    /** פותח נקודה חמה, מבקש מהמחשב להתחבר אליה ופותח קישור מוצפן. null אם אי אפשר. לא לקרוא משרשור הממשק. */
+    static Hot tryHotspot(Context ctx, final Session bt, Session.Listener l) {
+        if (Build.VERSION.SDK_INT < 26 || (bt.peerCaps() & 4) == 0) return null;
+        final DirectHotspot hs = new DirectHotspot(ctx);
+        try {
+            String[] c = hs.start();
+            if (bt.offerHotspot(c[0], c[1], 45000)) {
+                Session w = tryWifi(ctx, bt, l);
+                if (w != null) {
+                    Hot h = new Hot();
+                    h.wifi = w;
+                    h.end = new Runnable() {
+                        @Override public void run() {
+                            bt.sendHotspotEnd();
+                            hs.stop();
+                        }
+                    };
+                    return h;
+                }
+            }
+        } catch (IOException ignored) { }
+        bt.sendHotspotEnd();
+        hs.stop();
+        return null;
+    }
+
     static Session connect(Context ctx, BluetoothDevice dev, Session.Listener l, Status st)
             throws IOException, InterruptedException {
         return connect(ctx, dev, l, st, null);

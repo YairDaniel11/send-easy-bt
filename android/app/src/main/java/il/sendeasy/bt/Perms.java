@@ -37,6 +37,8 @@ final class Perms {
         if (Build.VERSION.SDK_INT >= 33 && !has(c, Manifest.permission.POST_NOTIFICATIONS)) m.add(Manifest.permission.POST_NOTIFICATIONS);
         if (Build.VERSION.SDK_INT >= 23 && Build.VERSION.SDK_INT <= 32 && !has(c, Manifest.permission.READ_EXTERNAL_STORAGE)) m.add(Manifest.permission.READ_EXTERNAL_STORAGE);
         if (Build.VERSION.SDK_INT >= 23 && Build.VERSION.SDK_INT <= 28 && !has(c, Manifest.permission.WRITE_EXTERNAL_STORAGE)) m.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+        // נקודה חמה זמנית להעברה בוויפי כשאין רשת משותפת (אנדרואיד 8 ומעלה)
+        if (Build.VERSION.SDK_INT >= 26 && !has(c, DirectHotspot.permission())) m.add(DirectHotspot.permission());
         return m;
     }
 

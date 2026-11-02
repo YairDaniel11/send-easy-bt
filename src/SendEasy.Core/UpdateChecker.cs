@@ -93,6 +93,7 @@ public static class UpdateChecker
         foreach (var rel in doc.RootElement.EnumerateArray())
         {
             var tag = rel.GetProperty("tag_name").GetString() ?? "";
+            if (rel.TryGetProperty("prerelease", out var pre) && pre.ValueKind == JsonValueKind.True) continue; // גרסת טרום הפצה לא מוצעת כעדכון
             if (!rel.TryGetProperty("assets", out var assets)) continue;
             // תגית רגילה (vX.Y.Z, מתקין ו-APK באותו Release) או תגית ישנה android-vX.Y.Z
             var verText = tag.StartsWith("android-v", StringComparison.OrdinalIgnoreCase) ? tag.Substring("android-v".Length) : tag.TrimStart('v', 'V');

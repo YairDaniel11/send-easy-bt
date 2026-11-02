@@ -254,6 +254,43 @@ public class BtService extends Service {
             final String address = dev.getAddress();
             Session s = new Session(sock.getInputStream(), sock.getOutputStream(), sock,
                     Prefs.deviceId(this), Connector.myName(this), Connector.tmpDir(this), new Incoming(address, deviceName(dev)));
+            final String devName = deviceName(dev);
+            s.wifiHandler = new Session.WifiHandler() {
+                @Override public WifiLink.Offer onWifiRequest() {
+                    final WifiLink.Listener l = WifiLink.listen();
+                    if (l == null) return null;
+                    new Thread(new Runnable() {
+                        @Override public void run() {
+                            java.net.Socket sock = l.accept(15000);
+                            if (sock == null) return;
+                            try {
+                                WifiLink.Channel ch = new WifiLink.Channel(sock, l.offer.key, false);
+                                Session ws = new Session(ch.in, ch.out, sock, Prefs.deviceId(BtService.this), Connector.myName(BtService.this),
+                                        Connector.tmpDir(BtService.this), new Incoming(address, devName));
+                                sessions.put(ws, Boolean.TRUE);
+                                sessionStarted();
+                                ws.start();
+                            } catch (IOException e) {
+                                try { sock.close(); } catch (IOException ignored) { }
+                            }
+                        }
+                    }, "SE-WifiAccept").start();
+                    return l.offer;
+                }
+            };
+            s.hotspotHandler = new Session.HotspotHandler() {
+                @Override public String[] onHotspotRequest() {
+                    if (Build.VERSION.SDK_INT < 26) return null;
+                    try {
+                        return hotspot().start();
+                    } catch (IOException e) {
+                        return null;
+                    }
+                }
+                @Override public void onHotspotEnd() {
+                    if (Build.VERSION.SDK_INT >= 26) hotspot().stop();
+                }
+            };
             s.newChatHandler = new Runnable() {
                 @Override public void run() {
                     if (ChatStore.newThread(getApplicationContext(), address)) Events.post(Events.CHAT, address);
@@ -274,6 +311,14 @@ public class BtService extends Service {
             if (n != null && n.length() > 0) return n;
         } catch (SecurityException ignored) { }
         return d.getAddress();
+    }
+
+    private DirectHotspot hotspotObj;
+
+    /** נקודה חמה זמנית אחת לשירות (אנדרואיד 8 ומעלה בלבד). */
+    private synchronized DirectHotspot hotspot() {
+        if (hotspotObj == null) hotspotObj = new DirectHotspot(this);
+        return hotspotObj;
     }
 
     // ------------------------------------------------------------ WakeLock
@@ -320,6 +365,7 @@ public class BtService extends Service {
         @Override
         public int onFileOffer(Session s, Session.IncomingFile f) {
             if (!Prefs.receiveEnabled(BtService.this)) return Protocol.REJECT_USER;
+            if (f.update) return checkUpdateOffer(f);
             if (!Storage.hasSpaceFor(BtService.this, f.size, f.name)) return Protocol.REJECT_STORAGE;
             return 0;
         }
@@ -339,6 +385,7 @@ public class BtService extends Service {
         public boolean onFileReceived(Session s, Session.IncomingFile f, File temp) {
             RECEIVING.remove(s);
             cancelProgress(address);
+            if (f.update) return receiveUpdate(temp);
             if (Storage.isVoiceName(f.name)) {
                 // הודעה קולית: נשמרת בתיקייה פנימית ומופיעה בצ'אט, לא בתיקיית ההורדות
                 String stored = Storage.storeVoice(BtService.this, temp, f.name);
@@ -389,6 +436,66 @@ public class BtService extends Service {
             sessionEnded();
             RECEIVING.remove(s);
             cancelProgress(address);
+        }
+    }
+
+    // ------------------------------------------------------------ עדכון מהמחשב
+
+    private static final java.util.regex.Pattern UPDATE_NAME =
+            java.util.regex.Pattern.compile("SendEasyBT-(\\d+(?:\\.\\d+){0,2})\\.apk");
+    private static final long MAX_UPDATE_BYTES = 150L * 1024 * 1024;
+
+    /** 0 = לקבל. שם הקובץ חייב להיות SendEasyBT-גרסה.apk, והגרסה חדשה מזו שמותקנת. */
+    private int checkUpdateOffer(Session.IncomingFile f) {
+        java.util.regex.Matcher m = UPDATE_NAME.matcher(f.name);
+        if (!m.matches() || f.size <= 0 || f.size > MAX_UPDATE_BYTES) return Protocol.REJECT_NAME;
+        try {
+            if (!UpdateChecker.isNewer(m.group(1), UpdateChecker.installed(this))) return Protocol.REJECT_UPTODATE;
+        } catch (Exception e) {
+            return Protocol.REJECT_NAME;
+        }
+        if (getCacheDir().getUsableSpace() < f.size * 2) return Protocol.REJECT_STORAGE;
+        return 0;
+    }
+
+    /** שומר את ה-APK ב-cache/updates, בודק שהוא של האפליקציה הזו ושהוא חדש, ומציע התקנה. המערכת בודקת את החתימה. */
+    private boolean receiveUpdate(File temp) {
+        File dir = ApkDownloader.dir(this);
+        File out = ApkDownloader.apkFile(this);
+        try {
+            File[] old = dir.listFiles();
+            if (old != null) for (File o : old) o.delete();
+            if (!dir.isDirectory() && !dir.mkdirs()) return false;
+            if (!temp.renameTo(out)) {
+                java.io.InputStream in = new java.io.FileInputStream(temp);
+                java.io.OutputStream os = new java.io.FileOutputStream(out);
+                try {
+                    byte[] buf = new byte[16384];
+                    int n;
+                    while ((n = in.read(buf)) > 0) os.write(buf, 0, n);
+                } finally {
+                    try { in.close(); } catch (java.io.IOException ignored) { }
+                    try { os.close(); } catch (java.io.IOException ignored) { }
+                }
+            }
+            try { dir.setExecutable(true, false); out.setReadable(true, false); } catch (RuntimeException ignored) { }
+            android.content.pm.PackageInfo pi = getPackageManager().getPackageArchiveInfo(out.getPath(), 0);
+            if (pi == null || !getPackageName().equals(pi.packageName) || !UpdateChecker.isNewer(pi.versionName, UpdateChecker.installed(this))) {
+                out.delete();
+                return false;
+            }
+            Intent i = new Intent(this, MainActivity.class);
+            i.putExtra(MainActivity.EXTRA_INSTALL_UPDATE, true);
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            int fl = PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0);
+            notifyEvent(getString(R.string.rx_update_title), getString(R.string.rx_update_text, Fmt.ltr(pi.versionName)),
+                    null, PendingIntent.getActivity(this, 9, i, fl));
+            try { startActivity(i); } catch (RuntimeException ignored) { } // בחזית עובד, ברקע (אנדרואיד 10+) נחסם ונשארת ההתראה
+            Events.post(Events.RECEIVED, out.getName());
+            return true;
+        } catch (Exception e) {
+            out.delete();
+            return false;
         }
     }
 

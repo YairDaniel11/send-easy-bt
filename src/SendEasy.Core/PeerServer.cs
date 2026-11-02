@@ -73,6 +73,19 @@ public sealed class PeerServer : IDisposable
             from = cfg.DisplayName(addr, from); // כינוי שהמשתמש נתן למכשיר
             session = new PeerSession(sock.InputStream.AsStreamForRead(), sock.OutputStream.AsStreamForWrite(), sock,
                 cfg.GetOrCreateDeviceId(), Environment.MachineName, Path.Combine(Path.GetTempPath(), "SendEasyBT", "rx"), paired);
+            Wire(session, from, addr, paired, register: true);
+            await session.StartAsync();
+        }
+        catch (Exception ex)
+        {
+            Error?.Invoke(ex.Message);
+            session?.Close(ex);
+            if (session == null) sock.Dispose();
+        }
+    }
+    /// <summary>מחבר את מטפלי הקבלה לסשן (בלוטוס, או קישור וויפי שנפתח לבקשת הצד השני).</summary>
+    void Wire(PeerSession session, string from, ulong addr, bool paired, bool register)
+    {
             session.OfferHandler = async f =>
             {
                 var c = _settings();
@@ -107,17 +120,26 @@ public sealed class PeerServer : IDisposable
             session.Failed += f => Aborted?.Invoke(f);
             session.TextReceived += t => TextReceived?.Invoke(session.PeerName.Length > 0 ? session.PeerName : from, addr, t);
             session.TextReceivedEx += (t, id) => TextReceivedEx?.Invoke(from, addr, t, id);
-            PeerConnections.Register(addr, session, inbound: true); // משמש לאישורי קריאה בלבד
+
+            if (register) PeerConnections.Register(addr, session, inbound: true); // משמש לאישורי קריאה בלבד
             var s = session;
             session.Closed += ex => { lock (_sessions) _sessions.Remove(s); if (ex is not (null or EndOfStreamException or OperationCanceledException)) Error?.Invoke(ex.Message); };
             lock (_sessions) _sessions.Add(session);
-            await session.StartAsync();
-        }
-        catch (Exception ex)
-        {
-            Error?.Invoke(ex.Message);
-            session?.Close(ex);
-            if (session == null) sock.Dispose();
-        }
+            session.WifiHandler = () =>
+            {
+                var l = WifiLink.Listen(TimeSpan.FromSeconds(15));
+                if (l == null) return null;
+                _ = Task.Run(async () =>
+                {
+                    var acc = await l.Value.Accept();
+                    if (acc == null) return;
+                    var cfg = _settings();
+                    var ws = new PeerSession(acc.Value.Stream, acc.Value.Stream, acc.Value.Closer, cfg.GetOrCreateDeviceId(), Environment.MachineName,
+                        Path.Combine(Path.GetTempPath(), "SendEasyBT", "rx"), paired);
+                    Wire(ws, from, addr, paired, register: false);
+                    try { await ws.StartAsync(); } catch { ws.Close(); }
+                });
+                return l.Value.Offer;
+            };
     }
 }

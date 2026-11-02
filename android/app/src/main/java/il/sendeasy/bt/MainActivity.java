@@ -119,6 +119,8 @@ public class MainActivity extends Activity implements Events.Listener {
     }
 
     static final String EXTRA_CHECK_UPDATE = "checkUpdate";
+    /** נשלח מהתראת "התקבל עדכון מהמחשב": פותח את התקנת ה-APK שהתקבל. */
+    static final String EXTRA_INSTALL_UPDATE = "installUpdate";
     /** מצב שנקבע מווידג'ט: בחירת מכשיר ואז שליחת קובץ או פתיחת צ'אט. */
     static final String EXTRA_WIDGET_MODE = "widgetMode";
     static final String WIDGET_SEND = "send";
@@ -150,6 +152,11 @@ public class MainActivity extends Activity implements Events.Listener {
             else Toast.makeText(this, R.string.upd_allow_denied, Toast.LENGTH_LONG).show();
         } else {
             Intent in = getIntent();
+            if (in != null && in.getBooleanExtra(EXTRA_INSTALL_UPDATE, false)) {
+                in.removeExtra(EXTRA_INSTALL_UPDATE);
+                File apk = ApkDownloader.apkFile(this);
+                if (apk.isFile()) { installApk(apk); return; }
+            }
             if (in != null && in.getBooleanExtra(EXTRA_CHECK_UPDATE, false)) { forceUpdateCheck = true; in.removeExtra(EXTRA_CHECK_UPDATE); }
             boolean force = forceUpdateCheck;
             forceUpdateCheck = false;

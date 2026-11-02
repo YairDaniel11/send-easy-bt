@@ -31,12 +31,22 @@ final class Protocol {
     static final int T_FILE_END = 0x24;
     static final int T_FILE_DONE = 0x25;
     static final int T_CANCEL = 0x26;
+    static final int T_WIFI_REQUEST = 0x30;
+    static final int T_WIFI_READY = 0x31;
+    static final int T_WIFI_FAIL = 0x32;
+    static final int T_HOTSPOT_REQUEST = 0x33;
+    static final int T_HOTSPOT_READY = 0x34;
+    static final int T_HOTSPOT_FAIL = 0x35;
+    static final int T_HOTSPOT_JOINED = 0x36;
+    static final int T_HOTSPOT_END = 0x37;
     static final int T_ERROR = 0xF0;
 
     static final int REJECT_USER = 1;
     static final int REJECT_STORAGE = 2;
     static final int REJECT_NAME = 3;
     static final int REJECT_BUSY = 4;
+    /** עדכון אפליקציה שנשלח מהמחשב: הגרסה שבטלפון כבר זהה או חדשה יותר. */
+    static final int REJECT_UPTODATE = 5;
 
     static final int DONE_OK = 0;
     static final int DONE_HASH = 1;

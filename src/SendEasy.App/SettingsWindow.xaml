@@ -92,6 +92,8 @@
 
                 <TextBlock Text="אפליקציית אנדרואיד" FontWeight="SemiBold" Margin="0,18,0,6"/>
                 <ui:Button x:Name="ApkBtn" Content="הורד את אפליקציית האנדרואיד למחשב" HorizontalAlignment="Stretch" Click="Apk_Click"/>
+                <ui:Button x:Name="SendApkBtn" Content="שלח עדכון אפליקציה לטלפון (בלוטוס)" HorizontalAlignment="Stretch" Margin="0,8,0,0" Click="SendApk_Click"
+                           ToolTip="שולח את קובץ האפליקציה לטלפון בלי אינטרנט. הטלפון יציע להתקין אותו."/>
                 <ProgressBar x:Name="ApkBar" Maximum="1000" Height="5" Margin="0,8,0,0" Visibility="Collapsed"/>
                 <TextBlock x:Name="ApkStatus" Opacity="0.7" FontSize="12" TextWrapping="Wrap" Margin="0,6,0,0"/>
 

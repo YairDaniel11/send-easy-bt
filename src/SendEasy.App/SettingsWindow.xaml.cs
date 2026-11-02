@@ -93,6 +93,43 @@ public partial class SettingsWindow : Wpf.Ui.Controls.FluentWindow
         catch { }
     }
 
+    /// <summary>שולח לטלפון את ה-APK (בלוטוס, בלי אינטרנט): קודם זה שבתיקיית התוכנה, אחר כך זה שהורדנו, ואם אין בוחרים קובץ.</summary>
+    void SendApk_Click(object s, RoutedEventArgs e)
+    {
+        static Version? Ver(string f)
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(System.IO.Path.GetFileName(f), @"^SendEasyBT-(\d+(?:\.\d+){0,2})\.apk$");
+            return m.Success && Version.TryParse(m.Groups[1].Value, out var v) ? v : null;
+        }
+        string? apk = null;
+        try
+        {
+            apk = System.IO.Directory.GetFiles(AppContext.BaseDirectory, "SendEasyBT-*.apk")
+                .Select(f => (f, v: Ver(f))).Where(x => x.v != null).OrderByDescending(x => x.v).Select(x => x.f).FirstOrDefault();
+        }
+        catch { }
+        if (apk == null && _apkLocal != null && System.IO.File.Exists(_apkLocal) && Ver(_apkLocal) != null) apk = _apkLocal;
+        if (apk == null)
+        {
+            var dlg = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "בחר את קובץ האפליקציה (SendEasyBT-גרסה.apk)",
+                Filter = "אפליקציית אנדרואיד|SendEasyBT-*.apk",
+            };
+            if (dlg.ShowDialog(this) != true) return;
+            if (Ver(dlg.FileName) == null)
+            {
+                ApkStatus.Text = "שם הקובץ חייב להיות בצורה SendEasyBT-1.2.3.apk, כמו בדף ההורדות.";
+                return;
+            }
+            apk = dlg.FileName;
+        }
+        ApkStatus.Text = "בחר את הטלפון בחלון השליחה: " + TrayApp.Ltr(System.IO.Path.GetFileName(apk));
+        var w = new SendWindow(new List<string> { apk }, _s, null);
+        w.Show();
+        WindowFront.Bring(w);
+    }
+
     async void Apk_Click(object s, RoutedEventArgs e)
     {
         if (_apkLocal != null && System.IO.File.Exists(_apkLocal))

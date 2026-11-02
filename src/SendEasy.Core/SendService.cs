@@ -108,29 +108,94 @@ public static class SendService
         return (null, why);
     }
 
-    static async Task SendViaPeerAsync(PeerSession peer, List<string> files, Action<string> status,
+    /// <summary>קבצים מעל הגודל הזה מנסים לעבור בוויפי (אם שני המכשירים ברשת משותפת), והשאר בבלוטוס.</summary>
+    const long WifiMinBytes = 512 * 1024;
+
+    /// <summary>העברה מעל 3MB בלי רשת משותפת: מבקשים מהטלפון נקודה חמה זמנית (המחשב מתנתק מהרשת שלו בזמן ההעברה).</summary>
+    const long HotspotMinBytes = 3L * 1024 * 1024;
+
+    /// <summary>מבקש מהטלפון קישור וויפי מוצפן ומתחבר אליו. null אם אין רשת משותפת, ואז ממשיכים בבלוטוס.</summary>
+    static async Task<(PeerSession? Session, bool Hotspot)> TryWifiAsync(PeerSession bt, long totalBytes, Action<string> status, CancellationToken ct)
+    {
+        var s = await ConnectWifiAsync(bt, status, ct);
+        if (s != null) return (s, false);
+        if (totalBytes < HotspotMinBytes) return (null, false);
+        status("אין רשת משותפת. מבקש מהטלפון נקודה חמה זמנית (המחשב יתנתק מהרשת שלו עד סוף ההעברה)...");
+        if (!await bt.RequestHotspotAsync(TimeSpan.FromSeconds(60))) { await bt.EndHotspotAsync(); return (null, false); }
+        status("מחובר לנקודה החמה של הטלפון...");
+        s = await ConnectWifiAsync(bt, status, ct);
+        if (s == null) { await bt.EndHotspotAsync(); return (null, false); }
+        return (s, true);
+    }
+
+    static async Task<PeerSession?> ConnectWifiAsync(PeerSession bt, Action<string> status, CancellationToken ct)
+    {
+        try
+        {
+            status("בודק אם אפשר להעביר בוויפי (רשת משותפת)...");
+            var offer = await bt.RequestWifiAsync(TimeSpan.FromSeconds(6));
+            if (offer == null) return null;
+            var link = await WifiLink.ConnectAsync(offer, ct);
+            if (link == null) { Log("wifi: no route to " + string.Join(",", offer.Ips)); return null; }
+            var cfg = Settings.Load();
+            var s = new PeerSession(link.Value.Stream, link.Value.Stream, link.Value.Closer, cfg.GetOrCreateDeviceId(), Environment.MachineName,
+                Path.Combine(Path.GetTempPath(), "SendEasyBT", "rx"), true)
+            {
+                OfferHandler = _ => Task.FromResult(PeerProtocol.RejectBusy),
+            };
+            await s.StartAsync();
+            if (!await s.WaitHelloAsync(TimeSpan.FromSeconds(5))) { s.Close(); return null; }
+            return s;
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex) { Log("wifi: " + ex.Message); return null; }
+    }
+
+    static void Log(string m) => System.Diagnostics.Debug.WriteLine(m);
+
+    static async Task SendViaPeerAsync(PeerSession btPeer, List<string> files, Action<string> status,
+        IProgress<double> progress, CancellationToken ct)
+    {
+        PeerSession? wifi = null;
+        bool hotspot = false;
+        long total = files.Sum(f => new FileInfo(f).Length);
+        if (total >= WifiMinBytes) (wifi, hotspot) = await TryWifiAsync(btPeer, total, status, ct);
+        var peer = wifi ?? btPeer;
+        string via = wifi != null ? (hotspot ? "בוויפי, נקודה חמה של הטלפון" : "בוויפי") : "דרך שליחה קלה במכשיר השני";
+        try { await SendFilesAsync(peer, files, via, status, progress, ct); }
+        finally
+        {
+            wifi?.Close();
+            if (hotspot) await btPeer.EndHotspotAsync();
+        }
+    }
+
+    static async Task SendFilesAsync(PeerSession peer, List<string> files, string via, Action<string> status,
         IProgress<double> progress, CancellationToken ct)
     {
         for (int i = 0; i < files.Count; i++)
         {
             var f = files[i];
             string label = files.Count > 1 ? $"({i + 1}/{files.Count}) " : "";
-            status($"{label}שולח {Path.GetFileName(f)} (דרך שליחה קלה במכשיר השני)...");
+            status($"{label}שולח {Path.GetFileName(f)} ({via})...");
             long size = new FileInfo(f).Length;
             int lastPct = -1;
             var p = new Progress<long>(b =>
             {
                 progress.Report(size > 0 ? (double)b / size : 1);
                 int pct = size > 0 ? (int)(b * 100 / size) : 100;
-                if (pct != lastPct) { lastPct = pct; status($"{label}שולח {Path.GetFileName(f)} (דרך שליחה קלה במכשיר השני)... {pct}%"); }
+                if (pct != lastPct) { lastPct = pct; status($"{label}שולח {Path.GetFileName(f)} ({via})... {pct}%"); }
             });
             await using var fs = new FileStream(f, FileMode.Open, FileAccess.Read, FileShare.Read, 64 * 1024, true);
-            var r = await peer.SendFileAsync(fs, Path.GetFileName(f), size, p, ct);
+            var r = await peer.SendFileAsync(fs, Path.GetFileName(f), size, p, ct, isUpdate: PeerProtocol.IsUpdateApk(Path.GetFileName(f)));
             switch (r)
             {
                 case PeerSendResult.Ok: break;
                 case PeerSendResult.Cancelled: throw new OperationCanceledException(ct);
-                case PeerSendResult.Rejected: throw new IOException("המכשיר השני סירב לקבל את הקובץ");
+                case PeerSendResult.Rejected:
+                    throw new IOException(peer.LastRejectReason == PeerProtocol.RejectUpToDate
+                        ? "בטלפון כבר מותקנת הגרסה הזו או גרסה חדשה יותר"
+                        : "המכשיר השני סירב לקבל את הקובץ");
                 case PeerSendResult.HashMismatch: throw new IOException("הקובץ הגיע פגום, נסה שוב");
                 default: throw new IOException("שגיאה בצד המקבל");
             }

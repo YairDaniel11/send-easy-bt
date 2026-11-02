@@ -43,6 +43,8 @@ final class Session {
         long got;
         /** הצד השולח סימן שהקובץ נשלח מתוך הצ'אט (דגל אופציונלי אחרי השם, ביט 0). */
         boolean fromChat;
+        /** דגל אופציונלי אחרי השם, ביט 1: הקובץ הוא APK של גרסה חדשה של האפליקציה. */
+        boolean update;
         File temp;
         FileOutputStream out;
         MessageDigest md;
@@ -86,6 +88,8 @@ final class Session {
     private volatile boolean cancelIncoming;
     private volatile byte[] peerId;
     private volatile String peerName = "";
+    private volatile int peerCaps;
+    private final BlockingQueue<byte[]> wifiReplies = new LinkedBlockingQueue<byte[]>();
     private volatile int lastRejectReason;
     /** מוחלף בצורה אטומית: closeInternal רץ גם מהפינגר, ו-onFileFailed חייב להיקרא פעם אחת בלבד. */
     private final AtomicReference<IncomingFile> incoming = new AtomicReference<IncomingFile>();
@@ -121,7 +125,8 @@ final class Session {
         byte[] nm = utf8Limit(myName, 64);
         byte[] hello = new byte[1 + 2 + 16 + 1 + nm.length];
         hello[0] = (byte) Protocol.VERSION;
-        // caps (2 בייט): 0 בגרסה 1
+        // caps (2 בייט): ביט 0 = קישור וויפי, ביט 1 = יכול לארח נקודה חמה (אנדרואיד 8 ומעלה)
+        hello[2] = (byte) (WifiLink.CAP | (android.os.Build.VERSION.SDK_INT >= 26 ? 2 : 0));
         System.arraycopy(myId, 0, hello, 3, 16);
         hello[19] = (byte) nm.length;
         System.arraycopy(nm, 0, hello, 20, nm.length);
@@ -260,6 +265,36 @@ final class Session {
             case Protocol.T_FILE_DONE:
                 if (p.length >= 9) xferEvents.offer(new long[]{type, getLong(p, 0), p[8] & 0xFF});
                 break;
+            case Protocol.T_WIFI_REQUEST: {
+                WifiLink.Offer o = null;
+                WifiHandler h = wifiHandler;
+                if (h != null) {
+                    try { o = h.onWifiRequest(); } catch (RuntimeException ignored) { }
+                }
+                if (o == null) send(Protocol.T_WIFI_FAIL, null, null, 0, 0);
+                else send(Protocol.T_WIFI_READY, o.toBytes(), null, 0, 0);
+                break;
+            }
+            case Protocol.T_HOTSPOT_REQUEST: {
+                String[] c = null;
+                HotspotHandler hh = hotspotHandler;
+                if (hh != null) {
+                    busy = true; // פתיחת נקודה חמה לוקחת כמה שניות, והפינג לא נסגר בזמן הזה
+                    try { c = hh.onHotspotRequest(); } catch (RuntimeException ignored) {
+                    } finally { lastRx = System.currentTimeMillis(); busy = false; }
+                }
+                if (c == null) send(Protocol.T_HOTSPOT_FAIL, new byte[]{1}, null, 0, 0);
+                else send(Protocol.T_HOTSPOT_READY, hotspotPayload(c[0], c[1]), null, 0, 0);
+                break;
+            }
+            case Protocol.T_HOTSPOT_JOINED: hotspotJoined.offer(p.length > 0 && p[0] == 1); break;
+            case Protocol.T_HOTSPOT_END: {
+                HotspotHandler hh = hotspotHandler;
+                if (hh != null) hh.onHotspotEnd();
+                break;
+            }
+            case Protocol.T_WIFI_READY: wifiReplies.offer(p); break;
+            case Protocol.T_WIFI_FAIL: wifiReplies.offer(new byte[0]); break;
             case Protocol.T_ERROR:
                 throw new IOException("הצד השני דיווח על שגיאה");
             default:
@@ -275,6 +310,7 @@ final class Session {
             throw new IOException("גרסת פרוטוקול לא תואמת: " + ver);
         }
         peerId = Arrays.copyOfRange(p, 3, 19);
+        peerCaps = ((p[1] & 0xFF) << 8) | (p[2] & 0xFF);
         int nl = p[19] & 0xFF;
         if (20 + nl > p.length) nl = p.length - 20;
         peerName = new String(p, 20, nl, UTF8);
@@ -319,7 +355,10 @@ final class Session {
         f.id = id;
         f.size = size;
         f.name = name;
-        if (p.length > 18 + nl) f.fromChat = (p[18 + nl] & 1) != 0;
+        if (p.length > 18 + nl) {
+            f.fromChat = (p[18 + nl] & 1) != 0;
+            f.update = (p[18 + nl] & 2) != 0;
+        }
         int r = listener.onFileOffer(this, f);
         if (r != 0) {
             send(Protocol.T_FILE_REJECT, concat(longBytes(id), new byte[]{(byte) r}), null, 0, 0);
@@ -468,6 +507,73 @@ final class Session {
 
     /** נקרא כשהצד השני פותח צ'אט חדש. */
     volatile Runnable newChatHandler;
+
+    /** מקבל: מופעל כשהצד השני מבקש קישור וויפי. מחזיר הצעה, או null אם אי אפשר. */
+    interface WifiHandler {
+        WifiLink.Offer onWifiRequest();
+    }
+
+    volatile WifiHandler wifiHandler;
+
+    /** מארח נקודה חמה: מופעל כשהמחשב מבקש נקודה חמה זמנית ({שם רשת, סיסמה}, או null אם אי אפשר), ושוב בסיום. */
+    interface HotspotHandler {
+        String[] onHotspotRequest();
+        void onHotspotEnd();
+    }
+
+    volatile HotspotHandler hotspotHandler;
+    private final BlockingQueue<Boolean> hotspotJoined = new LinkedBlockingQueue<Boolean>();
+
+    private static byte[] hotspotPayload(String ssid, String pass) {
+        byte[] s = ssid.getBytes(UTF8), p = pass.getBytes(UTF8);
+        byte[] b = new byte[2 + s.length + p.length];
+        b[0] = (byte) s.length;
+        System.arraycopy(s, 0, b, 1, s.length);
+        b[1 + s.length] = (byte) p.length;
+        System.arraycopy(p, 0, b, 2 + s.length, p.length);
+        return b;
+    }
+
+    /** הטלפון פתח נקודה חמה ומבקש מהמחשב להתחבר אליה. true אם המחשב אישר שהתחבר. */
+    boolean offerHotspot(String ssid, String pass, long timeoutMs) {
+        if ((peerCaps & 4) == 0 || closed.get()) return false;
+        try {
+            hotspotJoined.clear();
+            send(Protocol.T_HOTSPOT_READY, hotspotPayload(ssid, pass), null, 0, 0);
+            Boolean ok = hotspotJoined.poll(timeoutMs, TimeUnit.MILLISECONDS);
+            return ok != null && ok;
+        } catch (IOException e) {
+            return false;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
+    /** מסיימים: המחשב עוזב את הנקודה החמה וחוזר לרשת שלו. */
+    void sendHotspotEnd() {
+        try {
+            if (!closed.get()) send(Protocol.T_HOTSPOT_END, null, null, 0, 0);
+        } catch (IOException ignored) { }
+    }
+
+    int peerCaps() { return peerCaps; }
+
+    /** מבקש מהצד השני קישור וויפי מוצפן. null אם הוא לא תומך, אין לו רשת, או לא ענה בזמן. */
+    WifiLink.Offer requestWifi(long timeoutMs) {
+        if ((peerCaps & WifiLink.CAP) == 0 || closed.get()) return null;
+        try {
+            wifiReplies.clear();
+            send(Protocol.T_WIFI_REQUEST, null, null, 0, 0);
+            byte[] r = wifiReplies.poll(timeoutMs, TimeUnit.MILLISECONDS);
+            return r == null ? null : WifiLink.Offer.parse(r);
+        } catch (IOException e) {
+            return null;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return null;
+        }
+    }
 
     /** מזהה ההעברה האחרונה ששלחנו; משמש כמזהה הודעה לאישור קריאה של תמונה/הקלטה. */
     volatile long lastSentId;

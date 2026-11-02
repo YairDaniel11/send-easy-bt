@@ -113,6 +113,10 @@
     <string name="menu_check_update">בדוק עדכון עכשיו</string>
     <string name="upd_new">יש גרסה חדשה %1$s. לפתוח את דף ההורדה?</string>
     <string name="upd_new_auto">יש גרסה חדשה %1$s. להוריד ולהתקין עכשיו?\n\nאם ההתקנה נכשלת, הסר את הגרסה הנוכחית והתקן מחדש.</string>
+    <string name="send_try_hotspot">אין רשת משותפת. פותח נקודה חמה זמנית במכשיר…</string>
+    <string name="send_try_wifi">בודק אם אפשר להעביר בוויפי (רשת משותפת)…</string>
+    <string name="rx_update_title">התקבל עדכון מהמחשב</string>
+    <string name="rx_update_text">גרסה %1$s. לחץ כדי להתקין.</string>
     <string name="upd_install">התקן</string>
     <string name="upd_bar">יש גרסה חדשה %1$s — לחץ אישור לעדכון</string>
     <string name="upd_downloading">מוריד עדכון…</string>

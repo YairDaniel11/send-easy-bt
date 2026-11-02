@@ -18,9 +18,17 @@ public static class PeerProtocol
 
     public const byte Hello = 0x01, Ping = 0x02, Pong = 0x03, Text = 0x10, Ack = 0x11, Read = 0x12, NewChat = 0x13,
         FileOffer = 0x20, FileAccept = 0x21, FileReject = 0x22, FileChunk = 0x23, FileEnd = 0x24,
-        FileDone = 0x25, Cancel = 0x26, Error = 0xF0;
+        FileDone = 0x25, Cancel = 0x26, WifiRequest = 0x30, WifiReady = 0x31, WifiFail = 0x32,
+        HotspotRequest = 0x33, HotspotReady = 0x34, HotspotFail = 0x35, HotspotJoined = 0x36, HotspotEnd = 0x37, Error = 0xF0;
 
-    public const int RejectUser = 1, RejectStorage = 2, RejectName = 3, RejectBusy = 4;
+    /// <summary>ביטים ב-caps של HELLO: 1 = קישור וויפי, 2 = יכול לארח נקודה חמה, 4 = יכול להתחבר לנקודה חמה.</summary>
+    public const int CapWifi = 1, CapHotspotHost = 2, CapHotspotJoin = 4;
+
+    public const int RejectUser = 1, RejectStorage = 2, RejectName = 3, RejectBusy = 4, RejectUpToDate = 5;
+
+    /// <summary>שם קובץ של עדכון אפליקציה (SendEasyBT-גרסה.apk): נשלח עם דגל העדכון, והטלפון מציע להתקין אותו.</summary>
+    public static bool IsUpdateApk(string fileName) =>
+        System.Text.RegularExpressions.Regex.IsMatch(fileName, @"^SendEasyBT-\d+(\.\d+){0,2}\.apk$");
     public const int DoneOk = 0, DoneHash = 1, DoneIo = 2, DoneCancelled = 3;
 
     public const int PingIntervalMs = 8000, DeadAfterMs = 30000;
@@ -63,6 +71,13 @@ public sealed class PeerSession : IDisposable
     Active? _active;
 
     public byte[]? PeerId { get; private set; }
+    /// <summary>היכולות שהצד השני הכריז עליהן ב-HELLO (ביט 0 = קישור וויפי).</summary>
+    public int PeerCaps { get; private set; }
+    /// <summary>מקבל: מופעל כשהצד השני מבקש קישור וויפי. מחזיר הצעה, או null אם אי אפשר.</summary>
+    public Func<WifiOffer?>? WifiHandler { get; set; }
+    TaskCompletionSource<WifiOffer?>? _wifiWait;
+    TaskCompletionSource<bool>? _hotspotWait;
+    bool _joinedHere;
     public string PeerName { get; private set; } = "";
     public int LastRejectReason { get; private set; }
     public bool IsClosed => Volatile.Read(ref _closed) != 0;
@@ -95,6 +110,7 @@ public sealed class PeerSession : IDisposable
         if (nm.Length > 64) nm = nm[..64];
         var hello = new byte[1 + 2 + 16 + 1 + nm.Length];
         hello[0] = PeerProtocol.Version;
+        hello[2] = (byte)(PeerProtocol.CapWifi | (DirectNetwork.HasWifiAdapter() ? PeerProtocol.CapHotspotJoin : 0)); // caps (u16 big-endian)
         Array.Copy(_myId, 0, hello, 3, 16);
         hello[19] = (byte)nm.Length;
         Array.Copy(nm, 0, hello, 20, nm.Length);
@@ -204,6 +220,21 @@ public sealed class PeerSession : IDisposable
             case PeerProtocol.FileDone:
                 if (p.Length >= 9) _xfer.Writer.TryWrite((type, BinaryPrimitives.ReadInt64BigEndian(p), p[8]));
                 break;
+            case PeerProtocol.WifiRequest:
+                {
+                    WifiOffer? o = null;
+                    try { o = WifiHandler?.Invoke(); } catch { }
+                    if (o == null) await SendFrameAsync(PeerProtocol.WifiFail, default, default);
+                    else await SendFrameAsync(PeerProtocol.WifiReady, o.ToBytes(), default);
+                    break;
+                }
+            case PeerProtocol.HotspotRequest: await SendFrameAsync(PeerProtocol.HotspotFail, new byte[] { 1 }, default); break; // המחשב לא מארח נקודה חמה
+            case PeerProtocol.HotspotReady: await OnHotspotReadyAsync(p); break;
+            case PeerProtocol.HotspotFail: _hotspotWait?.TrySetResult(false); break;
+            case PeerProtocol.HotspotJoined: break;
+            case PeerProtocol.HotspotEnd: DirectNetwork.Instance.Leave(); break;
+            case PeerProtocol.WifiReady: _wifiWait?.TrySetResult(WifiOffer.Parse(p)); break;
+            case PeerProtocol.WifiFail: _wifiWait?.TrySetResult(null); break;
             case PeerProtocol.Error: throw new IOException("הצד השני דיווח על שגיאה");
             default: break; // סוג לא מוכר: מתעלמים (תאימות קדימה)
         }
@@ -218,6 +249,7 @@ public sealed class PeerSession : IDisposable
             throw new IOException("גרסת פרוטוקול לא תואמת: " + p[0]);
         }
         PeerId = p[3..19];
+        PeerCaps = (p[1] << 8) | p[2];
         int nl = Math.Min(p[19], p.Length - 20);
         PeerName = Encoding.UTF8.GetString(p, 20, nl);
         _hello.TrySetResult();
@@ -400,10 +432,71 @@ public sealed class PeerSession : IDisposable
     }
 
     /// <summary>שולח קובץ אחד. קובץ אחד בכל רגע: שליחות נוספות ממתינות.</summary>
+    /// <summary>הטלפון פתח נקודה חמה (לבקשתנו או ביוזמתו): מתחברים אליה ומודיעים לו. זה יכול לקחת עד חצי דקה, והפינג לא נסגר בזמן הזה.</summary>
+    async Task OnHotspotReadyAsync(byte[] p)
+    {
+        bool ok = false;
+        try
+        {
+            int sl = p.Length > 0 ? p[0] : 0;
+            int pl = p.Length > 1 + sl ? p[1 + sl] : 0;
+            if (p.Length >= 2 + sl + pl && sl > 0 && pl > 0)
+            {
+                var ssid = Encoding.UTF8.GetString(p, 1, sl);
+                var pass = Encoding.UTF8.GetString(p, 2 + sl, pl);
+                _busy = true;
+                try { ok = await DirectNetwork.Instance.JoinAsync(ssid, pass); }
+                finally { Volatile.Write(ref _lastRx, Environment.TickCount64); _busy = false; }
+                if (ok) _joinedHere = true;
+            }
+        }
+        catch { ok = false; }
+        _hotspotWait?.TrySetResult(ok);
+        await SendFrameAsync(PeerProtocol.HotspotJoined, new[] { (byte)(ok ? 1 : 0) }, default);
+    }
+
+    /// <summary>מבקש מהטלפון לפתוח נקודה חמה זמנית ומתחבר אליה. true אם המחשב מחובר לרשת של הטלפון.</summary>
+    public async Task<bool> RequestHotspotAsync(TimeSpan timeout)
+    {
+        if ((PeerCaps & PeerProtocol.CapHotspotHost) == 0 || IsClosed || !DirectNetwork.HasWifiAdapter()) return false;
+        var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _hotspotWait = tcs;
+        try
+        {
+            await SendFrameAsync(PeerProtocol.HotspotRequest, default, default);
+            var done = await Task.WhenAny(tcs.Task, Task.Delay(timeout));
+            return done == tcs.Task && await tcs.Task;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>מסיימים: הטלפון סוגר את הנקודה החמה, והמחשב חוזר לרשת הקודמת שלו.</summary>
+    public async Task EndHotspotAsync()
+    {
+        _joinedHere = false;
+        try { if (!IsClosed) await SendFrameAsync(PeerProtocol.HotspotEnd, default, default); } catch { }
+        DirectNetwork.Instance.Leave();
+    }
+
+    /// <summary>מבקש מהצד השני קישור וויפי מוצפן. null אם הוא לא תומך, אין לו רשת, או לא ענה בזמן.</summary>
+    public async Task<WifiOffer?> RequestWifiAsync(TimeSpan timeout)
+    {
+        if ((PeerCaps & WifiLink.Cap) == 0 || IsClosed) return null;
+        var tcs = new TaskCompletionSource<WifiOffer?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _wifiWait = tcs;
+        try
+        {
+            await SendFrameAsync(PeerProtocol.WifiRequest, default, default);
+            var done = await Task.WhenAny(tcs.Task, Task.Delay(timeout));
+            return done == tcs.Task ? await tcs.Task : null;
+        }
+        catch { return null; }
+    }
+
     /// <summary>מזהה ההעברה האחרונה ששלחנו (משמש כמזהה הודעה לאישור קריאה של תמונה/הקלטה).</summary>
     public long LastSentId { get; private set; }
 
-    public async Task<PeerSendResult> SendFileAsync(Stream src, string name, long size, IProgress<long>? progress, CancellationToken ct, bool fromChat = false)
+    public async Task<PeerSendResult> SendFileAsync(Stream src, string name, long size, IProgress<long>? progress, CancellationToken ct, bool fromChat = false, bool isUpdate = false)
     {
         await _sendLock.WaitAsync(ct);
         try
@@ -413,12 +506,13 @@ public sealed class PeerSession : IDisposable
             long id = Random.Shared.NextInt64(1, long.MaxValue);
             LastSentId = id;
             while (_xfer.Reader.TryRead(out _)) { }
-            var head = new byte[8 + 8 + 2 + nb.Length + (fromChat ? 1 : 0)];
+            byte flags = (byte)((fromChat ? 1 : 0) | (isUpdate ? 2 : 0));
+            var head = new byte[8 + 8 + 2 + nb.Length + (flags != 0 ? 1 : 0)];
             BinaryPrimitives.WriteInt64BigEndian(head, id);
             BinaryPrimitives.WriteInt64BigEndian(head.AsSpan(8), size);
             head[16] = (byte)(nb.Length >> 8); head[17] = (byte)nb.Length;
             nb.CopyTo(head, 18);
-            if (fromChat) head[18 + nb.Length] = 1; // דגל: נשלח מתוך הצ'אט
+            if (flags != 0) head[18 + nb.Length] = flags; // ביט 0: נשלח מתוך הצ'אט, ביט 1: עדכון אפליקציה
             await SendFrameAsync(PeerProtocol.FileOffer, head, default);
 
             var ev = await WaitEventAsync(id, TimeSpan.FromSeconds(60), ct);
@@ -485,6 +579,7 @@ public sealed class PeerSession : IDisposable
         if (Interlocked.Exchange(ref _closed, 1) != 0) return;
         try { _cts.Cancel(); } catch { }
         try { _closer.Dispose(); } catch { }
+        if (_joinedHere) DirectNetwork.Instance.Leave();
         _hello.TrySetResult();
         FailActive();
         Closed?.Invoke(why);

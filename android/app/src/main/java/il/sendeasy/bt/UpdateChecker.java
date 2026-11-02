@@ -110,7 +110,7 @@ final class UpdateChecker {
         }
     }
 
-    private static String installed(Context c) throws Exception {
+    static String installed(Context c) throws Exception {
         return c.getPackageManager().getPackageInfo(c.getPackageName(), 0).versionName;
     }
 
@@ -133,7 +133,7 @@ final class UpdateChecker {
             for (int i = 0; i < arr.length(); i++) {
                 JSONObject o = arr.getJSONObject(i);
                 String tag = o.optString("tag_name", "");
-                if (o.optBoolean("draft", false)) continue;
+                if (o.optBoolean("draft", false) || o.optBoolean("prerelease", false)) continue; // גרסת טרום הפצה לא מוצעת כעדכון
                 String ver;
                 if (tag.startsWith(OLD_TAG_PREFIX)) ver = tag.substring(OLD_TAG_PREFIX.length());
                 else if (tag.startsWith(TAG_PREFIX)) ver = tag.substring(TAG_PREFIX.length());

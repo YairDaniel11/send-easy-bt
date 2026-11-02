@@ -11,6 +11,17 @@ Write-Host '== full build + signed package'
 & (Join-Path $PSScriptRoot 'package.ps1')
 if ($LASTEXITCODE -ne 0) { throw 'package failed' }
 
+Write-Host '== android app (bundled for "send update to phone")'
+# האפליקציה נכנסת לתוכנה בשם SendEasyBT-<גרסה>.apk, כדי שאפשר יהיה לשלוח אותה לטלפון בבלוטוס בלי אינטרנט
+Get-ChildItem $dist -Filter 'SendEasyBT-*.apk' -ErrorAction SilentlyContinue | Remove-Item -Force
+$apk = Get-ChildItem (Join-Path $root 'androidppuild\outputspkelease') -Filter '*.apk' -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -match '(\d+\.\d+\.\d+)\.apk$' } | Sort-Object LastWriteTime | Select-Object -Last 1
+if ($apk) {
+    $apkVersion = [regex]::Match($apk.Name, '(\d+\.\d+\.\d+)\.apk$').Groups[1].Value
+    Copy-Item $apk.FullName (Join-Path $dist "SendEasyBT-$apkVersion.apk") -Force
+    Write-Host "bundled $($apk.Name) as SendEasyBT-$apkVersion.apk"
+} else { Write-Host 'no release APK found under androidppuild\outputspkelease: the installer will not include the app' }
+
 Write-Host '== installers'
 $iscc = Get-ChildItem "$env:USERPROFILE\.nuget\packages\tools.innosetup\*\tools\ISCC.exe" | Sort-Object FullName | Select-Object -Last 1
 $iss = Join-Path $PSScriptRoot 'setup.iss'
