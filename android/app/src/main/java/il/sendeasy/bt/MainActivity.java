@@ -1078,11 +1078,6 @@ public class MainActivity extends Activity implements Events.Listener {
         return row;
     }
 
-    @Override public void onClick(View v) { action.run(); }
-        });
-        return row;
-    }
-
     @Override
     public boolean dispatchKeyEvent(KeyEvent e) {
         int code = e.getKeyCode();
