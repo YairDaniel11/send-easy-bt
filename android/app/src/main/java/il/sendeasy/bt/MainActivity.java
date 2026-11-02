@@ -101,6 +101,10 @@ public class MainActivity extends Activity implements Events.Listener {
 
         handleShare(getIntent());
         Perms.requestMissing(this);
+        if (reopenSettings) {
+            reopenSettings = false;
+            list.post(new Runnable() { @Override public void run() { showSettings(); } });
+        }
     }
 
     @Override
@@ -115,6 +119,13 @@ public class MainActivity extends Activity implements Events.Listener {
     }
 
     static final String EXTRA_CHECK_UPDATE = "checkUpdate";
+    /** מצב שנקבע מווידג'ט: בחירת מכשיר ואז שליחת קובץ או פתיחת צ'אט. */
+    static final String EXTRA_WIDGET_MODE = "widgetMode";
+    static final String WIDGET_SEND = "send";
+    static final String WIDGET_CHAT = "chat";
+    private String widgetMode;
+    /** אחרי החלפת מצב כהה המסך נבנה מחדש, ואז חלון ההגדרות נפתח שוב. */
+    private static boolean reopenSettings;
     private boolean forceUpdateCheck;
 
     @Override
@@ -179,8 +190,12 @@ public class MainActivity extends Activity implements Events.Listener {
         ArrayList<Uri> uris = new ArrayList<Uri>();
         if (Intent.ACTION_SEND.equals(a) || Intent.ACTION_SEND_MULTIPLE.equals(a)) sharedUris(in, uris);
         if (!uris.isEmpty()) pendingShare = uris;
+        widgetMode = in.getStringExtra(EXTRA_WIDGET_MODE);
+        if (!WIDGET_SEND.equals(widgetMode) && !WIDGET_CHAT.equals(widgetMode)) widgetMode = null;
         pickHint.setBackgroundDrawable(UiKit.rect(this, UiKit.attr(this, R.attr.sbAccent), 14));
-        pickHint.setVisibility(pendingShare == null ? View.GONE : View.VISIBLE);
+        if (widgetMode != null) pickHint.setText(WIDGET_SEND.equals(widgetMode) ? R.string.widget_pick_send : R.string.widget_pick_chat);
+        else pickHint.setText(R.string.main_pick_device);
+        pickHint.setVisibility(pendingShare == null && widgetMode == null ? View.GONE : View.VISIBLE);
     }
 
     /**
@@ -250,6 +265,11 @@ public class MainActivity extends Activity implements Events.Listener {
         }
         loadUnread();
         adapter.notifyDataSetChanged();
+        // ווידג'ט ועם מכשיר מצומד אחד בלבד: ישר לפעולה
+        if (widgetMode != null && devices.size() == 1) {
+            final BluetoothDevice only = devices.get(0);
+            list.post(new Runnable() { @Override public void run() { if (widgetMode != null) onDevice(only); } });
+        }
         if (!devices.isEmpty()) {
             list.requestFocus();
             if (list.getSelectedItemPosition() < 0) list.setSelection(0);
@@ -340,6 +360,14 @@ public class MainActivity extends Activity implements Events.Listener {
     // ------------------------------------------------------------ פעולות
 
     private void onDevice(final BluetoothDevice d) {
+        if (widgetMode != null) {
+            boolean send = WIDGET_SEND.equals(widgetMode);
+            widgetMode = null;
+            setIntent(new Intent(this, MainActivity.class)); // כדי שלא יופעל שוב בסיבוב מסך
+            pickHint.setVisibility(View.GONE);
+            if (send) pickFiles(d.getAddress()); else openChat(d.getAddress());
+            return;
+        }
         if (pendingShare != null) {
             startSend(d.getAddress(), pendingShare);
             pendingShare = null;
@@ -872,56 +900,156 @@ public class MainActivity extends Activity implements Events.Listener {
         startActivity(i);
     }
 
-    /** כל ההגדרות בחלונית אחת (רשימה נגישה ב-D-pad), עם מצב בטקסט של כל פריט. */
+    /**
+     * כל ההגדרות בחלונית אחת. הדלקה וכיבוי במתגים, והחלונית נשארת פתוחה אחרי כל שינוי.
+     * שורות עם חץ פותחות חלונית משנה. כל השורות ממוקדות, כדי שאפשר יהיה לנווט במקשים.
+     */
     private void showSettings() {
-        final String[] items = {
-                getString(R.string.menu_toggle_receive),
-                getString(Prefs.showServiceNotification(this) ? R.string.menu_svc_notif_shown : R.string.menu_svc_notif_hidden),
-                getString(R.string.menu_receive_dir),
-                getString(R.string.menu_save_dir),
-                getString(Prefs.notifyEvents(this) ? R.string.menu_notify_shown : R.string.menu_notify_hidden),
-                getString(R.string.menu_notify_alerts),
-                getString(R.string.menu_chat_style),
-                getString(R.string.menu_rename_device),
-                getString(R.string.menu_delete_chats)};
-        new AlertDialog.Builder(this)
+        final LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        int pad = UiKit.dp(this, 8);
+        box.setPadding(pad, pad, pad, pad);
+
+        box.addView(switchRow(getString(R.string.set_receive), Prefs.receiveEnabled(this), new android.widget.CompoundButton.OnCheckedChangeListener() {
+            @Override public void onCheckedChanged(android.widget.CompoundButton b, boolean on) {
+                Prefs.setReceiveEnabled(MainActivity.this, on);
+                if (on) BtService.start(MainActivity.this); else BtService.stop(MainActivity.this);
+                updateStatus();
+            }
+        }));
+        box.addView(switchRow(getString(R.string.set_svc_notif), Prefs.showServiceNotification(this), new android.widget.CompoundButton.OnCheckedChangeListener() {
+            @Override public void onCheckedChanged(android.widget.CompoundButton b, boolean on) {
+                Prefs.setShowServiceNotification(MainActivity.this, on);
+                // הפעלה מחדש כדי שההתראה תיבנה בערוץ המתאים
+                if (Prefs.receiveEnabled(MainActivity.this) && BtService.isRunning()) BtService.restart(MainActivity.this);
+                if (!on && Build.VERSION.SDK_INT >= 26) offerHideInSystemSettings();
+            }
+        }));
+        box.addView(switchRow(getString(R.string.set_notify), Prefs.notifyEvents(this), new android.widget.CompoundButton.OnCheckedChangeListener() {
+            @Override public void onCheckedChanged(android.widget.CompoundButton b, boolean on) { Prefs.setNotifyEvents(MainActivity.this, on); }
+        }));
+        box.addView(switchRow(getString(R.string.alert_ring), Prefs.notifySound(this), new android.widget.CompoundButton.OnCheckedChangeListener() {
+            @Override public void onCheckedChanged(android.widget.CompoundButton b, boolean on) { Prefs.setNotifySound(MainActivity.this, on); }
+        }));
+        box.addView(switchRow(getString(R.string.alert_vibrate), Prefs.notifyVibrate(this), new android.widget.CompoundButton.OnCheckedChangeListener() {
+            @Override public void onCheckedChanged(android.widget.CompoundButton b, boolean on) { Prefs.setNotifyVibrate(MainActivity.this, on); }
+        }));
+        box.addView(switchRow(getString(R.string.alert_wake), Prefs.notifyWake(this), new android.widget.CompoundButton.OnCheckedChangeListener() {
+            @Override public void onCheckedChanged(android.widget.CompoundButton b, boolean on) { Prefs.setNotifyWake(MainActivity.this, on); }
+        }));
+        box.addView(switchRow(getString(R.string.set_dark), ThemeUtil.isDark(this), new android.widget.CompoundButton.OnCheckedChangeListener() {
+            @Override public void onCheckedChanged(android.widget.CompoundButton b, boolean on) {
+                Prefs.setTheme(MainActivity.this, on ? 2 : 1);
+                // המסך נטען מחדש בערכת הנושא החדשה, ואז חלון ההגדרות נפתח שוב
+                reopenSettings = true;
+                if (settingsDlg != null) settingsDlg.dismiss();
+                recreate();
+            }
+        }));
+
+        box.addView(actionRow(getString(R.string.menu_receive_dir), new Runnable() {
+            @Override public void run() {
+                new AlertDialog.Builder(MainActivity.this)
+                        .setMessage(getString(R.string.main_receive_dir, Fmt.ltr(Storage.receiveDirLabel(MainActivity.this))))
+                        .setPositiveButton(android.R.string.ok, null).show();
+            }
+        }));
+        box.addView(actionRow(getString(R.string.menu_save_dir), new Runnable() {
+            @Override public void run() { showSaveDirDialog(); }
+        }));
+        box.addView(actionRow(getString(R.string.menu_chat_style), new Runnable() {
+            @Override public void run() {
+                new AlertDialog.Builder(MainActivity.this)
+                        .setTitle(R.string.menu_chat_style)
+                        .setSingleChoiceItems(new String[]{getString(R.string.style_wa), getString(R.string.style_gc), getString(R.string.style_kp)}, Prefs.chatStyle(MainActivity.this), new DialogInterface.OnClickListener() {
+                            @Override public void onClick(DialogInterface d, int w) { Prefs.setChatStyle(MainActivity.this, w); d.dismiss(); }
+                        }).show();
+            }
+        }));
+        box.addView(actionRow(getString(R.string.menu_rename_device), new Runnable() {
+            @Override public void run() { showRenameDevice(); }
+        }));
+        box.addView(actionRow(getString(R.string.menu_delete_chats), new Runnable() {
+            @Override public void run() { showDeleteChats(); }
+        }));
+
+        android.widget.ScrollView sv = new android.widget.ScrollView(this);
+        sv.addView(box);
+        settingsDlg = new AlertDialog.Builder(this)
                 .setTitle(R.string.menu_settings)
-                .setItems(items, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface dlg, int which) {
-                        if (which == 0) {
-                            boolean on = !Prefs.receiveEnabled(MainActivity.this);
-                            Prefs.setReceiveEnabled(MainActivity.this, on);
-                            if (on) BtService.start(MainActivity.this); else BtService.stop(MainActivity.this);
-                            updateStatus();
-                        } else if (which == 1) {
-                            Prefs.setShowServiceNotification(MainActivity.this, !Prefs.showServiceNotification(MainActivity.this));
-                            // הפעלה מחדש כדי שההתראה תיבנה בערוץ המתאים
-                            if (Prefs.receiveEnabled(MainActivity.this) && BtService.isRunning()) BtService.restart(MainActivity.this);
-                            if (!Prefs.showServiceNotification(MainActivity.this) && Build.VERSION.SDK_INT >= 26) offerHideInSystemSettings();
-                        } else if (which == 2) {
-                            new AlertDialog.Builder(MainActivity.this)
-                                    .setMessage(getString(R.string.main_receive_dir, Fmt.ltr(Storage.receiveDirLabel(MainActivity.this))))
-                                    .setPositiveButton(android.R.string.ok, null).show();
-                        } else if (which == 3) {
-                            showSaveDirDialog();
-                        } else if (which == 4) {
-                            Prefs.setNotifyEvents(MainActivity.this, !Prefs.notifyEvents(MainActivity.this));
-                        } else if (which == 5) {
-                            showAlertsDialog();
-                        } else if (which == 6) {
-                            new AlertDialog.Builder(MainActivity.this)
-                                    .setTitle(R.string.menu_chat_style)
-                                    .setSingleChoiceItems(new String[]{getString(R.string.style_wa), getString(R.string.style_gc), getString(R.string.style_kp)}, Prefs.chatStyle(MainActivity.this), new DialogInterface.OnClickListener() {
-                                        @Override public void onClick(DialogInterface d, int w) { Prefs.setChatStyle(MainActivity.this, w); d.dismiss(); }
-                                    }).show();
-                        } else if (which == 7) {
-                            showRenameDevice();
-                        } else {
-                            showDeleteChats();
-                        }
-                    }
-                })
-                .show();
+                .setView(sv)
+                .setPositiveButton(R.string.savedir_close, null)
+                .create();
+        settingsDlg.show();
+    }
+
+    private AlertDialog settingsDlg;
+
+    /** רקע שורה: טבעת בולטת בפוקוס (ניווט במקשים) ובלחיצה. */
+    private android.graphics.drawable.Drawable rowBackground() {
+        int accent = UiKit.attr(this, R.attr.sbAccent);
+        android.graphics.drawable.StateListDrawable sl = new android.graphics.drawable.StateListDrawable();
+        sl.addState(new int[]{android.R.attr.state_focused}, UiKit.rect(this, 0x22888888, 10, accent, 3));
+        sl.addState(new int[]{android.R.attr.state_pressed}, UiKit.rect(this, 0x33888888, 10, accent, 3));
+        sl.addState(new int[]{}, UiKit.rect(this, 0x00000000, 10));
+        return sl;
+    }
+
+    private LinearLayout baseRow() {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        row.setMinimumHeight(UiKit.dp(this, 52));
+        int p = UiKit.dp(this, 10);
+        row.setPadding(p, p / 2, p, p / 2);
+        row.setFocusable(true);
+        row.setClickable(true);
+        row.setBackgroundDrawable(rowBackground());
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.bottomMargin = UiKit.dp(this, 2);
+        row.setLayoutParams(lp);
+        return row;
+    }
+
+    private TextView rowLabel(String text) {
+        TextView t = new TextView(this);
+        t.setText(text);
+        t.setTextSize(16);
+        t.setTextColor(UiKit.attr(this, R.attr.sbText));
+        t.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        return t;
+    }
+
+    /** שורה עם מתג הדלקה וכיבוי. אישור (או נגיעה בשורה) מחליף את המתג. */
+    private View switchRow(String label, boolean checked, android.widget.CompoundButton.OnCheckedChangeListener l) {
+        LinearLayout row = baseRow();
+        row.addView(rowLabel(label));
+        final android.widget.Switch sw = new android.widget.Switch(this);
+        sw.setFocusable(false);
+        sw.setChecked(checked);
+        sw.setOnCheckedChangeListener(l); // אחרי קביעת המצב ההתחלתי, כדי שלא יופעל בבנייה
+        row.addView(sw);
+        row.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { sw.toggle(); }
+        });
+        return row;
+    }
+
+    /** שורה שפותחת חלונית משנה (חץ בצד). */
+    private View actionRow(String label, final Runnable action) {
+        LinearLayout row = baseRow();
+        row.addView(rowLabel(label));
+        TextView arrow = new TextView(this);
+        arrow.setText("‹");
+        arrow.setTextSize(22);
+        arrow.setTextColor(UiKit.attr(this, R.attr.sbTextSecondary));
+        row.addView(arrow);
+        row.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { action.run(); }
+        });
+        return row;
     }
 
     @Override

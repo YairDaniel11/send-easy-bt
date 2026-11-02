@@ -36,9 +36,10 @@ public partial class ConfirmDialog : Window
 
     void No_Click(object s, RoutedEventArgs e) => DialogResult = false;
 
-    public static bool Ask(Window? owner, string head, string body, string yes = "כן", string no = "ביטול")
+    public static bool Ask(Window? owner, string head, string body, string yes = "כן", string no = "ביטול", bool swapButtons = false)
     {
         var d = new ConfirmDialog(head, body, yes, no, SymbolRegular.QuestionCircle24);
+        if (swapButtons) d.ButtonRow.FlowDirection = FlowDirection.LeftToRight;
         if (owner is { IsLoaded: true }) d.Owner = owner; else d.WindowStartupLocation = WindowStartupLocation.CenterScreen;
         return d.ShowDialog() == true;
     }

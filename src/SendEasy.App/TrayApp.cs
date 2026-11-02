@@ -15,7 +15,10 @@ namespace SendEasy.App;
 /// <summary>תהליך הרקע: אייקון במגש, שרת קבלה, קיצורי מקשים וקבלת בקשות שליחה מהקליק הימני.</summary>
 sealed class TrayApp : IDisposable
 {
-    const int HotkeyMain = 1, HotkeyClipboard = 2, HotkeyFavoriteBase = 100;
+    const int HotkeyMain = 1, HotkeyClipboard = 2, HotkeyChat = 3, HotkeyFavoriteBase = 100;
+
+    /// <summary>המופע הרץ (לחלונות שצריכים לפתוח חלונות אחרים).</summary>
+    public static TrayApp? Instance { get; private set; }
 
     readonly NotifyIcon _tray;
     readonly System.Windows.Threading.Dispatcher _ui = System.Windows.Application.Current.Dispatcher;
@@ -29,6 +32,8 @@ sealed class TrayApp : IDisposable
 
     public TrayApp()
     {
+        Instance = this;
+        ApplyTheme(_settings);
         _tray = new NotifyIcon
         {
             Icon = LoadIcon(),
@@ -97,8 +102,7 @@ sealed class TrayApp : IDisposable
                 folder: () => OpenFolder(_settings.ReceiveDir),
                 settings: ShowSettings,
                 exit: ExitApp,
-                receiveChanged: on => { _settings.ReceiveEnabled = on; _settings.Save(); },
-                about: ShowAbout);
+                receiveChanged: on => { _settings.ReceiveEnabled = on; _settings.Save(); });
             _menu.Show();
         });
     }
@@ -135,11 +139,67 @@ sealed class TrayApp : IDisposable
         WindowFront.Bring(_history);
     }
 
+    SettingsWindow? _settingsWin;
+
+    /// <summary>חלון ההגדרות אינו מודאלי, כדי שאפשר יהיה לעבור ממנו לחלונות האחרים.</summary>
     public void ShowSettings()
     {
-        var w = new SettingsWindow(_settings, OpenUpdate);
-        w.Loaded += (_, _) => WindowFront.Bring(w);
-        if (w.ShowDialog() == true) { _settings.Save(); ApplyHotkeys(); _chat?.ReloadStyle(); }
+        if (!_ui.CheckAccess()) { _ui.BeginInvoke(ShowSettings); return; }
+        if (_settingsWin is { IsLoaded: true }) { WindowFront.Bring(_settingsWin); return; }
+        var w = new SettingsWindow(_settings, OpenUpdate, ShowAbout, ExitApp, UninstallApp, PreviewTheme);
+        _settingsWin = w;
+        w.Closed += (_, _) =>
+        {
+            if (_settingsWin == w) _settingsWin = null;
+            if (!w.Saved) return;
+            _settings.Save();
+            ApplyTheme(_settings);
+            ApplyHotkeys();
+            _chat?.ReloadStyle();
+        };
+        w.Show();
+        WindowFront.Bring(w);
+    }
+
+    void PreviewTheme(bool dark)
+    {
+        ApplyTheme(dark);
+        _chat?.ReloadStyle(dark);
+    }
+
+    /// <summary>מחיל מצב בהיר או כהה על כל החלונות (ועל חלונות שייפתחו אחר כך).</summary>
+    public static void ApplyTheme(Settings s) => ApplyTheme(s.DarkMode);
+
+    public static void ApplyTheme(bool dark) =>
+        Wpf.Ui.Appearance.ApplicationThemeManager.Apply(dark
+            ? Wpf.Ui.Appearance.ApplicationTheme.Dark : Wpf.Ui.Appearance.ApplicationTheme.Light);
+
+    /// <summary>פותח חלון שליחה מיד (למעבר מחלון אחר), בלי להמתין לאיסוף קבצים.</summary>
+    public void OpenSendWindow()
+    {
+        if (_sendNav is { IsLoaded: true }) { WindowFront.Bring(_sendNav); return; }
+        _sendNav = new SendWindow(new List<string>(), _settings, null);
+        _sendNav.Show();
+        WindowFront.Bring(_sendNav);
+    }
+
+    SendWindow? _sendNav;
+
+    /// <summary>הסרת התוכנה: מפעיל את מסיר ההתקנה (או הסרה ישירה אם אין מסיר) ויוצא.</summary>
+    void UninstallApp()
+    {
+        try
+        {
+            var unins = Path.Combine(Installer.InstallDir, "unins000.exe");
+            if (File.Exists(unins)) Process.Start(new ProcessStartInfo(unins, "/SILENT") { UseShellExecute = true });
+            else Installer.Uninstall();
+        }
+        catch (Exception ex)
+        {
+            ConfirmDialog.Tell(null, "ההסרה נכשלה", ex.Message, warning: true);
+            return;
+        }
+        ExitApp();
     }
 
     // ---- קיצורי מקשים ----
@@ -152,6 +212,7 @@ sealed class TrayApp : IDisposable
 
         if (_settings.HotkeyEnabled) Reg(HotkeyMain, _settings.Hotkey);
         if (_settings.ClipboardHotkeyEnabled) Reg(HotkeyClipboard, _settings.ClipboardHotkey);
+        if (_settings.ChatHotkeyEnabled) Reg(HotkeyChat, _settings.ChatHotkey);
         for (int i = 0; i < _settings.Favorites.Count; i++) Reg(HotkeyFavoriteBase + i, _settings.Favorites[i].Hotkey);
 
         if (failed.Count > 0)
@@ -165,6 +226,7 @@ sealed class TrayApp : IDisposable
     void OnHotkey(int id)
     {
         if (id == HotkeyClipboard) { SendClipboardText(); return; }
+        if (id == HotkeyChat) { OpenChat(); return; }
 
         FavoriteDevice? target = null;
         if (id >= HotkeyFavoriteBase && id - HotkeyFavoriteBase < _settings.Favorites.Count)
@@ -382,6 +444,18 @@ sealed class TrayApp : IDisposable
         _batchTimer.Start();
     }
 
+    /// <summary>פקודה ממופע שני של התוכנה (קיצור דרך בשולחן העבודה): פותחת חלון.</summary>
+    void RunCommand(string cmd)
+    {
+        switch (cmd)
+        {
+            case "chat": OpenChat(); break;
+            case "history": OpenHistory(); break;
+            case "settings": ShowSettings(); break;
+            case "about": ShowAbout(); break;
+        }
+    }
+
     public void ListenForPaths(string pipeName)
     {
         _ = Task.Run(async () =>
@@ -394,10 +468,15 @@ sealed class TrayApp : IDisposable
                     await s.WaitForConnectionAsync();
                     using var r = new StreamReader(s);
                     var list = new List<string>();
+                    var commands = new List<string>();
                     string? line;
                     while ((line = await r.ReadLineAsync()) != null)
-                        if (File.Exists(line) || Directory.Exists(line)) list.Add(line);
-                    OpenSend(list);
+                    {
+                        if (line.StartsWith("::")) commands.Add(line[2..]);
+                        else if (File.Exists(line) || Directory.Exists(line)) list.Add(line);
+                    }
+                    if (commands.Count > 0) _ = _ui.BeginInvoke(() => { foreach (var c in commands) RunCommand(c); });
+                    if (list.Count > 0 || commands.Count == 0) OpenSend(list);
                 }
                 catch { await Task.Delay(500); }
             }
@@ -439,12 +518,15 @@ sealed class TrayApp : IDisposable
     }
 
     UpdateWindow? _updateWindow;
-    void ExitApp()
+    /// <summary>יציאה מלאה: סוגר את כל החלונות ואת התהליך ברקע (קבלה, קיצורי מקשים ומגש).</summary>
+    public void ExitApp()
     {
         _tray.Visible = false;
         _server.Dispose();
         _peer.Dispose();
         System.Windows.Application.Current.Shutdown();
+        // רשת ביטחון: שהתהליך לא יישאר ברקע גם אם משהו תקוע
+        _ = Task.Delay(4000).ContinueWith(_ => Environment.Exit(0));
     }
 
     static string Trim(string s) => s.Length > 60 ? s[..60] : s; // מגבלת טקסט של NotifyIcon

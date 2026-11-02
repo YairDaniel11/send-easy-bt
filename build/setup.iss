@@ -32,11 +32,16 @@ Name: "he"; MessagesFile: "compiler:Languages\Hebrew.isl"
 [Tasks]
 Name: "modern"; Description: "הצג את ""שליחה קלה - BT (בלוטוס)"" ישירות בתפריט הקליק הימני, בלי ""הצג אפשרויות נוספות"" (בהתקנה הראשונה יבקש אישור מנהל להוספת תעודה)"; Check: IsWindows11
 
+Name: "desktopsend"; Description: "הוסף קיצור דרך בשולחן העבודה לשליחת קבצים"; Flags: unchecked
+Name: "desktopchat"; Description: "הוסף קיצור דרך בשולחן העבודה לחלון הצ'אט"; Flags: unchecked
+
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion; Excludes: "*.pdb"
 
 [Icons]
 Name: "{autoprograms}\שליחה קלה - BT"; Filename: "{app}\SendEasyBT.exe"
+Name: "{autodesktop}\שליחת קבצים - שליחה קלה BT"; Filename: "{app}\SendEasyBT.exe"; Tasks: desktopsend
+Name: "{autodesktop}\צ'אט - שליחה קלה BT"; Filename: "{app}\SendEasyBT.exe"; Parameters: "--background --chat"; Tasks: desktopchat
 
 [Run]
 ; הרישום עצמו (קליק ימני, "שלח אל", הפעלה עם Windows) נעשה על ידי התוכנה

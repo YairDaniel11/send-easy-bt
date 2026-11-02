@@ -95,12 +95,6 @@
                     <TextBlock Text="הגדרות..." VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
-            <Button Style="{StaticResource MenuRow}" Click="About_Click">
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Style="{StaticResource Glyph}" Text="&#xE946;"/>
-                    <TextBlock Text="אודות" VerticalAlignment="Center"/>
-                </StackPanel>
-            </Button>
             <Button Style="{StaticResource MenuRow}" Click="Exit_Click">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Style="{StaticResource Glyph}" Text="&#xE7E8;"/>

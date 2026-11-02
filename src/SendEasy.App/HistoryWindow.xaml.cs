@@ -17,8 +17,14 @@ enum FileKind { Image, Document, Audio, Video, Other }
 
 sealed class HistoryRow
 {
-    public required HistoryEntry E { get; init; }
+    public HistoryEntry E { get; }
     public string Name => E.Name;
+    /// <summary>הקובץ שנשמר ברשומה כבר לא נמצא בדיסק (נמחק או הועבר).</summary>
+    public bool Deleted { get; } 
+    public Visibility DeletedVisibility => Deleted ? Visibility.Visible : Visibility.Collapsed;
+    public static bool IsGone(HistoryEntry e) =>
+        e.Ok && !string.IsNullOrEmpty(e.Path) && !File.Exists(e.Path) && !Directory.Exists(e.Path);
+    public HistoryRow(HistoryEntry e) { E = e; Deleted = IsGone(e); }
     public string Arrow => !E.Ok ? "⚠ נכשל" : E.Sent ? "↑ נשלח אל" : "↓ התקבל מ-";
     public Brush ArrowBrush => !E.Ok ? Brushes.OrangeRed : E.Sent ? Brushes.SteelBlue : Brushes.SeaGreen;
     public string Detail =>
@@ -69,6 +75,8 @@ public partial class HistoryWindow : Wpf.Ui.Controls.FluentWindow
         InitializeComponent();
         BuildChips();
         Reload();
+        // קובץ יכול להימחק בזמן שהחלון פתוח: בודקים מחדש כשחוזרים אליו
+        Activated += (_, _) => { if (_all.Any(r => r.Deleted != HistoryRow.IsGone(r.E))) Reload(); };
     }
 
     void BuildChips()
@@ -94,7 +102,7 @@ public partial class HistoryWindow : Wpf.Ui.Controls.FluentWindow
 
     void Reload()
     {
-        _all = History.Load().Select(e => new HistoryRow { E = e }).ToList();
+        _all = History.Load().Select(e => new HistoryRow(e)).ToList();
         Refresh();
     }
 
@@ -157,6 +165,17 @@ public partial class HistoryWindow : Wpf.Ui.Controls.FluentWindow
         try { Process.Start(new ProcessStartInfo(e.Path!) { UseShellExecute = true }); } catch { }
     }
 
+    /// <summary>הקשה כפולה: פותח את התיקייה שבה הקובץ נמצא ומסמן אותו. אם הקובץ נמחק, פותח את התיקייה שבה היה (אם קיימת).</summary>
+    void ShowItemFolder()
+    {
+        var e = Current;
+        if (e == null || string.IsNullOrEmpty(e.Path)) return;
+        if (Exists(e.Path)) { Process.Start("explorer.exe", $"/select,\"{e.Path}\""); return; }
+        var dir = Path.GetDirectoryName(e.Path);
+        if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir)) Process.Start("explorer.exe", $"\"{dir}\"");
+        else ConfirmDialog.Tell(this, "הקובץ לא נמצא", "הקובץ והתיקייה שבה נשמר כבר לא נמצאים.", warning: true);
+    }
+
     void List_SelectionChanged(object s, SelectionChangedEventArgs e)
     {
         var c = Current;
@@ -166,11 +185,15 @@ public partial class HistoryWindow : Wpf.Ui.Controls.FluentWindow
         Hint.Text = c == null ? "בחר קובץ מהרשימה"
             : !c.Ok ? "השליחה נכשלה, אין קובץ לפתוח"
             : string.IsNullOrEmpty(c.Path) ? "לפריט זה לא נשמר מיקום"
-            : !ok ? "הקובץ כבר לא נמצא במקום שבו נשמר" : "";
+            : !ok ? "הקובץ נמחק או הועבר" : "הקשה כפולה: פתיחת התיקייה של הקובץ";
     }
 
     void Open_Click(object s, RoutedEventArgs e) => OpenItem();
-    void List_DoubleClick(object s, MouseButtonEventArgs e) => OpenItem();
+    void List_DoubleClick(object s, MouseButtonEventArgs e)
+    {
+        // רק הקשה על שורה (לא על פס הגלילה או על רקע ריק)
+        if (e.OriginalSource is DependencyObject d && ItemsControl.ContainerFromElement(List, d) is ListBoxItem) ShowItemFolder();
+    }
 
     void Show_Click(object s, RoutedEventArgs e)
     {

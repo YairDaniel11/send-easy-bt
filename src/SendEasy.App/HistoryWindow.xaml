@@ -2,7 +2,8 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-        Title="קבצים" Width="900" Height="640" MinWidth="620" MinHeight="420"
+        xmlns:local="clr-namespace:SendEasy.App"
+        Title="קבצים" Width="900" Height="640" MinWidth="780" MinHeight="420"
         FlowDirection="RightToLeft" WindowStartupLocation="CenterScreen"
         WindowBackdropType="Mica" ExtendsContentIntoTitleBar="True">
     <Grid>
@@ -88,6 +89,7 @@
                                 </Border>
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                     <TextBlock Text="{Binding Name}" FontSize="14" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="נמחק" FontSize="12" Foreground="#E53935" Visibility="{Binding DeletedVisibility}"/>
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="{Binding Arrow}" FontSize="12" FontWeight="SemiBold" Foreground="{Binding ArrowBrush}" Margin="0,0,6,0"/>
                                         <TextBlock Text="{Binding Detail}" FontSize="12" Opacity="0.65" TextTrimming="CharacterEllipsis"/>
@@ -103,12 +105,19 @@
             </Grid>
         </Grid>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="16,10,16,14">
+        <Grid Grid.Row="2" Margin="16,10,16,14">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <local:NavBar Grid.Column="1" Current="history" VerticalAlignment="Center"/>
+        <StackPanel Orientation="Horizontal">
             <ui:Button x:Name="OpenBtn" Content="פתח" Appearance="Primary" Click="Open_Click" MinWidth="80" Margin="0,0,8,0" IsEnabled="False" ToolTip="פותח את הקובץ או התיקייה"/>
             <ui:Button x:Name="ShowBtn" Content="הצג בתיקייה" Click="Show_Click" Margin="0,0,8,0" IsEnabled="False" ToolTip="פותח את סייר הקבצים ומסמן את הקובץ"/>
             <ui:Button x:Name="RemoveBtn" Content="הסר מהרשימה" Click="Remove_Click" Margin="0,0,8,0" IsEnabled="False" ToolTip="מסיר רק מהרשימה, הקובץ עצמו לא נמחק"/>
             <ui:Button Content="נקה הכל" Click="Clear_Click"/>
             <TextBlock x:Name="Hint" Opacity="0.65" VerticalAlignment="Center" Margin="14,0,0,0" FontSize="12"/>
         </StackPanel>
+        </Grid>
     </Grid>
 </ui:FluentWindow>

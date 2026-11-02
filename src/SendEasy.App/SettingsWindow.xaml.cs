@@ -14,12 +14,16 @@ public partial class SettingsWindow : Wpf.Ui.Controls.FluentWindow
     readonly List<FavoriteDevice> _favs;
     ulong _default;
 
-    readonly Action? _openUpdate;
+    readonly Action? _openUpdate, _openAbout, _exit, _uninstall;
+    readonly Action<bool>? _previewTheme;
 
-    public SettingsWindow(Settings s, Action? openUpdate = null)
+    /// <summary>true אם המשתמש לחץ "שמור" (החלון אינו מודאלי, ולכן אין DialogResult).</summary>
+    public bool Saved { get; private set; }
+
+    public SettingsWindow(Settings s, Action? openUpdate = null, Action? openAbout = null, Action? exit = null, Action? uninstall = null, Action<bool>? previewTheme = null)
     {
         _s = s;
-        _openUpdate = openUpdate;
+        _openUpdate = openUpdate; _openAbout = openAbout; _exit = exit; _uninstall = uninstall; _previewTheme = previewTheme;
         // עובדים על עותק, ושומרים רק בלחיצה על "שמור"
         _favs = s.Favorites.Select(f => new FavoriteDevice { Name = f.Name, Address = f.Address, Hotkey = f.Hotkey }).ToList();
         _default = s.DefaultDevice;
@@ -39,8 +43,12 @@ public partial class SettingsWindow : Wpf.Ui.Controls.FluentWindow
         DirectBox.IsChecked = s.HotkeyDirect;
         ClipBox.IsChecked = s.ClipboardHotkeyEnabled;
         ClipText.Text = s.ClipboardHotkey;
+        ChatKeyBox.IsChecked = s.ChatHotkeyEnabled;
+        ChatKeyText.Text = s.ChatHotkey;
+        DarkBox.IsChecked = s.DarkMode;
         AttachCapture(HotkeyText);
         AttachCapture(ClipText);
+        AttachCapture(ChatKeyText);
         BuildFavorites();
     }
 
@@ -58,8 +66,8 @@ public partial class SettingsWindow : Wpf.Ui.Controls.FluentWindow
             {
                 UpdateState.Set(r);
                 UpdStatus.Text = $"יש גרסה חדשה: {TrayApp.Ltr(r.Version.ToString(3))}";
-                // ההגדרות הן חלון מודאלי ויחסמו את חלון העדכון, לכן סוגרים אותן (בלי שמירה) ופותחים את העדכון
-                DialogResult = false;
+                // סוגרים את ההגדרות (בלי שמירה) ופותחים את חלון העדכון
+                Close();
                 Dispatcher.BeginInvoke(_openUpdate);
             }
             else UpdStatus.Text = $"הגרסה שלך ({TrayApp.Ltr(cur.ToString(3))}) עדכנית.";
@@ -198,6 +206,7 @@ public partial class SettingsWindow : Wpf.Ui.Controls.FluentWindow
         var all = new List<string>();
         if (HotkeyBox.IsChecked == true) all.Add(HotkeyText.Text);
         if (ClipBox.IsChecked == true) all.Add(ClipText.Text);
+        if (ChatKeyBox.IsChecked == true) all.Add(ChatKeyText.Text);
         all.AddRange(_favs.Select(f => f.Hotkey));
         var dup = all.Where(h => !string.IsNullOrWhiteSpace(h)).GroupBy(h => h, StringComparer.OrdinalIgnoreCase).FirstOrDefault(g => g.Count() > 1);
         if (dup != null)
@@ -220,11 +229,34 @@ public partial class SettingsWindow : Wpf.Ui.Controls.FluentWindow
         _s.HotkeyDirect = DirectBox.IsChecked == true;
         _s.ClipboardHotkeyEnabled = ClipBox.IsChecked == true;
         _s.ClipboardHotkey = ClipText.Text;
+        _s.ChatHotkeyEnabled = ChatKeyBox.IsChecked == true;
+        _s.ChatHotkey = ChatKeyText.Text;
+        _s.DarkMode = DarkBox.IsChecked == true;
         foreach (var f in _favs) if (f.Name.Length > 0) _s.SetAlias(f.Address, f.Name);
         _s.Favorites = _favs;
         _s.DefaultDevice = _favs.Any(f => f.Address == _default) ? _default : (_favs.FirstOrDefault()?.Address ?? 0);
-        DialogResult = true;
+        Saved = true;
+        Close();
     }
 
-    void Cancel_Click(object sender, RoutedEventArgs e) => DialogResult = false;
+    void Cancel_Click(object sender, RoutedEventArgs e) => Close();
+
+    /// <summary>מצב כהה חל מיד, גם לפני "שמור". ביטול או סגירה בלי שמירה מחזירים את המצב השמור.</summary>
+    void Dark_Click(object sender, RoutedEventArgs e) => _previewTheme?.Invoke(DarkBox.IsChecked == true);
+
+    protected override void OnClosed(EventArgs e)
+    {
+        if (!Saved) _previewTheme?.Invoke(_s.DarkMode);
+        base.OnClosed(e);
+    }
+
+    void About_Click(object sender, RoutedEventArgs e) => _openAbout?.Invoke();
+
+    void Exit_Click(object sender, RoutedEventArgs e) => _exit?.Invoke();
+
+    void Uninstall_Click(object sender, RoutedEventArgs e)
+    {
+        if (!ConfirmDialog.Ask(this, "להסיר את התוכנה?", "התוכנה תיסגר ותוסר מהמחשב. הקבצים שכבר התקבלו לא יימחקו.", "הסר", "ביטול", swapButtons: true)) return;
+        _uninstall?.Invoke();
+    }
 }

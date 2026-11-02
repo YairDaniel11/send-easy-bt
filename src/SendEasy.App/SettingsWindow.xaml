@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:local="clr-namespace:SendEasy.App"
         Title="הגדרות" Width="560" Height="680" MinHeight="420"
         FlowDirection="RightToLeft" WindowStartupLocation="CenterScreen"
         WindowBackdropType="Mica" ExtendsContentIntoTitleBar="True">
@@ -15,7 +16,19 @@
 
         <ScrollViewer PanningMode="VerticalOnly" Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="22,8,22,12">
-                <TextBlock Text="קבלת קבצים" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <local:NavBar Current="settings" HorizontalAlignment="Left"/>
+                    <ui:Button Grid.Column="1" Content="אודות" Padding="10,4" Click="About_Click" ToolTip="גרסה, תיאור וקישור למאגר"/>
+                </Grid>
+
+                <TextBlock Text="מראה" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                <ui:ToggleSwitch x:Name="DarkBox" Content="מצב כהה" Click="Dark_Click"/>
+
+                <TextBlock Text="קבלת קבצים" FontWeight="SemiBold" Margin="0,18,0,6"/>
                 <ComboBox x:Name="ModeBox" HorizontalAlignment="Stretch">
                     <ComboBoxItem Content="שאל אותי על כל קובץ"/>
                     <ComboBoxItem Content="אוטומטית ממכשירים מצומדים, שאל על השאר"/>
@@ -38,6 +51,8 @@
                 <CheckBox x:Name="DirectBox" Margin="0,6,0,0" Content="שלח מיד למכשיר ברירת המחדל, בלי חלון בחירה"/>
                 <CheckBox x:Name="ClipBox" Margin="0,10,0,0" Content="שלח טקסט או קישור מהלוח (כקובץ טקסט)"/>
                 <TextBox x:Name="ClipText" IsReadOnly="True" Margin="0,4,0,0"/>
+                <CheckBox x:Name="ChatKeyBox" Margin="0,10,0,0" Content="פתח את חלון הצ&apos;אט"/>
+                <TextBox x:Name="ChatKeyText" IsReadOnly="True" Margin="0,4,0,0"/>
                 <TextBlock Text="לחץ בתיבה ואז על הצירוף הרצוי. חובה לפחות Ctrl, Alt, Shift או Win."
                            Opacity="0.6" TextWrapping="Wrap" Margin="0,4,0,0" FontSize="12"/>
 
@@ -78,6 +93,12 @@
                 <CheckBox x:Name="DelBox" Content="מחק את קובץ ה-ZIP אחרי חילוץ מוצלח"/>
                 <TextBlock Opacity="0.6" TextWrapping="Wrap" Margin="0,6,0,0" FontSize="12"
                            Text="החילוץ תמיד בטוח: נתיבים חשודים או ארכיון גדול מדי נדחים, ולעולם לא נדרס קובץ קיים."/>
+
+                <TextBlock Text="ניהול התוכנה" FontWeight="SemiBold" Margin="0,22,0,6"/>
+                <ui:Button Content="יציאה מהתוכנה (סוגר גם את הרקע)" HorizontalAlignment="Stretch" Click="Exit_Click"
+                           ToolTip="סוגר את כל החלונות ואת הקבלה ברקע"/>
+                <ui:Button x:Name="UninstallBtn" Content="הסרת התוכנה" HorizontalAlignment="Stretch" Margin="0,8,0,0"
+                           Foreground="#E53935" Click="Uninstall_Click"/>
 
             </StackPanel>
         </ScrollViewer>

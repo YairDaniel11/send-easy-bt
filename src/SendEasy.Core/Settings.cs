@@ -40,6 +40,11 @@ public sealed class Settings
     /// <summary>קיצור לשליחת טקסט מהלוח (כקובץ טקסט) למכשיר ברירת המחדל.</summary>
     public bool ClipboardHotkeyEnabled { get; set; } = true;
     public string ClipboardHotkey { get; set; } = "Ctrl+Alt+V";
+    /// <summary>קיצור מקשים גלובלי לפתיחת חלון הצ'אט.</summary>
+    public bool ChatHotkeyEnabled { get; set; } = false;
+    public string ChatHotkey { get; set; } = "Ctrl+Alt+C";
+    /// <summary>מצב כהה לכל חלונות התוכנה.</summary>
+    public bool DarkMode { get; set; } = false;
     /// <summary>בדיקת עדכונים: מאגר GitHub בפורמט owner/repo. ריק = כבוי.</summary>
     /// <summary>חלון קטן בפינה בכל הודעה חדשה (כשחלון הצ'אט לא פתוח בחזית).</summary>
     public bool NotifyPopup { get; set; } = true;

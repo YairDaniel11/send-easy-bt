@@ -83,6 +83,31 @@
             android:configChanges="orientation|screenSize|screenLayout|keyboard|keyboardHidden|uiMode"
             android:exported="false" />
 
+        <!-- ווידג'טים למסך הבית -->
+        <receiver
+            android:name=".ActionWidget$Send"
+            android:exported="true"
+            android:label="@string/widget_send">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_send" />
+        </receiver>
+
+        <receiver
+            android:name=".ActionWidget$Chat"
+            android:exported="true"
+            android:label="@string/widget_chat">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_chat" />
+        </receiver>
+
         <provider
             android:name=".ApkProvider"
             android:authorities="${applicationId}.apkprovider"

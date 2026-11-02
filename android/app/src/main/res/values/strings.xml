@@ -208,4 +208,17 @@
     <string name="bt_settings_failed">לא ניתן לפתוח את הגדרות הבלוטוס</string>
     <string name="chats_no_others">אין צ\'אטים נוספים עם המכשיר</string>
     <string name="rx_new_message">התקבלה הודעה</string>
+
+    <string name="widget_send">שלח קובץ</string>
+    <string name="widget_chat">צ\'אט</string>
+    <string name="widget_send_desc">פותח את בחירת הקבצים לשליחה למחשב</string>
+    <string name="widget_chat_desc">פותח צ\'אט עם המחשב</string>
+    <string name="widget_pick_send">בחר מכשיר לשליחת קובץ</string>
+    <string name="widget_pick_chat">בחר מכשיר לצ\'אט</string>
+
+    <string name="set_receive">קבלת קבצים והודעות ברקע</string>
+    <string name="set_svc_notif">התראה קבועה בסטטוס בר</string>
+    <string name="set_notify">התראה בעת קבלת הודעה</string>
+    <string name="set_dark">מצב כהה</string>
+    <string name="set_section_alerts">בעת קבלת הודעה</string>
 </resources>

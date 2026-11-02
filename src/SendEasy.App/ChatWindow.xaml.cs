@@ -94,7 +94,8 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
 
     static string Fmt(int s) => $"{s / 60}:{s % 60:00}";
     static SolidColorBrush B(string hex) => new((Color)ColorConverter.ConvertFromString(hex));
-    static bool IsDark() => Wpf.Ui.Appearance.ApplicationThemeManager.GetAppTheme() == Wpf.Ui.Appearance.ApplicationTheme.Dark;
+    bool? _darkOverride;
+    bool IsDark() => _darkOverride ?? Wpf.Ui.Appearance.ApplicationThemeManager.GetAppTheme() == Wpf.Ui.Appearance.ApplicationTheme.Dark;
 
     // ---- שיחות אמיתיות (מהיסטוריית הצ'אט) ----
 
@@ -171,6 +172,13 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
     // ---- עיצוב ----
 
     /// <summary>הסגנון (ווטסאפ, גוגל צ'אט או כתבן) נבחר בהגדרות. נקרא אחרי שמירת ההגדרות.</summary>
+    /// <summary>מחיל את הצבעים לפי המצב (כהה או בהיר) שנקבע זה עתה, בלי להמתין לעדכון ערכת הנושא.</summary>
+    public void ReloadStyle(bool dark)
+    {
+        _darkOverride = dark;
+        ReloadStyle();
+    }
+
     public void ReloadStyle()
     {
         SetStyle();

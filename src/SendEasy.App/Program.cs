@@ -53,7 +53,8 @@ static class Program
         {
             // הפעלה ברקע בלי קבצים (למשל בסוף ההתקנה, שמפעילה את התוכנה פעמיים) כשהיא כבר רצה: אין מה להעביר,
             // ורשימה ריקה הייתה פותחת במופע הרץ חלון שליחה ריק
-            if (paths.Count == 0 && args.Contains("--background")) return;
+            var commands = new[] { "chat", "history", "settings", "about" }.Where(c => args.Contains("--" + c)).ToList();
+            if (paths.Count == 0 && commands.Count == 0 && args.Contains("--background")) return;
             // כבר רץ: מעבירים לו את הנתיבים ויוצאים
             try
             {
@@ -61,6 +62,7 @@ static class Program
                 c.Connect(3000);
                 using var w = new StreamWriter(c) { AutoFlush = true };
                 foreach (var p in paths) w.WriteLine(p);
+                foreach (var cmd in commands) w.WriteLine("::" + cmd); // למשל קיצור דרך לצ'אט כשהתוכנה כבר רצה
             }
             catch { }
             return;
@@ -69,11 +71,12 @@ static class Program
         var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
         app.Resources.MergedDictionaries.Add(new ThemesDictionary { Theme = ApplicationTheme.Light });
         app.Resources.MergedDictionaries.Add(new ControlsDictionary());
-        ApplicationThemeManager.ApplySystemTheme();
 
         using var tray = new TrayApp();
         tray.ListenForPaths(PipeName);
-        if (paths.Count > 0 || !args.Contains("--background")) tray.OpenSend(paths);
+        // --chat / --history / --settings / --about פותחים את החלון המבוקש בלבד, בלי חלון שליחה
+        bool onlyWindow = args.Any(a => a is "--chat" or "--history" or "--settings" or "--about");
+        if (paths.Count > 0 || (!args.Contains("--background") && !onlyWindow)) tray.OpenSend(paths);
         if (args.Contains("--chat")) tray.OpenChat();
         if (args.Contains("--history")) tray.OpenHistory();
         if (args.Contains("--settings")) _ = app.Dispatcher.BeginInvoke(tray.ShowSettings);

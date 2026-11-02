@@ -1,0 +1,12 @@
+<UserControl x:Class="SendEasy.App.NavBar"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    <!-- מעבר מהיר בין חלונות התוכנה: הכפתור של החלון הנוכחי מוסתר -->
+    <StackPanel Orientation="Horizontal">
+        <ui:Button x:Name="SendBtn" Content="שליחה" Margin="0,0,6,0" Padding="10,4" Click="Send_Click" ToolTip="חלון שליחת קבצים"/>
+        <ui:Button x:Name="ChatBtn" Content="צ'אט" Margin="0,0,6,0" Padding="10,4" Click="Chat_Click" ToolTip="חלון הצ'אט"/>
+        <ui:Button x:Name="HistoryBtn" Content="קבצים" Margin="0,0,6,0" Padding="10,4" Click="History_Click" ToolTip="היסטוריית הקבצים"/>
+        <ui:Button x:Name="SettingsBtn" Content="הגדרות" Margin="0,0,6,0" Padding="10,4" Click="Settings_Click" ToolTip="הגדרות התוכנה"/>
+    </StackPanel>
+</UserControl>
