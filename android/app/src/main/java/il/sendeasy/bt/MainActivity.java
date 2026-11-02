@@ -745,16 +745,20 @@ public class MainActivity extends Activity implements Events.Listener {
         btnRow.addView(upd, ul);
         upd.setId(View.generateViewId());
         close.setId(View.generateViewId());
-        LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        bl.topMargin = UiKit.dp(this, 14);
-        box.addView(btnRow, bl);
+        // הטקסט נגלל, והכפתורים קבועים בתחתית החלונית (במסך קטן הם לא נחתכים)
         android.widget.ScrollView sv = new android.widget.ScrollView(this);
         sv.addView(box);
-        sv.setBackgroundColor(UiKit.attr(this, R.attr.sbBg));
-        AlertDialog d = new AlertDialog.Builder(this).setView(sv).create();
+        LinearLayout outer = new LinearLayout(this);
+        outer.setOrientation(LinearLayout.VERTICAL);
+        outer.setBackgroundColor(UiKit.attr(this, R.attr.sbBg));
+        outer.addView(sv, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        bl.setMargins(UiKit.dp(this, 10), UiKit.dp(this, 8), UiKit.dp(this, 10), UiKit.dp(this, 10));
+        outer.addView(btnRow, bl);
+        AlertDialog d = new AlertDialog.Builder(this).setView(outer).create();
         holder[0] = d;
         d.show();
-        if (d.getWindow() != null) d.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(UiKit.attr(this, R.attr.sbBg)));
+        if (d.getWindow() != null) d.getWindow().setBackgroundDrawable(UiKit.rect(this, UiKit.attr(this, R.attr.sbBg), 16));
         close.requestFocus();
     }
 
