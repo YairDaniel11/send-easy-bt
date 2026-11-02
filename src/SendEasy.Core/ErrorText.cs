@@ -8,6 +8,8 @@ public static class ErrorText
 {
     public static string Describe(Exception ex)
     {
+        // הודעה שכבר בעברית (שלנו) נשארת כמו שהיא, גם אם סוג החריג הוא IOException וכד'
+        if (System.Text.RegularExpressions.Regex.IsMatch(ex.Message, "[֐-׿]")) return ex.Message;
         for (var e = ex; e != null; e = e.InnerException)
         {
             // WinRT מחזיר קודי Windows Sockets כ-HResult ולא כ-SocketException
@@ -46,7 +48,7 @@ public static class ErrorText
                 case IOException io when io.HResult == unchecked((int)0x80070070):
                     return "אין מספיק מקום פנוי בדיסק.";
                 case IOException:
-                    return "שגיאת קריאה או כתיבה בקובץ. ייתכן שהקובץ בשימוש בתוכנה אחרת.";
+                    return "שגיאת קריאה או כתיבה (בקובץ או בחיבור). אם מדובר בקובץ, ייתכן שהוא בשימוש בתוכנה אחרת.";
                 case System.Text.Json.JsonException:
                     return "התקבלה תשובה לא תקינה מהשרת.";
             }
