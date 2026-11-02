@@ -756,11 +756,9 @@ public class MainActivity extends Activity implements Events.Listener {
         try {
             ver = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
         } catch (Exception ignored) { }
-        int pad = UiKit.dp(this, 14);
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(pad, pad, pad, pad);
-        box.setBackgroundColor(UiKit.attr(this, R.attr.sbBg));
+        LinearLayout box = pageBody();
+        int pad = UiKit.dp(this, 6);
+        box.setPadding(UiKit.dp(this, 14), pad * 2, UiKit.dp(this, 14), pad);
         TextView t = new TextView(this);
         t.setTextSize(15);
         t.setTextColor(UiKit.attr(this, R.attr.sbText));
@@ -769,46 +767,25 @@ public class MainActivity extends Activity implements Events.Listener {
         android.text.util.Linkify.addLinks(t, android.text.util.Linkify.WEB_URLS);
         t.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
         box.addView(t, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        // מסך מלא: הכפתורים אחד מתחת לשני, ברוחב מלא, כך שהכיתוב לא נשבר והם לא נחתכים
         final android.app.Dialog[] holder = new android.app.Dialog[1];
-        TextView close = UiKit.actionButton(this, getString(R.string.savedir_close), new View.OnClickListener() {
-            @Override public void onClick(View v) { if (holder[0] != null) holder[0].dismiss(); }
-        });
-        // שני הכפתורים לרוחב כל החלונית, עם רווח גדול ביניהם. השורה LTR כדי ש"סגור" יישאר פיזית משמאל
-        close.setMinimumHeight(UiKit.dp(this, 44));
-        close.setMinHeight(UiKit.dp(this, 44));
         TextView upd = UiKit.actionButton(this, getString(R.string.menu_check_update), new View.OnClickListener() {
             @Override public void onClick(View v) {
                 if (holder[0] != null) holder[0].dismiss();
                 checkUpdate(true);
             }
         });
-        upd.setMinimumHeight(UiKit.dp(this, 44));
-        upd.setMinHeight(UiKit.dp(this, 44));
-        LinearLayout btnRow = new LinearLayout(this);
-        btnRow.setOrientation(LinearLayout.HORIZONTAL);
-        btnRow.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
-        LinearLayout.LayoutParams cl = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        cl.rightMargin = UiKit.dp(this, 12);
-        LinearLayout.LayoutParams ul = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        ul.leftMargin = UiKit.dp(this, 12);
-        btnRow.addView(close, cl);
-        btnRow.addView(upd, ul);
-        upd.setId(View.generateViewId());
-        close.setId(View.generateViewId());
-        // הטקסט נגלל, והכפתורים קבועים בתחתית החלונית (במסך קטן הם לא נחתכים)
-        android.widget.ScrollView sv = new android.widget.ScrollView(this);
-        sv.addView(box);
-        LinearLayout outer = new LinearLayout(this);
-        outer.setOrientation(LinearLayout.VERTICAL);
-        outer.setBackgroundColor(UiKit.attr(this, R.attr.sbBg));
-        outer.addView(sv, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        TextView close = UiKit.actionButton(this, getString(R.string.savedir_close), new View.OnClickListener() {
+            @Override public void onClick(View v) { if (holder[0] != null) holder[0].dismiss(); }
+        });
         LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        bl.setMargins(UiKit.dp(this, 10), UiKit.dp(this, 8), UiKit.dp(this, 10), UiKit.dp(this, 10));
-        outer.addView(btnRow, bl);
-        AlertDialog d = new AlertDialog.Builder(this).setView(outer).create();
-        holder[0] = d;
-        d.show();
-        if (d.getWindow() != null) d.getWindow().setBackgroundDrawable(UiKit.rect(this, UiKit.attr(this, R.attr.sbBg), 16));
+        bl.setMargins(0, UiKit.dp(this, 14), 0, 0);
+        box.addView(upd, bl);
+        LinearLayout.LayoutParams cl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        cl.setMargins(0, UiKit.dp(this, 8), 0, UiKit.dp(this, 14));
+        box.addView(close, cl);
+        holder[0] = pageDialog(getString(R.string.menu_about), box);
         close.requestFocus();
     }
 
