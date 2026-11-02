@@ -66,6 +66,10 @@ sealed class TrayApp : IDisposable
         });
         _peer.Error += msg => Debug.WriteLine("peer error: " + msg);
         _ = StartServerAsync();
+        Microsoft.Win32.SystemEvents.PowerModeChanged += (_, e) =>
+        {
+            if (e.Mode == Microsoft.Win32.PowerModes.Resume && _settings.ReceiveEnabled) _ui.BeginInvoke(() => _ = RestartReceiversAsync());
+        };
 
         _hotkey.Pressed += OnHotkey;
         ApplyHotkeys();
@@ -270,8 +274,42 @@ sealed class TrayApp : IDisposable
             _tray.ShowBalloonTip(6000, "שליחה קלה - BT",
                 "לא ניתן להפעיל קבלה בבלוטוס: " + ErrorText.Describe(ex), ToolTipIcon.Warning);
         }
-        try { await _peer.StartAsync(); }
-        catch (Exception ex) { Debug.WriteLine("peer start failed: " + ex.Message); }
+        await StartPeerAsync();
+    }
+
+    /// <summary>מפעיל את ההאזנה לאפליקציה בטלפון. אם נכשל (למשל חיבור קודם עדיין נסגר) מנסה שוב, ובסוף מציג שגיאה ברורה במקום להיכשל בשקט.</summary>
+    async Task StartPeerAsync()
+    {
+        Exception? last = null;
+        for (int i = 0; i < 5; i++)
+        {
+            try { await _peer.StartAsync(); return; }
+            catch (Exception ex)
+            {
+                last = ex;
+                Debug.WriteLine("peer start failed: " + ex.Message);
+                try { _peer.Stop(); } catch { }
+                await Task.Delay(3000);
+            }
+        }
+        try
+        {
+            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SendEasyBT");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(Path.Combine(dir, "peer.log"), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} הפעלת ההאזנה לאפליקציה נכשלה: {last}" + Environment.NewLine);
+        }
+        catch { }
+        _tray.ShowBalloonTip(8000, "שליחה קלה - BT",
+            "הקבלה מהאפליקציה בטלפון לא פעילה: " + (last == null ? "" : ErrorText.Describe(last)) + " נסה לצאת מהתוכנה ולהפעיל אותה מחדש.", ToolTipIcon.Warning);
+    }
+
+    /// <summary>אחרי שינה או כיבוי מסך המחשב, שירות הקבלה של Windows לפעמים נעלם בשקט. מפעילים אותו מחדש.</summary>
+    async Task RestartReceiversAsync()
+    {
+        await Task.Delay(5000); // נותנים לבלוטוס לעלות
+        try { _server.Stop(); } catch { }
+        try { _peer.Stop(); } catch { }
+        await StartServerAsync();
     }
 
     ulong _chatBalloonAddr;
@@ -307,6 +345,8 @@ sealed class TrayApp : IDisposable
     void OnFileInChat(ulong addr, IncomingFile f, string path)
     {
         bool voice = ChatLog.IsVoiceName(f.Name);
+        // קובץ שנשלח בשליחה רגילה (לא מהצ'אט) לא מופיע בשיחה: רק בחלון הקבצים ובהתראת הקבלה
+        if (!voice && !f.FromChat) return;
         // תמונה בצ'אט: עותק משלנו, כדי שהיא תוצג גם אם הקובץ בתיקיית הקבלה יימחק או יזוז
         if (!voice && System.IO.Path.GetExtension(f.Name).ToLowerInvariant() is ".jpg" or ".jpeg" or ".png" or ".gif" or ".bmp" or ".webp")
         {
