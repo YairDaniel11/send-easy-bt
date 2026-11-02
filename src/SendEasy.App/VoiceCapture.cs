@@ -60,7 +60,7 @@ sealed class VoiceCapture
             Dispose();
             return ex is UnauthorizedAccessException || ex.HResult == unchecked((int)0x80070005)
                 ? "אין גישה למיקרופון. אשר בהגדרות Windows > פרטיות > מיקרופון, כולל אפליקציות שולחן עבודה."
-                : "אי אפשר להקליט: " + ex.Message;
+                : "אי אפשר להקליט: " + SendEasy.Core.ErrorText.Describe(ex);
         }
     }
 

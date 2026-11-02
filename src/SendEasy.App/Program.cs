@@ -43,7 +43,7 @@ static class Program
             }
             catch (Exception ex)
             {
-                MessageBox.Show("הפעולה נכשלה: " + ex.Message, Installer.AppName, MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show("הפעולה נכשלה: " + SendEasy.Core.ErrorText.Describe(ex), Installer.AppName, MessageBoxButton.OK, MessageBoxImage.Error);
             }
             return;
         }

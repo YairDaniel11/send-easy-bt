@@ -11,6 +11,16 @@
         <item name="sbBubbleIn">@color/bubble_in_light</item>
         <item name="sbBubbleOut">@color/bubble_out_light</item>
         <item name="android:windowBackground">@color/bg_light</item>
+        <item name="android:alertDialogTheme">@style/AppDialog.Light</item>
+    </style>
+
+    <!-- חלונות דיאלוג בצבעי המסך הראשי (אותו עיצוב בבהיר ובכהה, רק צבעים שונים) -->
+    <style name="AppDialog.Light" parent="android:Theme.Holo.Light.Dialog">
+        <item name="android:windowBackground">@drawable/dialog_bg_light</item>
+    </style>
+
+    <style name="AppDialog.Dark" parent="android:Theme.Holo.Dialog">
+        <item name="android:windowBackground">@drawable/dialog_bg_night</item>
     </style>
 
     <style name="AppTheme.Light" parent="AppTheme" />
@@ -25,6 +35,7 @@
         <item name="sbBubbleIn">@color/bubble_in_night</item>
         <item name="sbBubbleOut">@color/bubble_out_night</item>
         <item name="android:windowBackground">@color/bg_night</item>
+        <item name="android:alertDialogTheme">@style/AppDialog.Dark</item>
     </style>
 
     <style name="ActionButton">

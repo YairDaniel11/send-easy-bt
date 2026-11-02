@@ -82,21 +82,62 @@ final class UiKit {
         t.setText(text);
         t.setTextSize(16);
         t.setGravity(Gravity.CENTER);
-        t.setMinHeight(dp(c, 48));
-        int p = dp(c, 10);
-        t.setPadding(p, p, p, p);
+        t.setMinHeight(dp(c, 42));
+        int p = dp(c, 8);
+        t.setPadding(p * 2, p, p * 2, p);
         t.setFocusable(true);
         t.setClickable(true);
         int accent = attr(c, R.attr.sbAccent);
         int row = attr(c, R.attr.sbRow);
         t.setTextColor(attr(c, R.attr.sbText));
         android.graphics.drawable.StateListDrawable sl = new android.graphics.drawable.StateListDrawable();
-        sl.addState(new int[]{android.R.attr.state_focused}, rect(c, row, 10, accent, 3));
-        sl.addState(new int[]{android.R.attr.state_pressed}, rect(c, row, 10, accent, 3));
-        sl.addState(new int[]{}, rect(c, row, 10));
+        sl.addState(new int[]{android.R.attr.state_focused}, rect(c, row, 20, accent, 3));
+        sl.addState(new int[]{android.R.attr.state_pressed}, rect(c, row, 20, accent, 3));
+        sl.addState(new int[]{}, rect(c, row, 20, 0x44888888, 1));
         t.setBackgroundDrawable(sl);
         t.setOnClickListener(l);
         return t;
+    }
+
+    /** מתג הדלקה וכיבוי בעיצוב אחד לכל ערכות הנושא (רק הצבעים משתנים). הנגיעה מטופלת בשורה שמכילה אותו. */
+    static final class ToggleView extends View {
+        interface Listener { void onChanged(boolean on); }
+
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final int onColor, offColor;
+        private boolean checked;
+        private Listener listener;
+
+        ToggleView(Context c, boolean checked) {
+            super(c);
+            this.checked = checked;
+            onColor = attr(c, R.attr.sbAccent);
+            offColor = 0x88888888;
+            setFocusable(false);
+            setClickable(false);
+        }
+
+        void setListener(Listener l) { listener = l; }
+
+        void toggle() {
+            checked = !checked;
+            invalidate();
+            if (listener != null) listener.onChanged(checked);
+        }
+
+        @Override protected void onMeasure(int w, int h) {
+            setMeasuredDimension(dp(getContext(), 46), dp(getContext(), 26));
+        }
+
+        @Override protected void onDraw(Canvas canvas) {
+            float w = getWidth(), h = getHeight();
+            paint.setColor(checked ? onColor : offColor);
+            canvas.drawRoundRect(new RectF(0, 0, w, h), h / 2, h / 2, paint);
+            paint.setColor(0xFFFFFFFF);
+            float r = h / 2 - dp(getContext(), 3);
+            float cx = checked ? w - h / 2 : h / 2;
+            canvas.drawCircle(cx, h / 2, r, paint);
+        }
     }
 
     /** צורת גל קול: עמודות בגבהים קבועים לפי זרע, עם התקדמות צבועה. */

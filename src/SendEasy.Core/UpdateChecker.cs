@@ -83,7 +83,7 @@ public static class UpdateChecker
 
     public static async Task<AndroidRelease> FindLatestAndroidAsync(string repo, CancellationToken ct)
     {
-        using var http = NewClient(TimeSpan.FromSeconds(15));
+        using var http = NewClient(TimeSpan.FromSeconds(40));
         http.DefaultRequestHeaders.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue { NoCache = true };
         var json = await http.GetStringAsync($"https://api.github.com/repos/{repo}/releases?per_page=50", ct);
         using var doc = JsonDocument.Parse(json);

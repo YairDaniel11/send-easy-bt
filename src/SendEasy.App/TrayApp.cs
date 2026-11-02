@@ -196,7 +196,7 @@ sealed class TrayApp : IDisposable
         }
         catch (Exception ex)
         {
-            ConfirmDialog.Tell(null, "ההסרה נכשלה", ex.Message, warning: true);
+            ConfirmDialog.Tell(null, "ההסרה נכשלה", ErrorText.Describe(ex), warning: true);
             return;
         }
         ExitApp();
@@ -268,7 +268,7 @@ sealed class TrayApp : IDisposable
         catch (Exception ex)
         {
             _tray.ShowBalloonTip(6000, "שליחה קלה - BT",
-                "לא ניתן להפעיל קבלה בבלוטוס: " + ex.Message, ToolTipIcon.Warning);
+                "לא ניתן להפעיל קבלה בבלוטוס: " + ErrorText.Describe(ex), ToolTipIcon.Warning);
         }
         try { await _peer.StartAsync(); }
         catch (Exception ex) { Debug.WriteLine("peer start failed: " + ex.Message); }
@@ -393,7 +393,7 @@ sealed class TrayApp : IDisposable
                 }
             }
             catch (UnsafeArchiveException ex) { note = "לא חולץ: " + ex.Message; }
-            catch (Exception ex) { note = "שגיאת חילוץ: " + ex.Message; }
+            catch (Exception ex) { note = "שגיאת חילוץ: " + ErrorText.Describe(ex); }
 
             _lastReceivedPath = shown;
             _chatBalloonAddr = 0;

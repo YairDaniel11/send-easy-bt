@@ -70,7 +70,7 @@ public partial class UpdateWindow : Wpf.Ui.Controls.FluentWindow
         }
         catch (Exception ex)
         {
-            Status.Text = "העדכון נכשל: " + ex.Message;
+            Status.Text = "העדכון נכשל: " + SendEasy.Core.ErrorText.Describe(ex);
             Reset();
         }
     }

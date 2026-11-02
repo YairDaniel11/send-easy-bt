@@ -710,11 +710,11 @@ public class MainActivity extends Activity implements Events.Listener {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(pad, pad, pad, pad);
-        box.setBackgroundColor(0xFFFFFFFF); // רקע בהיר מפורש, כדי שהטקסט יהיה קריא בכל ערכת נושא
+        box.setBackgroundColor(UiKit.attr(this, R.attr.sbBg));
         TextView t = new TextView(this);
         t.setTextSize(15);
-        t.setTextColor(0xFF111111);
-        t.setLinkTextColor(0xFF0B57D0);
+        t.setTextColor(UiKit.attr(this, R.attr.sbText));
+        t.setLinkTextColor(ThemeUtil.isDark(this) ? 0xFF6CB8FF : 0xFF0B57D0);
         t.setText(getString(R.string.about_text, getString(R.string.app_name), Fmt.ltr(ver == null ? "" : ver), REPO_URL));
         android.text.util.Linkify.addLinks(t, android.text.util.Linkify.WEB_URLS);
         t.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
@@ -734,15 +734,6 @@ public class MainActivity extends Activity implements Events.Listener {
         });
         upd.setMinimumHeight(UiKit.dp(this, 44));
         upd.setMinHeight(UiKit.dp(this, 44));
-        // צבעי כפתורים מפורשים על הרקע הלבן של חלון האודות (בלי תלות בערכת הנושא)
-        for (TextView b : new TextView[]{close, upd}) {
-            b.setTextColor(0xFF111111);
-            android.graphics.drawable.StateListDrawable bg = new android.graphics.drawable.StateListDrawable();
-            bg.addState(new int[]{android.R.attr.state_focused}, UiKit.rect(this, 0xFFE3E3E3, 10, 0xFF0B57D0, 3));
-            bg.addState(new int[]{android.R.attr.state_pressed}, UiKit.rect(this, 0xFFD0D0D0, 10, 0xFF0B57D0, 3));
-            bg.addState(new int[]{}, UiKit.rect(this, 0xFFE3E3E3, 10));
-            b.setBackgroundDrawable(bg);
-        }
         LinearLayout btnRow = new LinearLayout(this);
         btnRow.setOrientation(LinearLayout.HORIZONTAL);
         btnRow.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
@@ -759,11 +750,11 @@ public class MainActivity extends Activity implements Events.Listener {
         box.addView(btnRow, bl);
         android.widget.ScrollView sv = new android.widget.ScrollView(this);
         sv.addView(box);
-        sv.setBackgroundColor(0xFFFFFFFF);
+        sv.setBackgroundColor(UiKit.attr(this, R.attr.sbBg));
         AlertDialog d = new AlertDialog.Builder(this).setView(sv).create();
         holder[0] = d;
         d.show();
-        if (d.getWindow() != null) d.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0xFFFFFFFF));
+        if (d.getWindow() != null) d.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(UiKit.attr(this, R.attr.sbBg)));
         close.requestFocus();
     }
 
@@ -835,25 +826,6 @@ public class MainActivity extends Activity implements Events.Listener {
         if (neg != null) neg.requestFocus();
     }
 
-    private void showAlertsDialog() {
-        final boolean[] on = {Prefs.notifySound(this), Prefs.notifyVibrate(this), Prefs.notifyWake(this)};
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.menu_notify_alerts)
-                .setMultiChoiceItems(new String[]{getString(R.string.alert_ring), getString(R.string.alert_vibrate), getString(R.string.alert_wake)}, on,
-                        new DialogInterface.OnMultiChoiceClickListener() {
-                            @Override public void onClick(DialogInterface d, int which, boolean checked) { on[which] = checked; }
-                        })
-                .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
-                        Prefs.setNotifySound(MainActivity.this, on[0]);
-                        Prefs.setNotifyVibrate(MainActivity.this, on[1]);
-                        Prefs.setNotifyWake(MainActivity.this, on[2]);
-                    }
-                })
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
-    }
-
     /** התפריט הראשי: הגדרות, צ'אט חדש, מכשירי בלוטוס, אודות (בדיקת העדכון נמצאת באודות). */
     private void showMenu() {
         final String[] items = {
@@ -901,45 +873,30 @@ public class MainActivity extends Activity implements Events.Listener {
     }
 
     /**
-     * כל ההגדרות בחלונית אחת. הדלקה וכיבוי במתגים, והחלונית נשארת פתוחה אחרי כל שינוי.
-     * שורות עם חץ פותחות חלונית משנה. כל השורות ממוקדות, כדי שאפשר יהיה לנווט במקשים.
+     * ההגדרות לפי נושאים. הגדרה בלי תת-הגדרות היא מתג הדלקה וכיבוי; הגדרה עם תת-הגדרות (או בחירה) היא שורה עם חץ
+     * שפותחת חלונית משלה. החלונית נשארת פתוחה אחרי כל שינוי. כל השורות ממוקדות לניווט במקשים.
      */
     private void showSettings() {
-        final LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        int pad = UiKit.dp(this, 8);
-        box.setPadding(pad, pad, pad, pad);
+        final LinearLayout box = settingsBox();
 
-        box.addView(switchRow(getString(R.string.set_receive), Prefs.receiveEnabled(this), new android.widget.CompoundButton.OnCheckedChangeListener() {
-            @Override public void onCheckedChanged(android.widget.CompoundButton b, boolean on) {
+        box.addView(sectionTitle(getString(R.string.set_sec_general)));
+        box.addView(switchRow(getString(R.string.set_receive), Prefs.receiveEnabled(this), new UiKit.ToggleView.Listener() {
+            @Override public void onChanged(boolean on) {
                 Prefs.setReceiveEnabled(MainActivity.this, on);
                 if (on) BtService.start(MainActivity.this); else BtService.stop(MainActivity.this);
                 updateStatus();
             }
         }));
-        box.addView(switchRow(getString(R.string.set_svc_notif), Prefs.showServiceNotification(this), new android.widget.CompoundButton.OnCheckedChangeListener() {
-            @Override public void onCheckedChanged(android.widget.CompoundButton b, boolean on) {
+        box.addView(switchRow(getString(R.string.set_svc_notif), Prefs.showServiceNotification(this), new UiKit.ToggleView.Listener() {
+            @Override public void onChanged(boolean on) {
                 Prefs.setShowServiceNotification(MainActivity.this, on);
                 // הפעלה מחדש כדי שההתראה תיבנה בערוץ המתאים
                 if (Prefs.receiveEnabled(MainActivity.this) && BtService.isRunning()) BtService.restart(MainActivity.this);
                 if (!on && Build.VERSION.SDK_INT >= 26) offerHideInSystemSettings();
             }
         }));
-        box.addView(switchRow(getString(R.string.set_notify), Prefs.notifyEvents(this), new android.widget.CompoundButton.OnCheckedChangeListener() {
-            @Override public void onCheckedChanged(android.widget.CompoundButton b, boolean on) { Prefs.setNotifyEvents(MainActivity.this, on); }
-        }));
-        box.addView(switchRow(getString(R.string.alert_ring), Prefs.notifySound(this), new android.widget.CompoundButton.OnCheckedChangeListener() {
-            @Override public void onCheckedChanged(android.widget.CompoundButton b, boolean on) { Prefs.setNotifySound(MainActivity.this, on); }
-        }));
-        box.addView(switchRow(getString(R.string.alert_vibrate), Prefs.notifyVibrate(this), new android.widget.CompoundButton.OnCheckedChangeListener() {
-            @Override public void onCheckedChanged(android.widget.CompoundButton b, boolean on) { Prefs.setNotifyVibrate(MainActivity.this, on); }
-        }));
-        box.addView(switchRow(getString(R.string.alert_wake), Prefs.notifyWake(this), new android.widget.CompoundButton.OnCheckedChangeListener() {
-            @Override public void onCheckedChanged(android.widget.CompoundButton b, boolean on) { Prefs.setNotifyWake(MainActivity.this, on); }
-        }));
-        box.addView(switchRow(getString(R.string.set_dark), ThemeUtil.isDark(this), new android.widget.CompoundButton.OnCheckedChangeListener() {
-            @Override public void onCheckedChanged(android.widget.CompoundButton b, boolean on) {
+        box.addView(switchRow(getString(R.string.set_dark), ThemeUtil.isDark(this), new UiKit.ToggleView.Listener() {
+            @Override public void onChanged(boolean on) {
                 Prefs.setTheme(MainActivity.this, on ? 2 : 1);
                 // המסך נטען מחדש בערכת הנושא החדשה, ואז חלון ההגדרות נפתח שוב
                 reopenSettings = true;
@@ -948,15 +905,9 @@ public class MainActivity extends Activity implements Events.Listener {
             }
         }));
 
-        box.addView(actionRow(getString(R.string.menu_receive_dir), new Runnable() {
-            @Override public void run() {
-                new AlertDialog.Builder(MainActivity.this)
-                        .setMessage(getString(R.string.main_receive_dir, Fmt.ltr(Storage.receiveDirLabel(MainActivity.this))))
-                        .setPositiveButton(android.R.string.ok, null).show();
-            }
-        }));
-        box.addView(actionRow(getString(R.string.menu_save_dir), new Runnable() {
-            @Override public void run() { showSaveDirDialog(); }
+        box.addView(sectionTitle(getString(R.string.set_sec_messages)));
+        box.addView(actionRow(getString(R.string.menu_notify_alerts), new Runnable() {
+            @Override public void run() { showNotifySettings(); }
         }));
         box.addView(actionRow(getString(R.string.menu_chat_style), new Runnable() {
             @Override public void run() {
@@ -967,32 +918,109 @@ public class MainActivity extends Activity implements Events.Listener {
                         }).show();
             }
         }));
-        box.addView(actionRow(getString(R.string.menu_rename_device), new Runnable() {
-            @Override public void run() { showRenameDevice(); }
-        }));
         box.addView(actionRow(getString(R.string.menu_delete_chats), new Runnable() {
             @Override public void run() { showDeleteChats(); }
         }));
 
-        android.widget.ScrollView sv = new android.widget.ScrollView(this);
-        sv.addView(box);
-        settingsDlg = new AlertDialog.Builder(this)
-                .setTitle(R.string.menu_settings)
-                .setView(sv)
-                .setPositiveButton(R.string.savedir_close, null)
-                .create();
-        settingsDlg.show();
+        box.addView(sectionTitle(getString(R.string.set_sec_files)));
+        box.addView(actionRow(getString(R.string.menu_receive_dir), new Runnable() {
+            @Override public void run() {
+                new AlertDialog.Builder(MainActivity.this)
+                        .setMessage(getString(R.string.main_receive_dir, Fmt.ltr(Storage.receiveDirLabel(MainActivity.this))))
+                        .setPositiveButton(android.R.string.ok, null).show();
+            }
+        }));
+        box.addView(actionRow(getString(R.string.menu_save_dir), new Runnable() {
+            @Override public void run() { showSaveDirDialog(); }
+        }));
+
+        box.addView(sectionTitle(getString(R.string.set_sec_devices)));
+        box.addView(actionRow(getString(R.string.menu_rename_device), new Runnable() {
+            @Override public void run() { showRenameDevice(); }
+        }));
+
+        settingsDlg = styledDialog(getString(R.string.menu_settings), box);
+    }
+
+    /** התראה בעת קבלת הודעה: ההתראה עצמה ואופן ההתראה (תת-הגדרות). */
+    private void showNotifySettings() {
+        LinearLayout box = settingsBox();
+        box.addView(switchRow(getString(R.string.set_notify), Prefs.notifyEvents(this), new UiKit.ToggleView.Listener() {
+            @Override public void onChanged(boolean on) { Prefs.setNotifyEvents(MainActivity.this, on); }
+        }));
+        box.addView(sectionTitle(getString(R.string.set_sec_alert_kind)));
+        box.addView(switchRow(getString(R.string.alert_ring), Prefs.notifySound(this), new UiKit.ToggleView.Listener() {
+            @Override public void onChanged(boolean on) { Prefs.setNotifySound(MainActivity.this, on); }
+        }));
+        box.addView(switchRow(getString(R.string.alert_vibrate), Prefs.notifyVibrate(this), new UiKit.ToggleView.Listener() {
+            @Override public void onChanged(boolean on) { Prefs.setNotifyVibrate(MainActivity.this, on); }
+        }));
+        box.addView(switchRow(getString(R.string.alert_wake), Prefs.notifyWake(this), new UiKit.ToggleView.Listener() {
+            @Override public void onChanged(boolean on) { Prefs.setNotifyWake(MainActivity.this, on); }
+        }));
+        styledDialog(getString(R.string.menu_notify_alerts), box);
     }
 
     private AlertDialog settingsDlg;
 
-    /** רקע שורה: טבעת בולטת בפוקוס (ניווט במקשים) ובלחיצה. */
+    private LinearLayout settingsBox() {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        int pad = UiKit.dp(this, 6);
+        box.setPadding(pad, pad, pad, pad);
+        return box;
+    }
+
+    /** חלונית בצבעי המסך הראשי: כותרת, תוכן נגלל וכפתור סגירה עגול. */
+    private AlertDialog styledDialog(String title, View content) {
+        LinearLayout outer = new LinearLayout(this);
+        outer.setOrientation(LinearLayout.VERTICAL);
+        outer.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        TextView t = new TextView(this);
+        t.setText(title);
+        t.setTextSize(18);
+        t.setTypeface(null, android.graphics.Typeface.BOLD);
+        t.setGravity(android.view.Gravity.CENTER);
+        t.setTextColor(UiKit.attr(this, R.attr.sbText));
+        int p = UiKit.dp(this, 10);
+        t.setPadding(p, p, p, p);
+        outer.addView(t, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        android.widget.ScrollView sv = new android.widget.ScrollView(this);
+        sv.addView(content);
+        outer.addView(sv, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        final AlertDialog[] holder = new AlertDialog[1];
+        TextView close = UiKit.actionButton(this, getString(R.string.savedir_close), new View.OnClickListener() {
+            @Override public void onClick(View v) { if (holder[0] != null) holder[0].dismiss(); }
+        });
+        LinearLayout.LayoutParams cl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        cl.setMargins(p, p / 2, p, p);
+        outer.addView(close, cl);
+        AlertDialog d = new AlertDialog.Builder(this).setView(outer).create();
+        holder[0] = d;
+        d.show();
+        return d;
+    }
+
+    private TextView sectionTitle(String text) {
+        TextView t = new TextView(this);
+        t.setText(text);
+        t.setTextSize(13);
+        t.setTypeface(null, android.graphics.Typeface.BOLD);
+        t.setTextColor(UiKit.attr(this, R.attr.sbAccent));
+        int p = UiKit.dp(this, 10);
+        t.setPadding(p, p, p, UiKit.dp(this, 4));
+        return t;
+    }
+
+    /** רקע שורה: כרטיס עגול עם מסגרת עדינה, וטבעת בולטת בפוקוס (ניווט במקשים) ובלחיצה. */
     private android.graphics.drawable.Drawable rowBackground() {
         int accent = UiKit.attr(this, R.attr.sbAccent);
+        int row = UiKit.attr(this, R.attr.sbRow);
         android.graphics.drawable.StateListDrawable sl = new android.graphics.drawable.StateListDrawable();
-        sl.addState(new int[]{android.R.attr.state_focused}, UiKit.rect(this, 0x22888888, 10, accent, 3));
-        sl.addState(new int[]{android.R.attr.state_pressed}, UiKit.rect(this, 0x33888888, 10, accent, 3));
-        sl.addState(new int[]{}, UiKit.rect(this, 0x00000000, 10));
+        sl.addState(new int[]{android.R.attr.state_focused}, UiKit.rect(this, row, 20, accent, 3));
+        sl.addState(new int[]{android.R.attr.state_pressed}, UiKit.rect(this, row, 20, accent, 3));
+        sl.addState(new int[]{}, UiKit.rect(this, row, 20, 0x44888888, 1));
         return sl;
     }
 
@@ -1001,14 +1029,14 @@ public class MainActivity extends Activity implements Events.Listener {
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(android.view.Gravity.CENTER_VERTICAL);
         row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        row.setMinimumHeight(UiKit.dp(this, 52));
-        int p = UiKit.dp(this, 10);
-        row.setPadding(p, p / 2, p, p / 2);
+        row.setMinimumHeight(UiKit.dp(this, 42));
+        int p = UiKit.dp(this, 14);
+        row.setPadding(p, UiKit.dp(this, 6), p, UiKit.dp(this, 6));
         row.setFocusable(true);
         row.setClickable(true);
         row.setBackgroundDrawable(rowBackground());
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.bottomMargin = UiKit.dp(this, 2);
+        lp.setMargins(UiKit.dp(this, 4), UiKit.dp(this, 3), UiKit.dp(this, 4), UiKit.dp(this, 3));
         row.setLayoutParams(lp);
         return row;
     }
@@ -1016,20 +1044,18 @@ public class MainActivity extends Activity implements Events.Listener {
     private TextView rowLabel(String text) {
         TextView t = new TextView(this);
         t.setText(text);
-        t.setTextSize(16);
+        t.setTextSize(15);
         t.setTextColor(UiKit.attr(this, R.attr.sbText));
         t.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         return t;
     }
 
     /** שורה עם מתג הדלקה וכיבוי. אישור (או נגיעה בשורה) מחליף את המתג. */
-    private View switchRow(String label, boolean checked, android.widget.CompoundButton.OnCheckedChangeListener l) {
+    private View switchRow(String label, boolean checked, UiKit.ToggleView.Listener l) {
         LinearLayout row = baseRow();
         row.addView(rowLabel(label));
-        final android.widget.Switch sw = new android.widget.Switch(this);
-        sw.setFocusable(false);
-        sw.setChecked(checked);
-        sw.setOnCheckedChangeListener(l); // אחרי קביעת המצב ההתחלתי, כדי שלא יופעל בבנייה
+        final UiKit.ToggleView sw = new UiKit.ToggleView(this, checked);
+        sw.setListener(l);
         row.addView(sw);
         row.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { sw.toggle(); }
@@ -1048,6 +1074,11 @@ public class MainActivity extends Activity implements Events.Listener {
         row.addView(arrow);
         row.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { action.run(); }
+        });
+        return row;
+    }
+
+    @Override public void onClick(View v) { action.run(); }
         });
         return row;
     }

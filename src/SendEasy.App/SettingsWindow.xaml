@@ -45,6 +45,13 @@
                     <ui:Button Grid.Column="1" Content="עיון..." Margin="8,0,0,0" Click="Browse_Click"/>
                 </Grid>
 
+                <TextBlock Text="ארכיונים (ZIP)" FontWeight="SemiBold" Margin="0,18,0,6"/>
+                <CheckBox x:Name="OwnBox" Content="חלץ אוטומטית ארכיונים שנשלחו על ידי התוכנה (תיקיות)"/>
+                <CheckBox x:Name="AllBox" Content="חלץ כל קובץ ZIP שמתקבל, גם אם לא נשלח על ידי התוכנה"/>
+                <CheckBox x:Name="DelBox" Content="מחק את קובץ ה-ZIP אחרי חילוץ מוצלח"/>
+                <TextBlock Opacity="0.6" TextWrapping="Wrap" Margin="0,6,0,0" FontSize="12"
+                           Text="החילוץ תמיד בטוח: נתיבים חשודים או ארכיון גדול מדי נדחים, ולעולם לא נדרס קובץ קיים."/>
+
                 <TextBlock Text="קיצורי מקשים" FontWeight="SemiBold" Margin="0,18,0,6"/>
                 <CheckBox x:Name="HotkeyBox" Content="שלח את הקבצים שנבחרו בסייר"/>
                 <TextBox x:Name="HotkeyText" IsReadOnly="True" Margin="0,4,0,0"/>
@@ -87,12 +94,6 @@
                 <ui:Button x:Name="ApkBtn" Content="הורד את אפליקציית האנדרואיד למחשב" HorizontalAlignment="Stretch" Click="Apk_Click"/>
                 <ProgressBar x:Name="ApkBar" Maximum="1000" Height="5" Margin="0,8,0,0" Visibility="Collapsed"/>
                 <TextBlock x:Name="ApkStatus" Opacity="0.7" FontSize="12" TextWrapping="Wrap" Margin="0,6,0,0"/>
-                <TextBlock Text="ארכיונים (ZIP)" FontWeight="SemiBold" Margin="0,18,0,6"/>
-                <CheckBox x:Name="OwnBox" Content="חלץ אוטומטית ארכיונים שנשלחו על ידי התוכנה (תיקיות)"/>
-                <CheckBox x:Name="AllBox" Content="חלץ כל קובץ ZIP שמתקבל, גם אם לא נשלח על ידי התוכנה"/>
-                <CheckBox x:Name="DelBox" Content="מחק את קובץ ה-ZIP אחרי חילוץ מוצלח"/>
-                <TextBlock Opacity="0.6" TextWrapping="Wrap" Margin="0,6,0,0" FontSize="12"
-                           Text="החילוץ תמיד בטוח: נתיבים חשודים או ארכיון גדול מדי נדחים, ולעולם לא נדרס קובץ קיים."/>
 
                 <TextBlock Text="ניהול התוכנה" FontWeight="SemiBold" Margin="0,22,0,6"/>
                 <ui:Button Content="יציאה מהתוכנה (סוגר גם את הרקע)" HorizontalAlignment="Stretch" Click="Exit_Click"

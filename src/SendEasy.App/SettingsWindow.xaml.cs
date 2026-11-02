@@ -113,7 +113,7 @@ public partial class SettingsWindow : Wpf.Ui.Controls.FluentWindow
             ApkStatus.Text = $"ההורדה הסתיימה (גרסה {TrayApp.Ltr(ver)}): {TrayApp.Ltr(path)}\nהעבר את הקובץ לטלפון בבלוטוס או בכבל, והתקן אותו.\n(בטלפון עם חיבור לאינטרנט האפליקציה בודקת עדכונים בעצמה, ואפשר לבדוק גם במסך \"אודות\" שלה.)";
             System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{path}\"");
         }
-        catch (Exception ex) { ApkStatus.Text = "ההורדה נכשלה: " + ex.Message; }
+        catch (Exception ex) { ApkStatus.Text = "ההורדה נכשלה: " + ErrorText.Describe(ex); }
         finally { ApkBtn.IsEnabled = true; ApkBar.Visibility = Visibility.Collapsed; }
     }
     void BuildFavorites()

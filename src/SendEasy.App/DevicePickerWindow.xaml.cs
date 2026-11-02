@@ -43,7 +43,7 @@ public partial class DevicePickerWindow : Wpf.Ui.Controls.FluentWindow
                 items.Add(new Item(dev.BluetoothAddress, name, kind + (ChatLog.Load(dev.BluetoothAddress, 1).Count > 0 ? " · יש שיחה" : "")));
             }
         }
-        catch (Exception ex) { Status.Text = "לא ניתן לטעון מכשירים: " + ex.Message; return; }
+        catch (Exception ex) { Status.Text = "לא ניתן לטעון מכשירים: " + ErrorText.Describe(ex); return; }
         var score = DeviceUsage.Scores();
         List.ItemsSource = items.OrderByDescending(x => score(x.Address)).ThenBy(x => x.Name).ToList();
         Status.Visibility = items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;

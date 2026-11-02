@@ -680,7 +680,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
             if (IsImage(path)) new ImageViewWindow(path, this).Show();
             else System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
         }
-        catch (Exception ex) { ShowError(ex.Message); }
+        catch (Exception ex) { ShowError(ErrorText.Describe(ex)); }
     }
 
     string Ticks(Msg m) => m.Status == MsgStatus.Failed ? "⚠ לא נשלח" : m.Status == MsgStatus.Sent ? "✓" : "✓✓";
@@ -1021,7 +1021,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
             else { var r = await s.SendTextWithIdAsync(text); ok = r.Ok; entry.MsgId = r.Id; }
             if (!ok && err.Length == 0) err = "לא התקבל אישור מהמכשיר השני";
         }
-        catch (Exception ex) { err = ex.Message; }
+        catch (Exception ex) { err = ErrorText.Describe(ex); }
 
         if (ok) DeviceUsage.Record(conv.Address);
         entry.Status = ok ? "delivered" : "failed";
@@ -1090,7 +1090,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
             }
         }
         catch (OperationCanceledException) { cancelled = true; }
-        catch (Exception ex) { err = ex.Message; }
+        catch (Exception ex) { err = ErrorText.Describe(ex); }
         _sendCts = null;
         CancelSendBtn.Visibility = Visibility.Collapsed;
         if (cancelled)
@@ -1238,7 +1238,7 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
                 if (!ok) err = "השליחה נכשלה";
             }
         }
-        catch (Exception ex) { err = ex.Message; }
+        catch (Exception ex) { err = ErrorText.Describe(ex); }
         entry.Status = ok ? "delivered" : "failed";
         ChatLog.Add(conv.Address, entry);
         Reload(conv);

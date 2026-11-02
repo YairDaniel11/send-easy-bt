@@ -147,7 +147,7 @@ public partial class SendWindow : Wpf.Ui.Controls.FluentWindow
         if (((FrameworkElement)sender).Tag is not Dev d || d.Paired || _busy) return;
         ((FrameworkElement)sender).IsEnabled = false;
         try { await EnsurePairedAsync(d); }
-        catch (Exception ex) { StatusText.Text = "הצימוד נכשל: " + ex.Message; }
+        catch (Exception ex) { StatusText.Text = "הצימוד נכשל: " + ErrorText.Describe(ex); }
         finally { ((FrameworkElement)sender).IsEnabled = true; }
     }
 
@@ -175,7 +175,7 @@ public partial class SendWindow : Wpf.Ui.Controls.FluentWindow
             }
             else StatusText.Text = "הסרת הצימוד נכשלה: " + res.Status;
         }
-        catch (Exception ex) { StatusText.Text = "הסרת הצימוד נכשלה: " + ex.Message; }
+        catch (Exception ex) { StatusText.Text = "הסרת הצימוד נכשלה: " + ErrorText.Describe(ex); }
     }
 
     // ---- שינוי שם ----
@@ -395,8 +395,8 @@ public partial class SendWindow : Wpf.Ui.Controls.FluentWindow
                 }
                 catch (Exception ex)
                 {
-                    entry.Ok = false; entry.Note = ex.Message;
-                    failures.Add($"{t.Name}: {ex.Message}");
+                    entry.Ok = false; entry.Note = ErrorText.Describe(ex);
+                    failures.Add($"{t.Name}: {ErrorText.Describe(ex)}");
                 }
                 finally { History.Add(entry); }
             }
