@@ -999,13 +999,15 @@ public class MainActivity extends Activity implements Events.Listener {
         AlertDialog d = new AlertDialog.Builder(this).setView(outer).create();
         holder[0] = d;
         d.show();
+        // רקע מפורש בצבע המסך הראשי (בלי תלות בעיצוב הדיאלוג של המערכת, שבחלק מהמכשירים שקוף)
+        if (d.getWindow() != null) d.getWindow().setBackgroundDrawable(UiKit.rect(this, UiKit.attr(this, R.attr.sbBg), 16));
         return d;
     }
 
     private TextView sectionTitle(String text) {
         TextView t = new TextView(this);
         t.setText(text);
-        t.setTextSize(13);
+        t.setTextSize(14);
         t.setTypeface(null, android.graphics.Typeface.BOLD);
         t.setTextColor(UiKit.attr(this, R.attr.sbAccent));
         int p = UiKit.dp(this, 10);
