@@ -22,6 +22,8 @@ public static class PeerClient
         var host = svc?.ConnectionHostName
             ?? new Windows.Networking.HostName("(" + string.Join(":", Enumerable.Range(0, 6).Select(i => ((address >> (40 - 8 * i)) & 0xFF).ToString("X2"))) + ")");
         var service = svc?.ConnectionServiceName ?? "{" + PeerProtocol.ServiceUuid.ToString("D") + "}";
+        // לאבחון: איך מצאנו את השירות (חיפוש חי, מטמון או חיבור ישיר)
+        var how = live.Services.Count > 0 ? "חיפוש חי" : svc != null ? "מטמון של Windows" : "חיבור ישיר";
 
         var sock = new StreamSocket();
         using var reg = ct.Register(() => sock.Dispose());
@@ -43,10 +45,11 @@ public static class PeerClient
             OfferHandler = _ => Task.FromResult(PeerProtocol.RejectBusy), // חיבור יוצא לא מקבל קבצים
         };
         await s.StartAsync();
-        if (!await s.WaitHelloAsync(TimeSpan.FromSeconds(8)))
+        // טלפון שהמסך שלו כבוי לפעמים מתעורר לאט, ולכן ממתינים עד 15 שניות
+        if (!await s.WaitHelloAsync(TimeSpan.FromSeconds(15)))
         {
             s.Close();
-            throw new IOException("שליחה קלה במכשיר השני לא ענתה");
+            throw new IOException($"החיבור לטלפון נוצר ({how}) אבל האפליקציה בו לא ענתה תוך 15 שניות. סגור ופתח אותה בטלפון, ובדוק שהקבלה ברקע פעילה");
         }
         return s;
     }
