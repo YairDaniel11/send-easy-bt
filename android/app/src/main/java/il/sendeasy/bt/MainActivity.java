@@ -299,14 +299,64 @@ public class MainActivity extends Activity implements Events.Listener {
         status.setTypeface(null, android.graphics.Typeface.BOLD);
     }
 
+    /** UUID של פרופילי שמע: A2DP כמקלט, דיבורית (HFP) ואוזניית (HSP). מכשיר שמציע אותם בלי OBEX הוא התקן שמע. */
+    private static final String[] AUDIO_UUIDS = {"0000110b", "0000111e", "00001108", "00001203", "0000110d"};
+    private static final String OBEX_PUSH_UUID = "00001105";
+
     /** אוזניות, דיבורית, רמקול ושאר התקני שמע. */
     static boolean isAudio(BluetoothDevice d) {
         try {
             BluetoothClass c = d.getBluetoothClass();
-            return c != null && c.getMajorDeviceClass() == BluetoothClass.Device.Major.AUDIO_VIDEO;
+            if (c != null) {
+                int major = c.getMajorDeviceClass();
+                if (major == BluetoothClass.Device.Major.AUDIO_VIDEO) return true;
+                if (major == BluetoothClass.Device.Major.COMPUTER || major == BluetoothClass.Device.Major.PHONE) return false;
+                // התקן שמציג את עצמו כמשמיע/מקליט שמע (לפי סוג השירות)
+                if (c.hasService(BluetoothClass.Service.RENDER) || c.hasService(BluetoothClass.Service.AUDIO)) {
+                    if (!offersObexPush(d)) return true;
+                }
+            }
+            if (offersAudioProfile(d) && !offersObexPush(d)) return true;
         } catch (SecurityException e) {
             return false;
         }
+        return nameLooksAudio(d);
+    }
+
+    private static boolean offersObexPush(BluetoothDevice d) {
+        return hasUuid(d, new String[]{OBEX_PUSH_UUID});
+    }
+
+    private static boolean offersAudioProfile(BluetoothDevice d) {
+        return hasUuid(d, AUDIO_UUIDS);
+    }
+
+    private static boolean hasUuid(BluetoothDevice d, String[] prefixes) {
+        try {
+            android.os.ParcelUuid[] ids = d.getUuids();
+            if (ids == null) return false;
+            for (android.os.ParcelUuid u : ids) {
+                String s = u.toString().toLowerCase(java.util.Locale.US);
+                for (String p : prefixes) if (s.startsWith(p)) return true;
+            }
+        } catch (SecurityException ignored) { }
+        return false;
+    }
+
+    /** גיבוי אחרון כשהמערכת לא מדווחת סיווג ולא פרופילים: שמות נפוצים של אוזניות ורמקולים. */
+    private static boolean nameLooksAudio(BluetoothDevice d) {
+        String n;
+        try {
+            n = d.getName();
+        } catch (SecurityException e) {
+            return false;
+        }
+        if (n == null) return false;
+        n = n.toLowerCase(java.util.Locale.US);
+        String[] words = {"headset", "headphone", "earbud", "earphone", "buds", "airpods", "speaker", "soundcore", "liberty",
+                "jbl", "bose", "sony wh", "sony wf", "soundbar", "tws"};
+        for (String w : words) if (n.contains(w)) return true;
+        return false;
     }
 
     static boolean isComputer(BluetoothDevice d) {
@@ -877,21 +927,23 @@ public class MainActivity extends Activity implements Events.Listener {
     }
 
     /**
-     * ההגדרות לפי נושאים. הגדרה בלי תת-הגדרות היא מתג הדלקה וכיבוי; הגדרה עם תת-הגדרות (או בחירה) היא שורה עם חץ
-     * שפותחת חלונית משלה. החלונית נשארת פתוחה אחרי כל שינוי. כל השורות ממוקדות לניווט במקשים.
+     * ההגדרות במסך מלא, לפי נושאים, בכרטיסים. הגדרה בלי תת-הגדרות היא מתג הדלקה וכיבוי; הגדרה עם תת-הגדרות
+     * (או בחירה) היא שורה עם חץ שפותחת מסך משלה. המסך נשאר פתוח אחרי כל שינוי, וחזרה סוגרת אותו.
+     * כל השורות ממוקדות לניווט במקשים.
      */
     private void showSettings() {
-        final LinearLayout box = settingsBox();
+        final LinearLayout body = pageBody();
 
-        box.addView(sectionTitle(getString(R.string.set_sec_general)));
-        box.addView(switchRow(getString(R.string.set_receive), Prefs.receiveEnabled(this), new UiKit.ToggleView.Listener() {
+        body.addView(sectionTitle(getString(R.string.set_sec_general)));
+        LinearLayout general = card();
+        addRow(general, switchRow(getString(R.string.set_receive), Prefs.receiveEnabled(this), new UiKit.ToggleView.Listener() {
             @Override public void onChanged(boolean on) {
                 Prefs.setReceiveEnabled(MainActivity.this, on);
                 if (on) BtService.start(MainActivity.this); else BtService.stop(MainActivity.this);
                 updateStatus();
             }
         }));
-        box.addView(switchRow(getString(R.string.set_svc_notif), Prefs.showServiceNotification(this), new UiKit.ToggleView.Listener() {
+        addRow(general, switchRow(getString(R.string.set_svc_notif), Prefs.showServiceNotification(this), new UiKit.ToggleView.Listener() {
             @Override public void onChanged(boolean on) {
                 Prefs.setShowServiceNotification(MainActivity.this, on);
                 // הפעלה מחדש כדי שההתראה תיבנה בערוץ המתאים
@@ -899,21 +951,23 @@ public class MainActivity extends Activity implements Events.Listener {
                 if (!on && Build.VERSION.SDK_INT >= 26) offerHideInSystemSettings();
             }
         }));
-        box.addView(switchRow(getString(R.string.set_dark), ThemeUtil.isDark(this), new UiKit.ToggleView.Listener() {
+        addRow(general, switchRow(getString(R.string.set_dark), ThemeUtil.isDark(this), new UiKit.ToggleView.Listener() {
             @Override public void onChanged(boolean on) {
                 Prefs.setTheme(MainActivity.this, on ? 2 : 1);
-                // המסך נטען מחדש בערכת הנושא החדשה, ואז חלון ההגדרות נפתח שוב
+                // המסך נטען מחדש בערכת הנושא החדשה, ואז ההגדרות נפתחות שוב
                 reopenSettings = true;
                 if (settingsDlg != null) settingsDlg.dismiss();
                 recreate();
             }
         }));
+        body.addView(general);
 
-        box.addView(sectionTitle(getString(R.string.set_sec_messages)));
-        box.addView(actionRow(getString(R.string.menu_notify_alerts), new Runnable() {
+        body.addView(sectionTitle(getString(R.string.set_sec_messages)));
+        LinearLayout messages = card();
+        addRow(messages, actionRow(getString(R.string.menu_notify_alerts), new Runnable() {
             @Override public void run() { showNotifySettings(); }
         }));
-        box.addView(actionRow(getString(R.string.menu_chat_style), new Runnable() {
+        addRow(messages, actionRow(getString(R.string.menu_chat_style), new Runnable() {
             @Override public void run() {
                 new AlertDialog.Builder(MainActivity.this)
                         .setTitle(R.string.menu_chat_style)
@@ -922,111 +976,153 @@ public class MainActivity extends Activity implements Events.Listener {
                         }).show();
             }
         }));
-        box.addView(actionRow(getString(R.string.menu_delete_chats), new Runnable() {
+        addRow(messages, actionRow(getString(R.string.menu_delete_chats), new Runnable() {
             @Override public void run() { showDeleteChats(); }
         }));
+        body.addView(messages);
 
-        box.addView(sectionTitle(getString(R.string.set_sec_files)));
-        box.addView(actionRow(getString(R.string.menu_receive_dir), new Runnable() {
+        body.addView(sectionTitle(getString(R.string.set_sec_files)));
+        LinearLayout files = card();
+        addRow(files, actionRow(getString(R.string.menu_receive_dir), new Runnable() {
             @Override public void run() {
                 new AlertDialog.Builder(MainActivity.this)
                         .setMessage(getString(R.string.main_receive_dir, Fmt.ltr(Storage.receiveDirLabel(MainActivity.this))))
                         .setPositiveButton(android.R.string.ok, null).show();
             }
         }));
-        box.addView(actionRow(getString(R.string.menu_save_dir), new Runnable() {
+        addRow(files, actionRow(getString(R.string.menu_save_dir), new Runnable() {
             @Override public void run() { showSaveDirDialog(); }
         }));
+        body.addView(files);
 
-        box.addView(sectionTitle(getString(R.string.set_sec_devices)));
-        box.addView(actionRow(getString(R.string.menu_rename_device), new Runnable() {
+        body.addView(sectionTitle(getString(R.string.set_sec_devices)));
+        LinearLayout devs = card();
+        addRow(devs, actionRow(getString(R.string.menu_rename_device), new Runnable() {
             @Override public void run() { showRenameDevice(); }
         }));
+        body.addView(devs);
 
-        settingsDlg = styledDialog(getString(R.string.menu_settings), box);
+        settingsDlg = pageDialog(getString(R.string.menu_settings), body);
     }
 
     /** התראה בעת קבלת הודעה: ההתראה עצמה ואופן ההתראה (תת-הגדרות). */
     private void showNotifySettings() {
-        LinearLayout box = settingsBox();
-        box.addView(switchRow(getString(R.string.set_notify), Prefs.notifyEvents(this), new UiKit.ToggleView.Listener() {
+        LinearLayout body = pageBody();
+        body.addView(sectionTitle(getString(R.string.set_sec_notify)));
+        LinearLayout main = card();
+        addRow(main, switchRow(getString(R.string.set_notify), Prefs.notifyEvents(this), new UiKit.ToggleView.Listener() {
             @Override public void onChanged(boolean on) { Prefs.setNotifyEvents(MainActivity.this, on); }
         }));
-        box.addView(sectionTitle(getString(R.string.set_sec_alert_kind)));
-        box.addView(switchRow(getString(R.string.alert_ring), Prefs.notifySound(this), new UiKit.ToggleView.Listener() {
+        body.addView(main);
+        body.addView(sectionTitle(getString(R.string.set_sec_alert_kind)));
+        LinearLayout kind = card();
+        addRow(kind, switchRow(getString(R.string.alert_ring), Prefs.notifySound(this), new UiKit.ToggleView.Listener() {
             @Override public void onChanged(boolean on) { Prefs.setNotifySound(MainActivity.this, on); }
         }));
-        box.addView(switchRow(getString(R.string.alert_vibrate), Prefs.notifyVibrate(this), new UiKit.ToggleView.Listener() {
+        addRow(kind, switchRow(getString(R.string.alert_vibrate), Prefs.notifyVibrate(this), new UiKit.ToggleView.Listener() {
             @Override public void onChanged(boolean on) { Prefs.setNotifyVibrate(MainActivity.this, on); }
         }));
-        box.addView(switchRow(getString(R.string.alert_wake), Prefs.notifyWake(this), new UiKit.ToggleView.Listener() {
+        addRow(kind, switchRow(getString(R.string.alert_wake), Prefs.notifyWake(this), new UiKit.ToggleView.Listener() {
             @Override public void onChanged(boolean on) { Prefs.setNotifyWake(MainActivity.this, on); }
         }));
-        styledDialog(getString(R.string.menu_notify_alerts), box);
+        body.addView(kind);
+        pageDialog(getString(R.string.menu_notify_alerts), body);
     }
 
-    private AlertDialog settingsDlg;
+    private android.app.Dialog settingsDlg;
 
-    private LinearLayout settingsBox() {
+    private LinearLayout pageBody() {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        int pad = UiKit.dp(this, 6);
-        box.setPadding(pad, pad, pad, pad);
+        int pad = UiKit.dp(this, 10);
+        box.setPadding(pad, 0, pad, pad);
         return box;
     }
 
-    /** חלונית בצבעי המסך הראשי: כותרת, תוכן נגלל וכפתור סגירה עגול. */
-    private AlertDialog styledDialog(String title, View content) {
+    /** מסך מלא בעיצוב המסך הראשי: סרגל כותרת עם חזרה, ותוכן נגלל. חזרה (או המקש הרך הימני) סוגרת אותו. */
+    private android.app.Dialog pageDialog(String title, View content) {
+        final android.app.Dialog d = new android.app.Dialog(this, ThemeUtil.isDark(this) ? R.style.AppTheme_Dark : R.style.AppTheme_Light);
         LinearLayout outer = new LinearLayout(this);
         outer.setOrientation(LinearLayout.VERTICAL);
         outer.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        outer.setBackgroundColor(UiKit.attr(this, R.attr.sbBg));
+
+        LinearLayout head = new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        head.setBackgroundColor(UiKit.attr(this, R.attr.sbHeader));
+        int hp = UiKit.dp(this, 14);
+        head.setPadding(hp, 0, hp, 0);
+        TextView back = new TextView(this);
+        back.setText("›");
+        back.setTextSize(26);
+        back.setTextColor(0xFFFFFFFF);
+        back.setPadding(0, 0, UiKit.dp(this, 12), UiKit.dp(this, 3));
+        head.addView(back);
         TextView t = new TextView(this);
         t.setText(title);
-        t.setTextSize(18);
+        t.setTextSize(17);
         t.setTypeface(null, android.graphics.Typeface.BOLD);
-        t.setGravity(android.view.Gravity.CENTER);
-        t.setTextColor(UiKit.attr(this, R.attr.sbText));
-        int p = UiKit.dp(this, 10);
-        t.setPadding(p, p, p, p);
-        outer.addView(t, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        t.setTextColor(0xFFFFFFFF);
+        head.addView(t, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        head.setClickable(true);
+        head.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { d.dismiss(); }
+        });
+        outer.addView(head, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, UiKit.dp(this, 48)));
+
         android.widget.ScrollView sv = new android.widget.ScrollView(this);
         sv.addView(content);
         outer.addView(sv, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
-        final AlertDialog[] holder = new AlertDialog[1];
-        TextView close = UiKit.actionButton(this, getString(R.string.savedir_close), new View.OnClickListener() {
-            @Override public void onClick(View v) { if (holder[0] != null) holder[0].dismiss(); }
+
+        d.setContentView(outer);
+        d.setOnKeyListener(new DialogInterface.OnKeyListener() {
+            @Override public boolean onKey(DialogInterface dlg, int code, KeyEvent e) {
+                if (e.getAction() == KeyEvent.ACTION_UP && Keys.isBackAlt(code)) { dlg.dismiss(); return true; }
+                return false;
+            }
         });
-        LinearLayout.LayoutParams cl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        cl.setMargins(p, p / 2, p, p);
-        outer.addView(close, cl);
-        AlertDialog d = new AlertDialog.Builder(this).setView(outer).create();
-        holder[0] = d;
         d.show();
-        // רקע מפורש בצבע המסך הראשי (בלי תלות בעיצוב הדיאלוג של המערכת, שבחלק מהמכשירים שקוף)
-        if (d.getWindow() != null) d.getWindow().setBackgroundDrawable(UiKit.rect(this, UiKit.attr(this, R.attr.sbBg), 16));
+        if (d.getWindow() != null) d.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         return d;
     }
 
     private TextView sectionTitle(String text) {
         TextView t = new TextView(this);
         t.setText(text);
-        t.setTextSize(14);
+        t.setTextSize(13);
         t.setTypeface(null, android.graphics.Typeface.BOLD);
         t.setTextColor(UiKit.attr(this, R.attr.sbAccent));
-        int p = UiKit.dp(this, 10);
-        t.setPadding(p, p, p, UiKit.dp(this, 4));
+        t.setPadding(UiKit.dp(this, 4), UiKit.dp(this, 12), UiKit.dp(this, 4), UiKit.dp(this, 4));
         return t;
     }
 
-    /** רקע שורה: כרטיס עגול עם מסגרת עדינה, וטבעת בולטת בפוקוס (ניווט במקשים) ובלחיצה. */
+    /** כרטיס עגול שמקבץ שורות, עם קו דק ביניהן. */
+    private LinearLayout card() {
+        LinearLayout c = new LinearLayout(this);
+        c.setOrientation(LinearLayout.VERTICAL);
+        c.setBackgroundDrawable(UiKit.rect(this, UiKit.attr(this, R.attr.sbRow), 14, 0x33888888, 1));
+        c.setPadding(UiKit.dp(this, 1), UiKit.dp(this, 1), UiKit.dp(this, 1), UiKit.dp(this, 1));
+        return c;
+    }
+
+    private void addRow(LinearLayout card, View row) {
+        if (card.getChildCount() > 0) {
+            View line = new View(this);
+            line.setBackgroundColor(0x33888888);
+            card.addView(line, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1));
+        }
+        card.addView(row);
+    }
+
+    /** רקע שורה: שקוף, וטבעת בולטת בפוקוס (ניווט במקשים) ובלחיצה. */
     private android.graphics.drawable.Drawable rowBackground() {
         int accent = UiKit.attr(this, R.attr.sbAccent);
-        int row = UiKit.attr(this, R.attr.sbRow);
         android.graphics.drawable.StateListDrawable sl = new android.graphics.drawable.StateListDrawable();
-        sl.addState(new int[]{android.R.attr.state_focused}, UiKit.rect(this, row, 20, accent, 3));
-        sl.addState(new int[]{android.R.attr.state_pressed}, UiKit.rect(this, row, 20, accent, 3));
-        sl.addState(new int[]{}, UiKit.rect(this, row, 20, 0x44888888, 1));
+        sl.addState(new int[]{android.R.attr.state_focused}, UiKit.rect(this, 0x00000000, 12, accent, 3));
+        sl.addState(new int[]{android.R.attr.state_pressed}, UiKit.rect(this, 0x22888888, 12, accent, 3));
+        sl.addState(new int[]{}, UiKit.rect(this, 0x00000000, 12));
         return sl;
     }
 
@@ -1036,14 +1132,12 @@ public class MainActivity extends Activity implements Events.Listener {
         row.setGravity(android.view.Gravity.CENTER_VERTICAL);
         row.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         row.setMinimumHeight(UiKit.dp(this, 42));
-        int p = UiKit.dp(this, 14);
-        row.setPadding(p, UiKit.dp(this, 6), p, UiKit.dp(this, 6));
+        int p = UiKit.dp(this, 12);
+        row.setPadding(p, UiKit.dp(this, 4), p, UiKit.dp(this, 4));
         row.setFocusable(true);
         row.setClickable(true);
         row.setBackgroundDrawable(rowBackground());
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.setMargins(UiKit.dp(this, 4), UiKit.dp(this, 3), UiKit.dp(this, 4), UiKit.dp(this, 3));
-        row.setLayoutParams(lp);
+        row.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         return row;
     }
 
@@ -1069,7 +1163,7 @@ public class MainActivity extends Activity implements Events.Listener {
         return row;
     }
 
-    /** שורה שפותחת חלונית משנה (חץ בצד). */
+    /** שורה שפותחת מסך משנה (חץ בצד). */
     private View actionRow(String label, final Runnable action) {
         LinearLayout row = baseRow();
         row.addView(rowLabel(label));

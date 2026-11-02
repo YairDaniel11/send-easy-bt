@@ -225,4 +225,5 @@
     <string name="set_sec_files">קבצים</string>
     <string name="set_sec_devices">מכשירים</string>
     <string name="set_sec_alert_kind">אופן ההתראה</string>
+    <string name="set_sec_notify">התראה</string>
 </resources>

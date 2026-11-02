@@ -98,9 +98,9 @@ public static class SendService
             catch when (ct.IsCancellationRequested) { throw new OperationCanceledException(ct); }
             catch (Exception ex)
             {
-                why = ex.Message;
+                why = ErrorText.Describe(ex);
                 if (i == attempts) return (null, why);
-                status($"מתחבר לשליחה קלה במכשיר השני... ניסיון {i + 1} מתוך {attempts} ({ex.Message})");
+                status($"מתחבר לשליחה קלה במכשיר השני... ניסיון {i + 1} מתוך {attempts} ({ErrorText.Describe(ex)})");
                 System.Diagnostics.Debug.WriteLine($"PeerClient attempt {i} failed: {ex.GetType().Name} 0x{ex.HResult:X8} {ex.Message}");
                 await Task.Delay(2000, ct);
             }

@@ -10,6 +10,18 @@ public static class ErrorText
     {
         for (var e = ex; e != null; e = e.InnerException)
         {
+            // WinRT מחזיר קודי Windows Sockets כ-HResult ולא כ-SocketException
+            switch ((uint)e.HResult)
+            {
+                case 0x80072740: // WSAEADDRINUSE
+                    return "חיבור קודם למכשיר עדיין נסגר. מנסה שוב.";
+                case 0x8007274D: // WSAECONNREFUSED
+                    return "המכשיר השני סירב לחיבור. ודא שהאפליקציה פתוחה בו.";
+                case 0x8007274C or 0x80072751 or 0x80070490: // פסק זמן, אין נתיב, לא נמצא
+                    return "המכשיר השני לא זמין. ודא שהבלוטוס פועל והמכשיר קרוב.";
+                case 0x80072745 or 0x80072746: // החיבור נקטע
+                    return "החיבור למכשיר נותק.";
+            }
             switch (e)
             {
                 case TaskCanceledException or TimeoutException:
