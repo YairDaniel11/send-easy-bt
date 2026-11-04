@@ -45,6 +45,10 @@ public sealed class Settings
     public string ChatHotkey { get; set; } = "Ctrl+Alt+C";
     /// <summary>מצב כהה לכל חלונות התוכנה.</summary>
     public bool DarkMode { get; set; } = false;
+    /// <summary>מעבר בין חלונות מהכפתורים העליונים סוגר את החלון הנוכחי, כדי שלא יצטברו חלונות פתוחים.</summary>
+    public bool NavReplacesWindow { get; set; } = true;
+    /// <summary>האזנה להקלטה לפני שליחה (ברירת מחדל לא).</summary>
+    public bool VoicePreview { get; set; } = false;
     /// <summary>בדיקת עדכונים: מאגר GitHub בפורמט owner/repo. ריק = כבוי.</summary>
     /// <summary>חלון קטן בפינה בכל הודעה חדשה (כשחלון הצ'אט לא פתוח בחזית).</summary>
     public bool NotifyPopup { get; set; } = true;

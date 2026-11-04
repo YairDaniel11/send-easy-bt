@@ -418,6 +418,7 @@ public class BtService extends Service {
                 ChatStore.add(BtService.this, address, new ChatStore.Msg(System.currentTimeMillis(), false, ChatStore.T_FILE, f.name, 0, ChatStore.S_UNREAD));
                 Events.post(Events.CHAT, address);
             }
+            if (!f.fromChat) FileLog.add(BtService.this, false, name(), f.name, f.size);
             Events.post(Events.RECEIVED, f.name);
             notifyEvent(getString(R.string.rx_file, f.name), where, null, openFolder());
             return true;

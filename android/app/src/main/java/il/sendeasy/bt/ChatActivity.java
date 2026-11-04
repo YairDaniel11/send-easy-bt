@@ -222,6 +222,15 @@ public class ChatActivity extends Activity implements Events.Listener {
                 if (m.isVoice()) togglePlay(m);
                 else if (m.isPic()) { if (style == 2) openImage(m); else onPicClick(pos, m); }
                 else if (ChatStore.T_FILE.equals(m.kind)) openFileMessage(m);
+                else if (ChatStore.T_TEXT.equals(m.kind)) copyMsg(m);
+            }
+        });
+        list.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
+            @Override public boolean onItemLongClick(AdapterView<?> p, View v, int pos, long id) {
+                ChatStore.Msg m = msgs.get(pos);
+                if (!ChatStore.T_TEXT.equals(m.kind)) return false;
+                showSelectable(m);
+                return true;
             }
         });
         list.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -241,7 +250,7 @@ public class ChatActivity extends Activity implements Events.Listener {
             @Override public void onClick(View v) { toggleRecording(); }
         });
         attachBtn.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { FilePicker.pick(ChatActivity.this); }
+            @Override public void onClick(View v) { onAttach(); }
         });
         recPauseBtn.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { togglePause(); }
@@ -358,7 +367,7 @@ public class ChatActivity extends Activity implements Events.Listener {
         kpAttach.setIcon(IconView.ATTACH);
         kpAttach.setClickable(true);
         kpAttach.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { FilePicker.pick(ChatActivity.this); }
+            @Override public void onClick(View v) { onAttach(); }
         });
         kpMic.setIcon(IconView.MIC);
         kpMic.setClickable(true);
@@ -1112,6 +1121,55 @@ public class ChatActivity extends Activity implements Events.Listener {
             Toast.makeText(this, R.string.voice_too_short, Toast.LENGTH_SHORT).show();
             return;
         }
+        if (Prefs.voicePreview(this)) showVoicePreview(f); else sendRecorded(f);
+    }
+
+    /** האזנה להקלטה לפני שליחה (אם הוגדר בהגדרות): שלח, האזן, או מחק. */
+    private void showVoicePreview(final File f) {
+        final MediaPlayer[] mp = new MediaPlayer[1];
+        final AlertDialog d = new AlertDialog.Builder(this)
+                .setMessage("ההקלטה מוכנה")
+                .setCancelable(false)
+                .setPositiveButton("שלח", new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface dl, int w) { releasePreview(mp); sendRecorded(f); }
+                })
+                .setNegativeButton("מחק", new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface dl, int w) { releasePreview(mp); f.delete(); }
+                })
+                .setNeutralButton("האזן", null)
+                .create();
+        d.show();
+        d.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                if (mp[0] != null) { releasePreview(mp); return; }
+                try {
+                    MediaPlayer m = new MediaPlayer();
+                    FileInputStream in = new FileInputStream(f);
+                    try { m.setDataSource(in.getFD()); } finally { in.close(); }
+                    m.prepare();
+                    m.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+                        @Override public void onCompletion(MediaPlayer p) { releasePreview(mp); }
+                    });
+                    m.start();
+                    mp[0] = m;
+                } catch (IOException e) {
+                    Toast.makeText(ChatActivity.this, R.string.voice_play_failed, Toast.LENGTH_SHORT).show();
+                } catch (RuntimeException e) {
+                    Toast.makeText(ChatActivity.this, R.string.voice_play_failed, Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+    }
+
+    private void releasePreview(MediaPlayer[] mp) {
+        MediaPlayer m = mp[0];
+        mp[0] = null;
+        if (m == null) return;
+        try { m.stop(); } catch (RuntimeException ignored) { }
+        try { m.release(); } catch (RuntimeException ignored) { }
+    }
+
+    private void sendRecorded(final File f) {
         final Context app = getApplicationContext();
         final boolean track = !picSending; // אם נשלחות תמונות עכשיו: בלי שורת ביטול נפרדת
         final AtomicBoolean vcancel = track ? picCancel : new AtomicBoolean(false);
@@ -1254,12 +1312,24 @@ public class ChatActivity extends Activity implements Events.Listener {
     }
 
     /** הדבקה כללית מהלוח: תמונה נשלחת (אחרי תצוגה מקדימה), וטקסט מוכנס בתיבת הכתיבה בסמן. */
-    private void pasteFromClipboard() {
+    private void pasteFromClipboard() { pasteFromClipboard(0); }
+
+    /**
+     * באנדרואיד 10 ומעלה (ובשיאומי במיוחד) הלוח נקרא רק כשהחלון בפוקוס, ובדיוק אחרי סגירת התפריט הפוקוס עוד לא חזר.
+     * לכן ממתינים רגע וחוזרים על הניסיון פעם אחת, ורק אז מודיעים שאין מה להדביק.
+     */
+    private void pasteFromClipboard(final int attempt) {
         Uri pu = PasteEditText.clipImage(this);
         if (pu != null) { onImagePasted(pu); return; }
         CharSequence t = PasteEditText.clipText(this);
         if (t == null || t.length() == 0) {
-            Toast.makeText(this, R.string.paste_none, Toast.LENGTH_SHORT).show();
+            if (attempt < 2) {
+                ui.postDelayed(new Runnable() {
+                    @Override public void run() { if (!destroyed) pasteFromClipboard(attempt + 1); }
+                }, 250);
+                return;
+            }
+            Toast.makeText(this, R.string.paste_none, Toast.LENGTH_LONG).show();
             return;
         }
         int s = Math.max(0, input.getSelectionStart()), e = Math.max(0, input.getSelectionEnd());
@@ -1438,9 +1508,55 @@ public class ChatActivity extends Activity implements Events.Listener {
                 .show();
     }
 
+    private static final int REQ_CAMERA = 4003;
+
+    /** צירוף: במכשיר מגע עם מצלמה אפשר לבחור בין קובץ למצלמה; אחרת בורר הקבצים. */
+    private void onAttach() {
+        boolean cam = getPackageManager().hasSystemFeature(android.content.pm.PackageManager.FEATURE_TOUCHSCREEN)
+                && getPackageManager().hasSystemFeature(android.content.pm.PackageManager.FEATURE_CAMERA);
+        if (!cam) { FilePicker.pick(this); return; }
+        new AlertDialog.Builder(this)
+                .setItems(new String[]{"קובץ", "מצלמה"}, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int which) {
+                        if (which == 0) FilePicker.pick(ChatActivity.this); else takePhoto();
+                    }
+                }).show();
+    }
+
+    private void takePhoto() {
+        try {
+            File f = CamProvider.file(this);
+            if (f.exists()) f.delete();
+            Intent i = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
+            i.putExtra(android.provider.MediaStore.EXTRA_OUTPUT, CamProvider.uri(this));
+            i.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            if (android.os.Build.VERSION.SDK_INT < 21) {
+                // בגרסאות ישנות ההרשאה לא עוברת עם ה-Intent: מעניקים לכל אפליקציית מצלמה
+                for (android.content.pm.ResolveInfo ri : getPackageManager().queryIntentActivities(i, 0))
+                    grantUriPermission(ri.activityInfo.packageName, CamProvider.uri(this), Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            }
+            startActivityForResult(i, REQ_CAMERA);
+        } catch (RuntimeException e) {
+            Toast.makeText(this, "לא נמצאה אפליקציית מצלמה", Toast.LENGTH_SHORT).show();
+        }
+    }
+
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
+        if (req == REQ_CAMERA) {
+            File shot = CamProvider.file(this);
+            if (res == RESULT_OK && shot.isFile() && shot.length() > 0) {
+                // עותק בשם ייחודי, כדי שהצילום הבא לא ידרוס את זה שעדיין נשלח
+                File copy = new File(CamProvider.dir(this), "IMG_" + System.currentTimeMillis() + ".jpg");
+                if (shot.renameTo(copy)) {
+                    ArrayList<Uri> one = new ArrayList<Uri>();
+                    one.add(Uri.fromFile(copy));
+                    sendImages(one);
+                }
+            }
+            return;
+        }
         if (res != RESULT_OK || data == null) return;
         ArrayList<Uri> files = FilePicker.result(req, data);
         if (!files.isEmpty()) sendImages(files);
@@ -1512,6 +1628,33 @@ public class ChatActivity extends Activity implements Events.Listener {
     }
 
     // ------------------------------------------------------------ בניית שורות הודעה
+
+    /** חלון עם טקסט ההודעה שאפשר לסמן ממנו חלק (לחיצה ארוכה), או להעתיק הכל. */
+    private void showSelectable(final ChatStore.Msg m) {
+        TextView t = new TextView(this);
+        t.setText(m.text);
+        t.setTextSize(18);
+        t.setPadding(UiKit.dp(this, 18), UiKit.dp(this, 14), UiKit.dp(this, 18), UiKit.dp(this, 6));
+        if (android.os.Build.VERSION.SDK_INT >= 11) t.setTextIsSelectable(true);
+        android.widget.ScrollView sv = new android.widget.ScrollView(this);
+        sv.addView(t);
+        new AlertDialog.Builder(this)
+                .setView(sv)
+                .setPositiveButton("העתק הכל", new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) { copyMsg(m); }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    /** העתקת טקסט ההודעה ללוח (לחיצה או לחיצה ארוכה על הודעת טקסט). */
+    private void copyMsg(ChatStore.Msg m) {
+        try {
+            android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            cm.setPrimaryClip(android.content.ClipData.newPlainText("msg", m.text));
+            android.widget.Toast.makeText(this, "ההודעה הועתקה", android.widget.Toast.LENGTH_SHORT).show();
+        } catch (Exception ignored) { }
+    }
 
     private TextView text(String s, int color, float sp) {
         TextView t = new TextView(this);

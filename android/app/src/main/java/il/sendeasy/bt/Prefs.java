@@ -78,6 +78,15 @@ final class Prefs {
         sp(c).edit().putBoolean("notifyVibrate", on).apply();
     }
 
+    /** האזנה להקלטה לפני שליחה (ברירת מחדל לא). */
+    static boolean voicePreview(Context c) {
+        return sp(c).getBoolean("voicePreview", false);
+    }
+
+    static void setVoicePreview(Context c, boolean on) {
+        sp(c).edit().putBoolean("voicePreview", on).apply();
+    }
+
     /** הדלקת המסך בעת קבלת הודעה (ברירת מחדל לא). */
     static boolean notifyWake(Context c) {
         return sp(c).getBoolean("notifyWake", false);

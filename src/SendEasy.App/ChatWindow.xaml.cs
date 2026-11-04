@@ -641,10 +641,11 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
 
         if (m.Kind == MsgKind.Text)
         {
-            var tb = Line(who + ": " + m.Text);
-            tb.Margin = gap;
-            if (m.Mine) tb.Inlines.Add(new Run(tickText) { FontSize = 13, Foreground = tickBrush });
-            return tb;
+            var rtb = SelectableText(who + ": " + m.Text, PaperSize, Brushes.Black, new FontFamily(PaperFont));
+            rtb.Margin = gap;
+            if (m.Mine && rtb.Document.Blocks.FirstBlock is Paragraph para)
+                para.Inlines.Add(new Run(tickText) { FontSize = 13, Foreground = tickBrush });
+            return rtb;
         }
 
         var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = gap };
@@ -738,14 +739,43 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
             case MsgKind.Voice: return VoiceBubble(m, style);
             case MsgKind.File: return FileBubble(m, style);
             default:
-                var tb = new TextBlock
-                {
-                    TextWrapping = TextWrapping.Wrap, FontSize = 14.5, Foreground = B(_p.Text),
-                    Margin = new Thickness(0, style == 1 ? 2 : 0, 0, 0),
-                };
-                Emoticons.Fill(tb, m.Text, 14.5);
-                return tb;
+                var rtb = SelectableText(m.Text, 14.5, B(_p.Text), null, style == 0 ? 440 : 0);
+                rtb.Margin = new Thickness(0, style == 1 ? 2 : 0, 0, 0);
+                return rtb;
         }
+    }
+
+    /// <summary>טקסט הודעה שאפשר לסמן ולהעתיק (חלק ממנו או כולו): RichTextBox לקריאה בלבד בלי מסגרת, עם אימוג'י כתמונות.</summary>
+    static RichTextBox SelectableText(string text, double fontSize, Brush fg, FontFamily? font, double shrinkMax = 0)
+    {
+        var tmp = new TextBlock();
+        Emoticons.Fill(tmp, text, fontSize);
+        var inlines = tmp.Inlines.ToList();
+        tmp.Inlines.Clear();
+        var para = new Paragraph { Margin = new Thickness(0) };
+        foreach (var i in inlines) para.Inlines.Add(i);
+        var rtb = new RichTextBox
+        {
+            IsReadOnly = true, IsReadOnlyCaretVisible = false, BorderThickness = new Thickness(0), Background = Brushes.Transparent,
+            Padding = new Thickness(0), Foreground = fg, FontSize = fontSize, Cursor = Cursors.IBeam,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            Document = new FlowDocument(para) { PagePadding = new Thickness(0) },
+            FocusVisualStyle = null, HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        if (font != null) rtb.FontFamily = font;
+        if (shrinkMax > 0)
+        {
+            // בבועה הרוחב לפי הטקסט (עד המקסימום), ולא תמיד המקסימום
+            try
+            {
+                var ft = new FormattedText(Emoticons.ToGlyphs(text), System.Globalization.CultureInfo.GetCultureInfo("he-IL"), FlowDirection.RightToLeft,
+                    new Typeface(rtb.FontFamily, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal), fontSize, Brushes.Black, 1.0)
+                { MaxTextWidth = shrinkMax };
+                rtb.Width = Math.Min(shrinkMax, Math.Ceiling(ft.WidthIncludingTrailingWhitespace) + 16);
+            }
+            catch { }
+        }
+        return rtb;
     }
 
     static bool IsImage(string name) => System.IO.Path.GetExtension(name).ToLowerInvariant() is ".jpg" or ".jpeg" or ".png" or ".gif" or ".bmp" or ".webp";
@@ -1219,6 +1249,11 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         if (!send || conv == null) { await _voice.CancelAsync(); return; }
         var path = await _voice.StopAsync();
         if (path == null) { ShowError("ההקלטה קצרה מדי"); return; }
+        if (_settings.VoicePreview && !PreviewVoice(path))
+        {
+            try { System.IO.File.Delete(path); } catch { }
+            return;
+        }
         var name = System.IO.Path.GetFileName(path);
         long size = new System.IO.FileInfo(path).Length;
         var entry = new ChatEntry { Mine = true, Kind = "voice", Text = name, Size = size, Path = path, Device = conv.Name };
@@ -1244,6 +1279,39 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         Reload(conv);
         Update(conv);
         if (!ok) ShowError(err);
+    }
+
+    /// <summary>חלון קטן להאזנה להקלטה לפני שליחה. מחזיר true לשליחה, false למחיקה.</summary>
+    bool PreviewVoice(string path)
+    {
+        var mp = new System.Windows.Media.MediaPlayer();
+        bool playing = false;
+        bool send = false;
+        mp.Open(new Uri(path));
+        var win = new Window
+        {
+            Title = "ההקלטה מוכנה", Width = 340, SizeToContent = SizeToContent.Height, Owner = this, ResizeMode = ResizeMode.NoResize,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner, FlowDirection = FlowDirection.RightToLeft, ShowInTaskbar = false,
+        };
+        var play = new Button { Content = "▶ האזן", Padding = new Thickness(14, 6, 14, 6), Margin = new Thickness(4) };
+        var ok = new Button { Content = "שלח", Padding = new Thickness(14, 6, 14, 6), Margin = new Thickness(4), IsDefault = true };
+        var del = new Button { Content = "מחק", Padding = new Thickness(14, 6, 14, 6), Margin = new Thickness(4), IsCancel = true };
+        play.Click += (_, _) =>
+        {
+            if (playing) { mp.Stop(); playing = false; play.Content = "▶ האזן"; }
+            else { mp.Position = TimeSpan.Zero; mp.Play(); playing = true; play.Content = "■ עצור"; }
+        };
+        mp.MediaEnded += (_, _) => { playing = false; play.Content = "▶ האזן"; };
+        ok.Click += (_, _) => { send = true; win.Close(); };
+        var panel = new StackPanel { Margin = new Thickness(16) };
+        panel.Children.Add(new TextBlock { Text = "ההקלטה מוכנה. להאזין לפני השליחה?", Margin = new Thickness(0, 0, 0, 12), TextWrapping = TextWrapping.Wrap });
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
+        buttons.Children.Add(ok); buttons.Children.Add(play); buttons.Children.Add(del);
+        panel.Children.Add(buttons);
+        win.Content = panel;
+        win.ShowDialog();
+        try { mp.Stop(); mp.Close(); } catch { }
+        return send;
     }
 
     void StopPlayback()

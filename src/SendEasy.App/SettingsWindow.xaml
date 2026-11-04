@@ -27,6 +27,8 @@
 
                 <TextBlock Text="מראה" FontWeight="SemiBold" Margin="0,0,0,6"/>
                 <ui:ToggleSwitch x:Name="DarkBox" Content="מצב כהה" Click="Dark_Click"/>
+                <ui:ToggleSwitch x:Name="NavReplaceBox" Content="מעבר בין חלונות סוגר את החלון הנוכחי"/>
+                <ui:ToggleSwitch x:Name="VoicePreviewBox" Content="האזנה להקלטה לפני שליחה"/>
 
                 <TextBlock Text="קבלת קבצים" FontWeight="SemiBold" Margin="0,18,0,6"/>
                 <ComboBox x:Name="ModeBox" HorizontalAlignment="Stretch">

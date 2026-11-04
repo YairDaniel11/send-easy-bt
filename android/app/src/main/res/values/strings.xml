@@ -194,7 +194,7 @@
     <string name="file_open_failed">אי אפשר לפתוח את הקובץ</string>
     <string name="chat_connect_failed">אי אפשר להתחבר למחשב. ודא שהתוכנה פתוחה במחשב והבלוטוס פועל</string>
     <string name="chat_menu_paste">הדבק מהלוח</string>
-    <string name="paste_none">הלוח ריק</string>
+    <string name="paste_none">הלוח ריק, או שהמכשיר חוסם קריאה ממנו. בשיאומי: הגדרות האפליקציה &gt; הרשאות &gt; לוח (או כתיבה בתיבה ולחיצה ארוכה עליה והדבק)</string>
     <string name="draft_offer">לשמור את ההודעה כטיוטה? היא תישלח יחד עם ההודעה הבאה שתשלחו למכשיר הזה.</string>
     <string name="draft_saved">ההודעה נשמרה כטיוטה</string>
     <string name="paste_failed">לא ניתן להדביק תמונה</string>
@@ -223,6 +223,10 @@
     <string name="set_receive">קבלת קבצים והודעות ברקע</string>
     <string name="set_svc_notif">התראה קבועה בסטטוס בר</string>
     <string name="set_notify">התראה בעת קבלת הודעה</string>
+    <string name="set_voice_preview">האזנה להקלטה לפני שליחה</string>
+    <string name="menu_files_history">קבצים שנשלחו ונתקבלו</string>
+    <string name="files_history_empty">עדיין לא נשלחו או נתקבלו קבצים.</string>
+    <string name="chats_pick_some">לא נבחרו שיחות</string>
     <string name="set_dark">מצב כהה</string>
     <string name="set_sec_general">כללי</string>
     <string name="set_sec_messages">הודעות וצ\'אט</string>

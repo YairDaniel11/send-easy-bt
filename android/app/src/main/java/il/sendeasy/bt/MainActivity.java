@@ -138,11 +138,41 @@ public class MainActivity extends Activity implements Events.Listener {
         handleShare(intent);
     }
 
+    /** מאזין לכיבוי והדלקה של הבלוטוס, כדי שהרשימה והשירות יתעדכנו בלי לצאת ולהיכנס. */
+    private final android.content.BroadcastReceiver btStateReceiver = new android.content.BroadcastReceiver() {
+        @Override public void onReceive(android.content.Context c, Intent in) {
+            int st = in.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR);
+            if (st == BluetoothAdapter.STATE_ON) { reload(); startServiceIfNeeded(); }
+            else if (st == BluetoothAdapter.STATE_OFF) reload();
+        }
+    };
+    private boolean btReceiverOn;
+    private boolean askedEnableBt;
+
+    private void askEnableBluetooth() {
+        BluetoothAdapter bt = BluetoothAdapter.getDefaultAdapter();
+        if (bt == null || bt.isEnabled() || askedEnableBt) return;
+        askedEnableBt = true;
+        new AlertDialog.Builder(this)
+                .setMessage("הבלוטוס כבוי. להפעיל אותו?")
+                .setPositiveButton("הפעל", new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) {
+                        try { startActivity(new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)); } catch (RuntimeException ignored) { }
+                    }
+                })
+                .setNegativeButton("לא עכשיו", null)
+                .show();
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
         Events.add(this);
+        if (!btReceiverOn) {
+            try { registerReceiver(btStateReceiver, new android.content.IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED)); btReceiverOn = true; } catch (RuntimeException ignored) { }
+        }
         reload();
+        askEnableBluetooth();
         startServiceIfNeeded();
         refreshUpdateBar();
         if (pendingInstall != null) {
@@ -167,6 +197,7 @@ public class MainActivity extends Activity implements Events.Listener {
     @Override
     protected void onPause() {
         Events.remove(this);
+        if (btReceiverOn) { try { unregisterReceiver(btStateReceiver); } catch (RuntimeException ignored) { } btReceiverOn = false; }
         super.onPause();
     }
 
@@ -175,6 +206,17 @@ public class MainActivity extends Activity implements Events.Listener {
         if (Events.STATE.equals(kind)) updateStatus();
         if (Events.CHAT.equals(kind)) { loadUnread(); adapter.notifyDataSetChanged(); }
         if (Events.RECEIVED.equals(kind)) status.setText(getString(R.string.rx_file, arg));
+        if (Events.PROGRESS.equals(kind) && arg != null) {
+            // התקדמות קבלה (גם מהמחשב ומאפליקציה אחרת) באחוזים בשורת המצב
+            String[] a = arg.split("[|]");
+            if (a.length >= 2 && !(a.length >= 4 && "1".equals(a[3]))) {
+                try {
+                    int pct = Integer.parseInt(a[1]);
+                    if (pct < 0) updateStatus();
+                    else status.setText("מקבל " + a[0] + " - " + pct + "%");
+                } catch (NumberFormatException ignored) { }
+            }
+        }
     }
 
     @Override
@@ -664,38 +706,32 @@ public class MainActivity extends Activity implements Events.Listener {
     }
 
     private void showSaveDirDialog() {
-        float dp = getResources().getDisplayMetrics().density;
-        int pad = (int) (16 * dp);
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout body = pageBody();
         TextView path = new TextView(this);
-        path.setTextSize(15);
-        path.setPadding(pad, pad, pad, pad / 2);
+        path.setTextSize(14);
+        path.setTextColor(UiKit.attr(this, R.attr.sbTextSecondary));
+        path.setPadding(UiKit.dp(this, 6), UiKit.dp(this, 12), UiKit.dp(this, 6), UiKit.dp(this, 8));
         path.setText(getString(R.string.savedir_current, Fmt.ltr(Storage.receiveDirLabel(this))));
-        box.addView(path, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        ListView lv = new ListView(this);
-        lv.setAdapter(new android.widget.ArrayAdapter<String>(this, android.R.layout.simple_list_item_1,
-                new String[]{getString(R.string.savedir_choose), getString(R.string.savedir_default)}));
-        box.addView(lv, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        final AlertDialog dlg = new AlertDialog.Builder(this)
-                .setTitle(R.string.menu_save_dir)
-                .setView(box)
-                .create();
-        lv.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-            @Override public void onItemClick(AdapterView<?> p, View v, int pos, long id) {
-                dlg.dismiss();
-                if (pos == 0) {
-                    chooseSaveDir();
-                } else {
-                    releaseOldTree();
-                    Prefs.clearSaveLocation(MainActivity.this);
-                    updateStatus();
-                    Toast.makeText(MainActivity.this, R.string.savedir_reset, Toast.LENGTH_SHORT).show();
-                }
+        body.addView(path);
+        LinearLayout c = card();
+        final android.app.Dialog[] holder = new android.app.Dialog[1];
+        addRow(c, actionRow(getString(R.string.savedir_choose), new Runnable() {
+            @Override public void run() {
+                if (holder[0] != null) holder[0].dismiss();
+                chooseSaveDir();
             }
-        });
-        dlg.show();
-        lv.requestFocus();
+        }));
+        addRow(c, actionRow(getString(R.string.savedir_default), new Runnable() {
+            @Override public void run() {
+                if (holder[0] != null) holder[0].dismiss();
+                releaseOldTree();
+                Prefs.clearSaveLocation(MainActivity.this);
+                updateStatus();
+                Toast.makeText(MainActivity.this, R.string.savedir_reset, Toast.LENGTH_SHORT).show();
+            }
+        }));
+        body.addView(c);
+        holder[0] = pageDialog(getString(R.string.menu_save_dir), body);
     }
 
     private void chooseSaveDir() {
@@ -800,19 +836,22 @@ public class MainActivity extends Activity implements Events.Listener {
     private void showRenameDevice() {
         if (devices.isEmpty()) { Toast.makeText(this, R.string.main_no_devices, Toast.LENGTH_SHORT).show(); return; }
         final List<BluetoothDevice> list2 = new ArrayList<BluetoothDevice>(devices);
-        String[] names = new String[list2.size()];
-        for (int i = 0; i < names.length; i++) names[i] = DeviceNames.display(this, list2.get(i));
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.menu_rename_device)
-                .setItems(names, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface dlg, int which) {
-                        BluetoothDevice d = list2.get(which);
-                        DeviceNames.rename(MainActivity.this, d.getAddress(), nameOf(d), new Runnable() {
-                            @Override public void run() { reload(); }
-                        });
-                    }
-                })
-                .show();
+        LinearLayout body = pageBody();
+        LinearLayout c = card();
+        final android.app.Dialog[] holder = new android.app.Dialog[1];
+        for (int i = 0; i < list2.size(); i++) {
+            final BluetoothDevice d = list2.get(i);
+            addRow(c, actionRow(DeviceNames.display(this, d), new Runnable() {
+                @Override public void run() {
+                    if (holder[0] != null) holder[0].dismiss();
+                    DeviceNames.rename(MainActivity.this, d.getAddress(), nameOf(d), new Runnable() {
+                        @Override public void run() { reload(); }
+                    });
+                }
+            }));
+        }
+        body.addView(c);
+        holder[0] = pageDialog(getString(R.string.menu_rename_device), body);
     }
 
     /** בחירה מרובה של שיחות למחיקה (רק מכשירים שיש להן הודעות), עם אישור לפני המחיקה. */
@@ -828,21 +867,28 @@ public class MainActivity extends Activity implements Events.Listener {
         }
         if (withChat.isEmpty()) { Toast.makeText(this, R.string.chats_none, Toast.LENGTH_SHORT).show(); return; }
         final boolean[] sel = new boolean[withChat.size()];
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.menu_delete_chats)
-                .setMultiChoiceItems(labels.toArray(new String[0]), sel, new DialogInterface.OnMultiChoiceClickListener() {
-                    @Override public void onClick(DialogInterface d, int which, boolean checked) { sel[which] = checked; }
-                })
-                .setPositiveButton(R.string.chat_delete_btn, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface dlg, int w) {
-                        boolean any = false;
-                        for (boolean b : sel) any |= b;
-                        if (!any) return;
-                        confirmDeleteChats(withChat, sel);
-                    }
-                })
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
+        LinearLayout body = pageBody();
+        LinearLayout c = card();
+        for (int i = 0; i < sel.length; i++) {
+            final int idx = i;
+            addRow(c, switchRow(labels.get(i), false, new UiKit.ToggleView.Listener() {
+                @Override public void onChanged(boolean on) { sel[idx] = on; }
+            }));
+        }
+        body.addView(c);
+        final android.app.Dialog[] holder = new android.app.Dialog[1];
+        TextView del = UiKit.actionButton(this, getString(R.string.chat_delete_btn), new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                boolean any = false;
+                for (boolean b : sel) any |= b;
+                if (!any) { Toast.makeText(MainActivity.this, R.string.chats_pick_some, Toast.LENGTH_SHORT).show(); return; }
+                confirmDeleteChats(withChat, sel);
+            }
+        });
+        LinearLayout.LayoutParams dl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        dl.setMargins(0, UiKit.dp(this, 14), 0, UiKit.dp(this, 14));
+        body.addView(del, dl);
+        holder[0] = pageDialog(getString(R.string.menu_delete_chats), body);
     }
 
     private void confirmDeleteChats(final List<BluetoothDevice> withChat, final boolean[] sel) {
@@ -870,6 +916,7 @@ public class MainActivity extends Activity implements Events.Listener {
                 getString(R.string.menu_settings),
                 getString(R.string.menu_new_chat),
                 getString(R.string.menu_bt_devices),
+                getString(R.string.menu_files_history),
                 getString(R.string.menu_about)};
         new AlertDialog.Builder(this)
                 .setItems(items, new DialogInterface.OnClickListener() {
@@ -877,10 +924,49 @@ public class MainActivity extends Activity implements Events.Listener {
                         if (which == 0) showSettings();
                         else if (which == 1) showNewChat();
                         else if (which == 2) openBluetoothSettings();
+                        else if (which == 3) showFilesHistory();
                         else showAbout();
                     }
                 })
                 .show();
+    }
+
+    /** קבצים שנשלחו ונתקבלו: שם, כיוון, מכשיר ומתי. */
+    private void showFilesHistory() {
+        LinearLayout body = pageBody();
+        List<FileLog.Entry> all = FileLog.all(this);
+        if (all.isEmpty()) {
+            TextView t = new TextView(this);
+            t.setText(R.string.files_history_empty);
+            t.setTextSize(15);
+            t.setTextColor(UiKit.attr(this, R.attr.sbTextSecondary));
+            t.setPadding(UiKit.dp(this, 12), UiKit.dp(this, 20), UiKit.dp(this, 12), 0);
+            body.addView(t);
+        } else {
+            LinearLayout c = card();
+            java.text.DateFormat df = java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT);
+            for (FileLog.Entry e : all) {
+                LinearLayout row = baseRow();
+                row.setClickable(false);
+                LinearLayout col = new LinearLayout(this);
+                col.setOrientation(LinearLayout.VERTICAL);
+                col.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+                TextView n = new TextView(this);
+                n.setText(Fmt.ltr(e.name));
+                n.setTextSize(15);
+                n.setTextColor(UiKit.attr(this, R.attr.sbText));
+                col.addView(n);
+                TextView sub = new TextView(this);
+                sub.setText((e.sent ? "נשלח אל " : "התקבל מ-") + e.device + "  ·  " + Fmt.size(e.size) + "  ·  " + df.format(new java.util.Date(e.time)));
+                sub.setTextSize(12);
+                sub.setTextColor(UiKit.attr(this, R.attr.sbTextSecondary));
+                col.addView(sub);
+                row.addView(col);
+                addRow(c, row);
+            }
+            body.addView(c);
+        }
+        pageDialog(getString(R.string.menu_files_history), body);
     }
 
     /** הוספה, סריקה והסרה של מכשירי בלוטוס נעשות במסך ההגדרות של המערכת; הרשימה כאן מתרעננת בחזרה. */
@@ -953,12 +1039,15 @@ public class MainActivity extends Activity implements Events.Listener {
         }));
         addRow(messages, actionRow(getString(R.string.menu_chat_style), new Runnable() {
             @Override public void run() {
-                new AlertDialog.Builder(MainActivity.this)
-                        .setTitle(R.string.menu_chat_style)
-                        .setSingleChoiceItems(new String[]{getString(R.string.style_wa), getString(R.string.style_gc), getString(R.string.style_kp)}, Prefs.chatStyle(MainActivity.this), new DialogInterface.OnClickListener() {
-                            @Override public void onClick(DialogInterface d, int w) { Prefs.setChatStyle(MainActivity.this, w); d.dismiss(); }
-                        }).show();
+                showChoicePage(getString(R.string.menu_chat_style),
+                        new String[]{getString(R.string.style_wa), getString(R.string.style_gc), getString(R.string.style_kp)},
+                        Prefs.chatStyle(MainActivity.this), new ChoiceListener() {
+                            @Override public void onPick(int which) { Prefs.setChatStyle(MainActivity.this, which); }
+                        });
             }
+        }));
+        addRow(messages, switchRow(getString(R.string.set_voice_preview), Prefs.voicePreview(this), new UiKit.ToggleView.Listener() {
+            @Override public void onChanged(boolean on) { Prefs.setVoicePreview(MainActivity.this, on); }
         }));
         addRow(messages, actionRow(getString(R.string.menu_delete_chats), new Runnable() {
             @Override public void run() { showDeleteChats(); }
@@ -969,9 +1058,14 @@ public class MainActivity extends Activity implements Events.Listener {
         LinearLayout files = card();
         addRow(files, actionRow(getString(R.string.menu_receive_dir), new Runnable() {
             @Override public void run() {
-                new AlertDialog.Builder(MainActivity.this)
-                        .setMessage(getString(R.string.main_receive_dir, Fmt.ltr(Storage.receiveDirLabel(MainActivity.this))))
-                        .setPositiveButton(android.R.string.ok, null).show();
+                LinearLayout rb = pageBody();
+                TextView rt = new TextView(MainActivity.this);
+                rt.setTextSize(15);
+                rt.setTextColor(UiKit.attr(MainActivity.this, R.attr.sbText));
+                rt.setPadding(UiKit.dp(MainActivity.this, 8), UiKit.dp(MainActivity.this, 16), UiKit.dp(MainActivity.this, 8), 0);
+                rt.setText(getString(R.string.main_receive_dir, Fmt.ltr(Storage.receiveDirLabel(MainActivity.this))));
+                rb.addView(rt);
+                pageDialog(getString(R.string.menu_receive_dir), rb);
             }
         }));
         addRow(files, actionRow(getString(R.string.menu_save_dir), new Runnable() {
@@ -1014,6 +1108,31 @@ public class MainActivity extends Activity implements Events.Listener {
     }
 
     private android.app.Dialog settingsDlg;
+
+    interface ChoiceListener { void onPick(int which); }
+
+    /** בחירה מתוך רשימה במסך מלא, באותו עיצוב של שאר ההגדרות (במקום חלונית קופצת). */
+    private void showChoicePage(String title, String[] options, int current, final ChoiceListener l) {
+        LinearLayout body = pageBody();
+        LinearLayout c = card();
+        final android.app.Dialog[] dlg = new android.app.Dialog[1];
+        for (int i = 0; i < options.length; i++) {
+            final int idx = i;
+            LinearLayout row = baseRow();
+            row.addView(rowLabel(options[i]));
+            TextView mark = new TextView(this);
+            mark.setText(i == current ? "✓" : "");
+            mark.setTextSize(20);
+            mark.setTextColor(UiKit.attr(this, R.attr.sbAccent));
+            row.addView(mark);
+            row.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) { l.onPick(idx); if (dlg[0] != null) dlg[0].dismiss(); }
+            });
+            addRow(c, row);
+        }
+        body.addView(c);
+        dlg[0] = pageDialog(title, body);
+    }
 
     private LinearLayout pageBody() {
         LinearLayout box = new LinearLayout(this);

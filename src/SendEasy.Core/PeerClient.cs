@@ -25,18 +25,32 @@ public static class PeerClient
         // לאבחון: איך מצאנו את השירות (חיפוש חי, מטמון או חיבור ישיר)
         var how = live.Services.Count > 0 ? "חיפוש חי" : svc != null ? "מטמון של Windows" : "חיבור ישיר";
 
-        var sock = new StreamSocket();
-        using var reg = ct.Register(() => sock.Dispose());
-        try
+        // "Only one usage of each socket address" (WSAEADDRINUSE): חיבור קודם לאותו מכשיר עדיין נסגר (נפוץ בחלק מהמכשירים, כמו M36).
+        // ממתינים וחוזרים על הניסיון עם שקע חדש, במקום להיכשל מיד.
+        const int AddrInUse = unchecked((int)0x80072740);
+        StreamSocket? sock = null;
+        for (int attempt = 0; ; attempt++)
         {
-            await sock.ConnectAsync(host, service, SocketProtectionLevel.BluetoothEncryptionWithAuthentication);
+            sock = new StreamSocket();
+            var current = sock;
+            using var reg = ct.Register(() => current.Dispose());
+            try
+            {
+                await sock.ConnectAsync(host, service, SocketProtectionLevel.BluetoothEncryptionWithAuthentication);
+                break;
+            }
+            catch (Exception ex) when (ex.HResult == AddrInUse && attempt < 5 && !ct.IsCancellationRequested)
+            {
+                sock.Dispose();
+                await Task.Delay(800 * (attempt + 1), ct);
+            }
+            catch (Exception ex) when (svc == null)
+            {
+                sock.Dispose();
+                throw new IOException($"שליחה קלה לא נמצאה במכשיר השני (חיפוש: {live.Error}, חיבור ישיר: 0x{ex.HResult:X8})");
+            }
+            catch { sock.Dispose(); throw; }
         }
-        catch (Exception ex) when (svc == null)
-        {
-            sock.Dispose();
-            throw new IOException($"שליחה קלה לא נמצאה במכשיר השני (חיפוש: {live.Error}, חיבור ישיר: 0x{ex.HResult:X8})");
-        }
-        catch { sock.Dispose(); throw; }
 
         var cfg = Settings.Load();
         var s = new PeerSession(sock.InputStream.AsStreamForRead(), sock.OutputStream.AsStreamForWrite(), sock,

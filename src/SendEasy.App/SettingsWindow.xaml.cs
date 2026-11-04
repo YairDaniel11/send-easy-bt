@@ -46,6 +46,8 @@ public partial class SettingsWindow : Wpf.Ui.Controls.FluentWindow
         ChatKeyBox.IsChecked = s.ChatHotkeyEnabled;
         ChatKeyText.Text = s.ChatHotkey;
         DarkBox.IsChecked = s.DarkMode;
+        NavReplaceBox.IsChecked = s.NavReplacesWindow;
+        VoicePreviewBox.IsChecked = s.VoicePreview;
         AttachCapture(HotkeyText);
         AttachCapture(ClipText);
         AttachCapture(ChatKeyText);
@@ -269,6 +271,8 @@ public partial class SettingsWindow : Wpf.Ui.Controls.FluentWindow
         _s.ChatHotkeyEnabled = ChatKeyBox.IsChecked == true;
         _s.ChatHotkey = ChatKeyText.Text;
         _s.DarkMode = DarkBox.IsChecked == true;
+        _s.NavReplacesWindow = NavReplaceBox.IsChecked == true;
+        _s.VoicePreview = VoicePreviewBox.IsChecked == true;
         foreach (var f in _favs) if (f.Name.Length > 0) _s.SetAlias(f.Address, f.Name);
         _s.Favorites = _favs;
         _s.DefaultDevice = _favs.Any(f => f.Address == _default) ? _default : (_favs.FirstOrDefault()?.Address ?? 0);

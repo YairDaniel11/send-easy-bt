@@ -27,6 +27,7 @@ sealed class TrayApp : IDisposable
     readonly HotkeyManager _hotkey = new();
     readonly Dictionary<IncomingFile, ReceiveToast> _toasts = new();
     readonly Settings _settings = Settings.Load();
+    public bool NavReplacesWindow => _settings.NavReplacesWindow;
     string? _lastReceivedPath;
     string? _updateUrl;
 
@@ -78,6 +79,44 @@ sealed class TrayApp : IDisposable
         var updTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromHours(1) };
         updTimer.Tick += (_, _) => _ = CheckUpdateAsync();
         updTimer.Start();
+        var btTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+        btTimer.Tick += async (_, _) => await CheckBluetoothStateAsync();
+        btTimer.Start();
+    }
+
+    bool? _btOn;
+    MessageToast? _btOffToast;
+
+    /// <summary>בודק אם הבלוטוס במחשב דולק. כשכבה: הודעה (וסמל המגש מציין זאת); כשחזר: ההאזנה מופעלת מחדש.</summary>
+    async Task CheckBluetoothStateAsync()
+    {
+        bool? on;
+        try
+        {
+            var radios = await Windows.Devices.Radios.Radio.GetRadiosAsync();
+            var bt = radios.FirstOrDefault(r => r.Kind == Windows.Devices.Radios.RadioKind.Bluetooth);
+            on = bt == null ? null : bt.State == Windows.Devices.Radios.RadioState.On;
+        }
+        catch { return; }
+        if (on == null || on == _btOn) return;
+        bool? prev = _btOn;
+        _btOn = on;
+        if (on == false)
+        {
+            _tray.Text = "שליחה קלה - BT (הבלוטוס כבוי)";
+            {
+                try { _btOffToast?.Close(); } catch { }
+                _btOffToast = new MessageToast("הבלוטוס במחשב כבוי", "הפעל אותו כדי לשלוח ולקבל. לחיצה פותחת את הגדרות הבלוטוס.",
+                    () => { try { Process.Start(new ProcessStartInfo("ms-settings:bluetooth") { UseShellExecute = true }); } catch { } }, _settings.ToastPosition);
+                _btOffToast.Show();
+            }
+        }
+        else
+        {
+            _tray.Text = "שליחה קלה - BT";
+            try { _btOffToast?.Close(); } catch { }
+            if (prev == false && _settings.ReceiveEnabled) await RestartReceiversAsync();
+        }
     }
 
     /// <summary>אייקון התוכנה (מוטמע בקובץ ההרצה). אם נכשל: אייקון מערכת.</summary>

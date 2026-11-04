@@ -163,6 +163,7 @@ public class SendActivity extends Activity {
                     // שליחת קובץ רגילה לא נרשמת בצ'אט: רק מה שנשלח מתוך הצ'אט מופיע בשיחה
                     if (r == Session.R_OK) {
                         Usage.record(getApplicationContext(), address);
+                        FileLog.add(getApplicationContext(), true, DeviceNames.display(SendActivity.this, dev), it.name, it.size);
                         continue;
                     }
                     if (r == Session.R_CANCELLED) { result = getString(R.string.send_cancelled); break; }
