@@ -14,7 +14,7 @@ if ($LASTEXITCODE -ne 0) { throw 'package failed' }
 Write-Host '== android app (bundled for "send update to phone")'
 # האפליקציה נכנסת לתוכנה בשם SendEasyBT-<גרסה>.apk, כדי שאפשר יהיה לשלוח אותה לטלפון בבלוטוס בלי אינטרנט
 Get-ChildItem $dist -Filter 'SendEasyBT-*.apk' -ErrorAction SilentlyContinue | Remove-Item -Force
-$apk = Get-ChildItem (Join-Path $root 'androidppuild\outputspkelease') -Filter '*.apk' -ErrorAction SilentlyContinue |
+$apk = Get-ChildItem (Join-Path $root 'android\app\build\outputs\apk\release') -Filter '*.apk' -ErrorAction SilentlyContinue |
     Where-Object { $_.Name -match '(\d+\.\d+\.\d+)\.apk$' } | Sort-Object LastWriteTime | Select-Object -Last 1
 if ($apk) {
     $apkVersion = [regex]::Match($apk.Name, '(\d+\.\d+\.\d+)\.apk$').Groups[1].Value
