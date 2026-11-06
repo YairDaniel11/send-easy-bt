@@ -1225,12 +1225,6 @@ public class MainActivity extends Activity implements Events.Listener {
         head.setBackgroundColor(UiKit.attr(this, R.attr.sbHeader));
         int hp = UiKit.dp(this, 14);
         head.setPadding(hp, 0, hp, 0);
-        TextView back = new TextView(this);
-        back.setText("›");
-        back.setTextSize(26);
-        back.setTextColor(0xFFFFFFFF);
-        back.setPadding(0, 0, UiKit.dp(this, 12), UiKit.dp(this, 3));
-        head.addView(back);
         TextView t = new TextView(this);
         t.setText(title);
         t.setTextSize(17);
