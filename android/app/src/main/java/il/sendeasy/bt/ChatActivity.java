@@ -227,9 +227,7 @@ public class ChatActivity extends Activity implements Events.Listener {
         });
         list.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
             @Override public boolean onItemLongClick(AdapterView<?> p, View v, int pos, long id) {
-                ChatStore.Msg m = msgs.get(pos);
-                if (!ChatStore.T_TEXT.equals(m.kind)) return false;
-                showSelectable(m);
+                showMessageMenu(msgs.get(pos));
                 return true;
             }
         });
@@ -616,6 +614,7 @@ public class ChatActivity extends Activity implements Events.Listener {
         if (address == null || destroyed) return;
         final Context app = getApplicationContext();
         ChatStore.markInboundSeen(app, address);
+        BtService.refreshChatNotification(app); // מסיר מהסטטוס בר את ההתראות על הודעות שנקראו
         try {
             io.execute(new Runnable() {
                 @Override public void run() { sendPendingReads(app); }
@@ -783,6 +782,8 @@ public class ChatActivity extends Activity implements Events.Listener {
             io.execute(new Runnable() {
                 @Override public void run() {
                     int total = uris.size();
+                    final List<Uri> failed = new java.util.ArrayList<Uri>();
+                    final String[] failReason = {null};
                     try {
                         for (int i = 0; i < total && !picCancel.get(); i++) {
                             final int idx = i + 1;
@@ -826,7 +827,7 @@ public class ChatActivity extends Activity implements Events.Listener {
                             } else {
                                 ChatStore.removeOut(app, address, copy.getName());
                                 if (isPic || temp) copy.delete();
-                                if (!picCancel.get()) fail(getString(R.string.chat_failed) + ": " + err);
+                                if (!picCancel.get()) { failed.add(u); failReason[0] = err; }
                             }
                             Events.post(Events.CHAT, address);
                         }
@@ -835,7 +836,10 @@ public class ChatActivity extends Activity implements Events.Listener {
                     } finally {
                         picSending = false;
                         ui.post(new Runnable() {
-                            @Override public void run() { sendProgressT.setVisibility(View.GONE); }
+                            @Override public void run() {
+                                sendProgressT.setVisibility(View.GONE);
+                                if (!failed.isEmpty() && !destroyed) offerRetry(failed, failReason[0]);
+                            }
                         });
                     }
                 }
@@ -844,6 +848,20 @@ public class ChatActivity extends Activity implements Events.Listener {
             picSending = false;
             sendProgressT.setVisibility(View.GONE);
         }
+    }
+
+    /** תמונות או קבצים לא נשלחו: מציעים לנסות שוב (למשל כשהמחשב היה כבוי). */
+    private void offerRetry(final List<Uri> failed, String reason) {
+        AlertDialog d = new AlertDialog.Builder(this)
+                .setMessage(getString(R.string.chat_failed) + ": " + reason + "\n\n" + getString(R.string.retry_offer, failed.size()))
+                .setPositiveButton(R.string.retry_btn, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface x, int w) { sendImages(failed); }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .create();
+        d.show();
+        android.widget.Button b = d.getButton(DialogInterface.BUTTON_POSITIVE);
+        if (b != null) b.requestFocus();
     }
 
     private void reload() {
@@ -921,6 +939,15 @@ public class ChatActivity extends Activity implements Events.Listener {
 
     /** חיבור פתוח לשליחה (מהשרשור של io בלבד). אם נפל, פותח חדש. */
     private Session ensureSession() throws IOException, InterruptedException {
+        Session s0 = ensureSessionRaw();
+        if (ChatStore.pendingAnnounce(getApplicationContext(), address)) {
+            s0.sendNewChat(); // נכשל => IOException, והדגל נשאר לניסיון הבא
+            ChatStore.setPendingAnnounce(getApplicationContext(), address, false);
+        }
+        return s0;
+    }
+
+    private Session ensureSessionRaw() throws IOException, InterruptedException {
         if (session == null || session.isClosed()) {
             BluetoothDevice dev = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(address);
             Session s;
@@ -1341,7 +1368,9 @@ public class ChatActivity extends Activity implements Events.Listener {
     private void announceNewChat() {
         io.execute(new Runnable() {
             @Override public void run() {
-                try { ensureSession().sendNewChat(); } catch (Exception ignored) { }
+                // הדגל נשמר עד שההודעה מגיעה למכשיר השני, גם אם הוא לא נגיש עכשיו
+                ChatStore.setPendingAnnounce(getApplicationContext(), address, true);
+                try { ensureSession(); } catch (Exception ignored) { } // ensureSession שולח את ההודעה ומנקה את הדגל
             }
         });
     }
@@ -1630,6 +1659,38 @@ public class ChatActivity extends Activity implements Events.Listener {
     // ------------------------------------------------------------ בניית שורות הודעה
 
     /** חלון עם טקסט ההודעה שאפשר לסמן ממנו חלק (לחיצה ארוכה), או להעתיק הכל. */
+    /** לחיצה ארוכה על הודעה: סימון והעתקה (טקסט) ומחיקת ההודעה הבודדת (רק אצלנו). */
+    private void showMessageMenu(final ChatStore.Msg m) {
+        final boolean isText = ChatStore.T_TEXT.equals(m.kind);
+        String[] items = isText
+                ? new String[]{getString(R.string.msg_select_copy), getString(R.string.msg_delete)}
+                : new String[]{getString(R.string.msg_delete)};
+        new AlertDialog.Builder(this)
+                .setItems(items, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int which) {
+                        if (isText && which == 0) showSelectable(m); else confirmDeleteMessage(m);
+                    }
+                })
+                .show();
+    }
+
+    private void confirmDeleteMessage(final ChatStore.Msg m) {
+        android.app.AlertDialog d = new AlertDialog.Builder(this)
+                .setMessage(R.string.msg_delete_confirm)
+                .setPositiveButton(R.string.chat_delete_btn, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface x, int w) {
+                        stopPlay();
+                        ChatStore.deleteMessage(getApplicationContext(), address, m);
+                        reload();
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .create();
+        d.show();
+        android.widget.Button neg = d.getButton(DialogInterface.BUTTON_NEGATIVE);
+        if (neg != null) neg.requestFocus();
+    }
+
     private void showSelectable(final ChatStore.Msg m) {
         TextView t = new TextView(this);
         t.setText(m.text);

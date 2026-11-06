@@ -152,6 +152,20 @@
     <string name="browser_new_folder_fail">יצירת התיקייה נכשלה</string>
     <string name="chat_delete">מחק את השיחה</string>
     <string name="chat_delete_short">מחק שיחה</string>
+    <string name="set_show_transport">הצג באיזו דרך נשלח הקובץ (וויפי או בלוטוס)</string>
+    <string name="via_wifi">" · בוויפי"</string>
+    <string name="via_bt">" · בבלוטוס"</string>
+    <string name="set_tap_mode">בלחיצה על מכשיר ברשימה</string>
+    <string name="tap_ask">לשאול כל פעם</string>
+    <string name="retry_offer">לנסות לשלוח שוב (%1$d)?</string>
+    <string name="retry_btn">נסה שוב</string>
+    <string name="files_deleted">נמחק</string>
+    <string name="files_gone_msg">הקובץ כבר לא נמצא במקום שבו נשמר.</string>
+    <string name="files_folder_unknown">המיקום של הקובץ לא ידוע.</string>
+    <string name="files_folder_failed">אין אפליקציית קבצים שיכולה לפתוח את התיקייה.</string>
+    <string name="msg_select_copy">סימון והעתקה</string>
+    <string name="msg_delete">מחק הודעה</string>
+    <string name="msg_delete_confirm">למחוק את ההודעה? היא תימחק רק מהמכשיר הזה.</string>
     <string name="chat_delete_btn">מחק</string>
     <string name="chat_delete_confirm">למחוק את כל ההודעות עם %1$s? הקבצים שנשמרו בתיקיית ההורדות לא יימחקו.</string>
     <string name="menu_notify_shown">התראה בעת קבלת הודעה: מוצגת</string>
@@ -211,6 +225,8 @@
     <string name="menu_bt_devices">הוסף / הסר מכשירי בלוטוס</string>
     <string name="bt_settings_failed">לא ניתן לפתוח את הגדרות הבלוטוס</string>
     <string name="chats_no_others">אין צ\'אטים נוספים עם המכשיר</string>
+    <string name="chat_notif_many">%1$d הודעות חדשות</string>
+    <string name="chat_notif_multi">%1$d הודעות חדשות מ-%2$d שיחות</string>
     <string name="rx_new_message">התקבלה הודעה</string>
 
     <string name="widget_send">שלח קובץ</string>

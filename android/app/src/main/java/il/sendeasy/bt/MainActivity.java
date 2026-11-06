@@ -474,6 +474,9 @@ public class MainActivity extends Activity implements Events.Listener {
             pickHint.setVisibility(View.GONE);
             return;
         }
+        int tap = Prefs.deviceTapMode(this);
+        if (tap == 1) { openChat(d.getAddress()); return; }
+        if (tap == 2) { pickFiles(d.getAddress()); return; }
         final String[] items = {getString(R.string.act_send_file), getString(R.string.act_chat)};
         new AlertDialog.Builder(this)
                 .setTitle(DeviceNames.display(this, d))
@@ -931,6 +934,40 @@ public class MainActivity extends Activity implements Events.Listener {
                 .show();
     }
 
+    /** פותח את התיקייה שבה הקובץ מהיסטוריית הקבצים נמצא. */
+    private void openEntryFolder(FileLog.Entry e) {
+        Intent i = null;
+        try {
+            String l = e.loc == null ? "" : e.loc;
+            String ext = "content://com.android.externalstorage.documents/document/";
+            if (l.startsWith("/")) {
+                java.io.File parent = new java.io.File(l).getParentFile();
+                String root = android.os.Environment.getExternalStorageDirectory().getAbsolutePath();
+                if (parent != null && parent.getAbsolutePath().startsWith(root)) {
+                    String rel = parent.getAbsolutePath().substring(root.length());
+                    if (rel.startsWith("/")) rel = rel.substring(1);
+                    i = new Intent(Intent.ACTION_VIEW);
+                    i.setDataAndType(Uri.parse(ext + Uri.encode("primary:" + rel)), "vnd.android.document/directory");
+                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    if (getPackageManager().resolveActivity(i, 0) == null) i = null;
+                }
+            } else if (l.startsWith("content://") && l.contains("externalstorage.documents") && Build.VERSION.SDK_INT >= 21) {
+                String id = android.provider.DocumentsContract.getDocumentId(Uri.parse(l));
+                int cut = id.lastIndexOf('/');
+                if (cut > 0) {
+                    i = new Intent(Intent.ACTION_VIEW);
+                    i.setDataAndType(Uri.parse(ext + Uri.encode(id.substring(0, cut))), "vnd.android.document/directory");
+                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                }
+            }
+            if (i == null && !e.sent) i = Storage.folderIntent(this); // התיקייה הרגילה של הקבלה
+            if (i == null) { Toast.makeText(this, R.string.files_folder_unknown, Toast.LENGTH_SHORT).show(); return; }
+            startActivity(i);
+        } catch (RuntimeException ex) {
+            Toast.makeText(this, R.string.files_folder_failed, Toast.LENGTH_LONG).show();
+        }
+    }
+
     /** קבצים שנשלחו ונתקבלו: שם, כיוון, מכשיר ומתי. */
     private void showFilesHistory() {
         LinearLayout body = pageBody();
@@ -946,8 +983,15 @@ public class MainActivity extends Activity implements Events.Listener {
             LinearLayout c = card();
             java.text.DateFormat df = java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT);
             for (FileLog.Entry e : all) {
+                final FileLog.Entry en = e;
+                final boolean gone = !FileLog.exists(this, e);
                 LinearLayout row = baseRow();
-                row.setClickable(false);
+                row.setOnClickListener(new View.OnClickListener() {
+                    @Override public void onClick(View v) {
+                        if (gone) Toast.makeText(MainActivity.this, R.string.files_gone_msg, Toast.LENGTH_SHORT).show();
+                        else openEntryFolder(en);
+                    }
+                });
                 LinearLayout col = new LinearLayout(this);
                 col.setOrientation(LinearLayout.VERTICAL);
                 col.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
@@ -961,6 +1005,13 @@ public class MainActivity extends Activity implements Events.Listener {
                 sub.setTextSize(12);
                 sub.setTextColor(UiKit.attr(this, R.attr.sbTextSecondary));
                 col.addView(sub);
+                if (gone) {
+                    TextView del = new TextView(this);
+                    del.setText(R.string.files_deleted);
+                    del.setTextSize(12);
+                    del.setTextColor(0xFFE53935);
+                    col.addView(del);
+                }
                 row.addView(col);
                 addRow(c, row);
             }
@@ -1020,6 +1071,23 @@ public class MainActivity extends Activity implements Events.Listener {
                 if (Prefs.receiveEnabled(MainActivity.this) && BtService.isRunning()) BtService.restart(MainActivity.this);
                 if (!on && Build.VERSION.SDK_INT >= 26) offerHideInSystemSettings();
             }
+        }));
+        addRow(general, actionRow(getString(R.string.set_tap_mode), new Runnable() {
+            @Override public void run() {
+                final String[] opts = {getString(R.string.tap_ask), getString(R.string.act_chat), getString(R.string.act_send_file)};
+                new AlertDialog.Builder(MainActivity.this)
+                        .setTitle(R.string.set_tap_mode)
+                        .setSingleChoiceItems(opts, Prefs.deviceTapMode(MainActivity.this), new DialogInterface.OnClickListener() {
+                            @Override public void onClick(DialogInterface dlg, int which) {
+                                Prefs.setDeviceTapMode(MainActivity.this, which);
+                                dlg.dismiss();
+                            }
+                        })
+                        .show();
+            }
+        }));
+        addRow(general, switchRow(getString(R.string.set_show_transport), Prefs.showTransport(this), new UiKit.ToggleView.Listener() {
+            @Override public void onChanged(boolean on) { Prefs.setShowTransport(MainActivity.this, on); }
         }));
         addRow(general, switchRow(getString(R.string.set_dark), ThemeUtil.isDark(this), new UiKit.ToggleView.Listener() {
             @Override public void onChanged(boolean on) {

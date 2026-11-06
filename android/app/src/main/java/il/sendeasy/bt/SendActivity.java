@@ -156,14 +156,15 @@ public class SendActivity extends Activity {
                 int total = items.size();
                 for (int i = 0; i < total && !cancel.get(); i++) {
                     Item it = items.get(i);
-                    final String label = getString(R.string.send_file_of, i + 1, total, "");
+                    final String label = getString(R.string.send_file_of, i + 1, total, "")
+                            + (Prefs.showTransport(this) ? getString(wifi != null ? R.string.via_wifi : R.string.via_bt) : "");
                     final String name = it.name;
                     post(new Runnable() { @Override public void run() { statusT.setText(label.trim()); nameT.setText(name); bar.setProgress(0); infoT.setText(""); } });
                     int r = sendOne(out, it);
                     // שליחת קובץ רגילה לא נרשמת בצ'אט: רק מה שנשלח מתוך הצ'אט מופיע בשיחה
                     if (r == Session.R_OK) {
                         Usage.record(getApplicationContext(), address);
-                        FileLog.add(getApplicationContext(), true, DeviceNames.display(SendActivity.this, dev), it.name, it.size);
+                        FileLog.add(getApplicationContext(), true, DeviceNames.display(SendActivity.this, dev), it.name, it.size, FileLog.pathOf(getApplicationContext(), it.uri));
                         continue;
                     }
                     if (r == Session.R_CANCELLED) { result = getString(R.string.send_cancelled); break; }

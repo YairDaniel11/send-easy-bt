@@ -31,6 +31,7 @@ public class BtService extends Service {
     static final String CHANNEL_EVENTS_SILENT = "se_events_silent";
     private static final int ID_FOREGROUND = 1;
     private static final int ID_PROGRESS = 2;
+    private static final int ID_CHAT = 3; // התראה אחת מאוחדת לכל הודעות הצ'אט
     static final String ACTION_CANCEL_RX = "il.sendeasy.bt.CANCEL_RX";
 
     /** חיבורים שמקבלים עכשיו קובץ (לכתובת). */
@@ -418,7 +419,7 @@ public class BtService extends Service {
                 ChatStore.add(BtService.this, address, new ChatStore.Msg(System.currentTimeMillis(), false, ChatStore.T_FILE, f.name, 0, ChatStore.S_UNREAD));
                 Events.post(Events.CHAT, address);
             }
-            if (!f.fromChat) FileLog.add(BtService.this, false, name(), f.name, f.size);
+            if (!f.fromChat) FileLog.add(BtService.this, false, name(), f.name, f.size, Storage.LAST_LOC.get());
             Events.post(Events.RECEIVED, f.name);
             notifyEvent(getString(R.string.rx_file, f.name), where, null, openFolder());
             return true;
@@ -598,15 +599,19 @@ public class BtService extends Service {
         if (nm == null || !Prefs.notifyEvents(this)) return;
         if (chatAddress != null && chatAddress.equals(ChatActivity.openAddress)) return; // הצ'אט פתוח בחזית
         boolean sound = Prefs.notifySound(this);
-        Notification n = builder(sound ? CHANNEL_EVENTS : CHANNEL_EVENTS_SILENT)
-                .setContentTitle(title)
-                .setContentText(text)
-                .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
-                .setContentIntent(target != null ? target : openMain(chatAddress))
-                .setAutoCancel(true)
-                .setDefaults(sound ? (Notification.DEFAULT_SOUND | Notification.DEFAULT_LIGHTS) : Notification.DEFAULT_LIGHTS) // צליל ורטט ל-API פחות מ-26 (מ-26 הערוץ קובע)
-                .build();
-        try { nm.notify(ID_EVENT_BASE + (eventCounter++ % 50), n); } catch (RuntimeException ignored) { }
+        if (chatAddress != null && target == null) {
+            postChatNotification(this, title, text, true);
+        } else {
+            Notification n = builder(sound ? CHANNEL_EVENTS : CHANNEL_EVENTS_SILENT)
+                    .setContentTitle(title)
+                    .setContentText(text)
+                    .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
+                    .setContentIntent(target != null ? target : openMain(chatAddress))
+                    .setAutoCancel(true)
+                    .setDefaults(sound ? (Notification.DEFAULT_SOUND | Notification.DEFAULT_LIGHTS) : Notification.DEFAULT_LIGHTS) // צליל ורטט ל-API פחות מ-26 (מ-26 הערוץ קובע)
+                    .build();
+            try { nm.notify(ID_EVENT_BASE + (eventCounter++ % 50), n); } catch (RuntimeException ignored) { }
+        }
         if (Prefs.notifyVibrate(this)) {
             try {
                 android.os.Vibrator v = (android.os.Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
@@ -614,6 +619,53 @@ public class BtService extends Service {
             } catch (RuntimeException ignored) { }
         }
         if (Prefs.notifyWake(this)) wakeScreen();
+    }
+
+    /**
+     * התראה אחת לכל הודעות הצ'אט (אייקון אחד בסטטוס בר, ושונה מאייקון "האפליקציה פועלת").
+     * בשיחה אחת: שם השולח והודעה אחרונה; בכמה שיחות: מספר ההודעות. title/text null = רק רענון.
+     */
+    @SuppressWarnings("deprecation")
+    static void postChatNotification(Context c, String title, String text, boolean alert) {
+        NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (nm == null) return;
+        java.util.LinkedHashMap<String, Integer> un = ChatStore.unreadAll(c);
+        int total = 0;
+        for (int v : un.values()) total += v;
+        if (total == 0) { nm.cancel(ID_CHAT); return; }
+        String target = null;
+        String t, x;
+        if (un.size() == 1) {
+            target = un.keySet().iterator().next();
+            t = title != null ? title : c.getString(R.string.rx_text, DeviceNames.resolve(c, target, target));
+            x = total > 1 ? c.getString(R.string.chat_notif_many, total) + (text != null ? ": " + text : "")
+                    : (text != null ? text : c.getString(R.string.rx_new_message));
+        } else {
+            t = c.getString(R.string.notification_title);
+            x = c.getString(R.string.chat_notif_multi, total, un.size());
+        }
+        Intent i = new Intent(c, target == null ? MainActivity.class : ChatActivity.class);
+        if (target != null) i.putExtra(ChatActivity.EXTRA_ADDRESS, target);
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        int fl = PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0);
+        PendingIntent pi = PendingIntent.getActivity(c, target == null ? 0 : target.hashCode(), i, fl);
+        boolean sound = alert && Prefs.notifySound(c);
+        String channel = sound ? CHANNEL_EVENTS : CHANNEL_EVENTS_SILENT;
+        Notification.Builder b = Build.VERSION.SDK_INT >= 26 ? new Notification.Builder(c, channel) : new Notification.Builder(c);
+        b.setContentTitle(t)
+                .setContentText(x)
+                .setSmallIcon(android.R.drawable.stat_notify_chat)
+                .setContentIntent(pi)
+                .setNumber(total)
+                .setAutoCancel(true);
+        if (Build.VERSION.SDK_INT < 26) b.setDefaults(sound ? (Notification.DEFAULT_SOUND | Notification.DEFAULT_LIGHTS) : 0);
+        if (!alert) b.setOnlyAlertOnce(true);
+        try { nm.notify(ID_CHAT, b.build()); } catch (RuntimeException ignored) { }
+    }
+
+    /** הצ'אט נקרא: מעדכן את ההתראה המאוחדת, או מסיר אותה אם לא נשאר מה לקרוא. */
+    static void refreshChatNotification(Context c) {
+        postChatNotification(c.getApplicationContext(), null, null, false);
     }
 
     @SuppressWarnings("deprecation")

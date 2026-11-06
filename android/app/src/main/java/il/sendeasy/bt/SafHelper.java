@@ -60,6 +60,7 @@ final class SafHelper {
             try { DocumentsContract.deleteDocument(cr, doc); } catch (Exception ignored) { }
             throw e;
         }
+        Storage.LAST_LOC.set(doc.toString());
         return treeLabel(tree) + "/" + finalName;
     }
 

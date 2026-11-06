@@ -223,6 +223,32 @@ final class ChatStore {
         rewrite(c, address, M_IN_SENT, msgId);
     }
 
+    /** כתובות המכשירים שיש בשיחה הפעילה שלהם הודעות שלא נקראו, ומספר ההודעות אצל כל אחד. */
+    static synchronized java.util.LinkedHashMap<String, Integer> unreadAll(Context c) {
+        java.util.LinkedHashMap<String, Integer> out = new java.util.LinkedHashMap<String, Integer>();
+        File[] fs = dir(c).listFiles();
+        if (fs == null) return out;
+        for (File f : fs) {
+            String nm = f.getName();
+            if (!nm.endsWith(".log")) continue;
+            String b = nm.substring(0, nm.length() - 4);
+            int n = 1;
+            int dot = b.indexOf('.');
+            if (dot >= 0) {
+                try { n = Integer.parseInt(b.substring(dot + 1)); } catch (NumberFormatException e) { continue; }
+                b = b.substring(0, dot);
+            }
+            if (b.length() != 12 || n != threadPrefs(c).getInt(b, 1)) continue; // רק השיחה הפעילה
+            int cnt = 0;
+            for (Msg m : loadFile(f)) if (!m.out && S_UNREAD.equals(m.status)) cnt++;
+            if (cnt == 0) continue;
+            StringBuilder addr = new StringBuilder();
+            for (int i = 0; i < 12; i += 2) { if (i > 0) addr.append(':'); addr.append(b.substring(i, i + 2).toUpperCase()); }
+            out.put(addr.toString(), cnt);
+        }
+        return out;
+    }
+
     /** מספר ההודעות הנכנסות שלא נקראו. */
     static synchronized int unread(Context c, String address) {
         int n = 0;
@@ -258,6 +284,46 @@ final class ChatStore {
         for (int n : threads(c, address)) if (n != act && threadFile(c, address, n).exists()) { next = n; break; }
         setActiveThread(c, address, next);
         Events.post(Events.CHAT, address);
+    }
+
+    /** מוחק הודעה אחת מהשיחה הפעילה (רק אצלנו), ואת ההקלטה או התמונה הפנימית שלה. true אם נמחקה. */
+    static synchronized boolean deleteMessage(Context c, String address, Msg target) {
+        List<Msg> all = load(c, address);
+        boolean found = false;
+        for (int i = 0; i < all.size(); i++) {
+            Msg m = all.get(i);
+            if (m.time == target.time && m.out == target.out && m.kind.equals(target.kind) && m.text.equals(target.text)) {
+                all.remove(i);
+                found = true;
+                break;
+            }
+        }
+        if (!found) return false;
+        try {
+            Writer w = new OutputStreamWriter(new FileOutputStream(file(c, address), false), "UTF-8");
+            try { for (Msg m : all) w.write(line(m)); } finally { w.close(); }
+        } catch (IOException e) {
+            return false;
+        }
+        String n = new File(target.text).getName();
+        if (n.length() > 0) {
+            if (target.isVoice()) new File(Storage.voiceDir(c), n).delete();
+            else if (target.isPic()) new File(Storage.imagesDir(c), n).delete();
+        }
+        Events.post(Events.CHAT, address);
+        return true;
+    }
+
+    /**
+     * נפתחה שיחה חדשה אצלנו אבל המכשיר השני לא היה נגיש ולא קיבל את ההודעה "שיחה חדשה".
+     * הדגל נשמר עד לחיבור המוצלח הבא, ואז נשלח לפני כל הודעה, כדי שההודעות לא ייכנסו אצלו לשיחה הקודמת.
+     */
+    static void setPendingAnnounce(Context c, String address, boolean pending) {
+        threadPrefs(c).edit().putBoolean("pa_" + base(address), pending).commit();
+    }
+
+    static boolean pendingAnnounce(Context c, String address) {
+        return threadPrefs(c).getBoolean("pa_" + base(address), false);
     }
 
     /** מוחק את כל השיחות עם המכשיר. */

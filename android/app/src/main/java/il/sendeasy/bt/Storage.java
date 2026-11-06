@@ -166,6 +166,7 @@ final class Storage {
         File dest = uniqueFile(dir, name);
         if (!temp.renameTo(dest)) copyToFile(temp, dest);
         MediaScannerConnection.scanFile(c, new String[]{dest.getAbsolutePath()}, null, null);
+        LAST_LOC.set(dest.getAbsolutePath());
         return dest.getAbsolutePath();
     }
 
@@ -176,7 +177,11 @@ final class Storage {
     }
 
     /** מפרסם את הקובץ הזמני ביעד הסופי. מחזיר תיאור מיקום, או null בכשל. לא דורס קבצים קיימים. */
+    /** מיקום הקובץ האחרון שפורסם בשרשור הזה (נתיב או URI), לרישום בהיסטוריה. */
+    static final ThreadLocal<String> LAST_LOC = new ThreadLocal<String>();
+
     static String publish(Context c, File temp, String name) {
+        LAST_LOC.set(null);
         boolean customFailed = false;
         if (hasCustom(c)) {
             try {
@@ -209,6 +214,7 @@ final class Storage {
             // אותה מערכת קבצים: שינוי שם מיידי, בלי העתקה ארוכה. אחרת (או בכשל) מעתיקים
             if (!temp.renameTo(dest)) copyToFile(temp, dest);
             MediaScannerConnection.scanFile(c, new String[]{dest.getAbsolutePath()}, null, null);
+            LAST_LOC.set(dest.getAbsolutePath());
             return dest.getAbsolutePath();
         } catch (Exception e) {
             return null;
@@ -246,6 +252,7 @@ final class Storage {
             cr.delete(uri, null, null);
             throw e;
         }
+        LAST_LOC.set(uri.toString());
         return "Download/" + DIR_NAME + "/" + name;
     }
 

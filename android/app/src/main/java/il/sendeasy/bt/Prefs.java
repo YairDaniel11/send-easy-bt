@@ -88,6 +88,24 @@ final class Prefs {
     }
 
     /** הדלקת המסך בעת קבלת הודעה (ברירת מחדל לא). */
+    /** להציג בשליחה באיזו דרך עוברים הקבצים (וויפי או בלוטוס). כבוי כברירת מחדל. */
+    static boolean showTransport(Context c) {
+        return sp(c).getBoolean("showTransport", false);
+    }
+
+    static void setShowTransport(Context c, boolean on) {
+        sp(c).edit().putBoolean("showTransport", on).apply();
+    }
+
+    /** מה קורה בלחיצה על מכשיר ברשימה: 0 תפריט, 1 צ'אט, 2 שליחת קבצים. */
+    static int deviceTapMode(Context c) {
+        return sp(c).getInt("deviceTapMode", 0);
+    }
+
+    static void setDeviceTapMode(Context c, int mode) {
+        sp(c).edit().putInt("deviceTapMode", mode).apply();
+    }
+
     static boolean notifyWake(Context c) {
         return sp(c).getBoolean("notifyWake", false);
     }
