@@ -489,7 +489,7 @@ public class ChatActivity extends Activity implements Events.Listener {
     private void showKpSmileys() {
         final String[] codes = {":)", ":("};
         final String[] shown = {Fmt.ltr(":)"), Fmt.ltr(":(")};
-        new AlertDialog.Builder(this)
+        new UiKit.ListDialog(this)
                 .setItems(shown, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int which) { insertEmoticon(codes[which]); }
                 })
@@ -1314,7 +1314,7 @@ public class ChatActivity extends Activity implements Events.Listener {
 
     private void showMenu() {
         final String[] items = {getString(R.string.chat_menu_style), getString(R.string.chat_menu_paste), getString(R.string.chat_delete), getString(R.string.menu_new_chat), getString(R.string.menu_other_chats)};
-        new AlertDialog.Builder(this)
+        new UiKit.ListDialog(this)
                 .setItems(items, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int which) {
                         if (which == 0) {
@@ -1387,7 +1387,7 @@ public class ChatActivity extends Activity implements Events.Listener {
             String when = l.isEmpty() ? getString(R.string.chats_empty) : df.format(new Date(l.get(0).time)) + " · " + getString(R.string.chats_count, l.size());
             labels[i] = getString(R.string.chats_item, ths.get(i), when) + (ths.get(i) == act ? " ✓" : "");
         }
-        new AlertDialog.Builder(this)
+        new UiKit.ListDialog(this)
                 .setTitle(getString(R.string.chats_title, Fmt.ltr(deviceName)))
                 .setItems(labels, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int which) {
@@ -1544,7 +1544,7 @@ public class ChatActivity extends Activity implements Events.Listener {
         boolean cam = getPackageManager().hasSystemFeature(android.content.pm.PackageManager.FEATURE_TOUCHSCREEN)
                 && getPackageManager().hasSystemFeature(android.content.pm.PackageManager.FEATURE_CAMERA);
         if (!cam) { FilePicker.pick(this); return; }
-        new AlertDialog.Builder(this)
+        new UiKit.ListDialog(this)
                 .setItems(new String[]{"קובץ", "מצלמה"}, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int which) {
                         if (which == 0) FilePicker.pick(ChatActivity.this); else takePhoto();
@@ -1665,7 +1665,7 @@ public class ChatActivity extends Activity implements Events.Listener {
         String[] items = isText
                 ? new String[]{getString(R.string.msg_select_copy), getString(R.string.msg_delete)}
                 : new String[]{getString(R.string.msg_delete)};
-        new AlertDialog.Builder(this)
+        new UiKit.ListDialog(this)
                 .setItems(items, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int which) {
                         if (isText && which == 0) showSelectable(m); else confirmDeleteMessage(m);

@@ -1,13 +1,21 @@
 package il.sendeasy.bt;
 
+import android.app.Activity;
+import android.app.Dialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.StateListDrawable;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.Window;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 /** עזרי עיצוב בקוד (צורות עגולות, אווטארים), כי ?attr בתוך drawable נתמך רק מאנדרואיד 5. */
@@ -35,6 +43,89 @@ final class UiKit {
         GradientDrawable g = rect(c, color, radiusDp);
         g.setStroke(dp(c, strokeDp), strokeColor);
         return g;
+    }
+
+
+    /**
+     * דיאלוג בחירה מרשימה, בלי המסגרת הכפולה של AlertDialog (Holo מצייר לוח פנימי מתחת לרקע המעוגל).
+     * ה-API זהה ל-AlertDialog.Builder במה שנחוץ: setTitle, setItems, show.
+     */
+    static final class ListDialog {
+        private final Activity act;
+        private CharSequence title;
+        private CharSequence[] items = new CharSequence[0];
+        private DialogInterface.OnClickListener listener;
+
+        ListDialog(Activity a) { act = a; }
+
+        ListDialog setTitle(CharSequence t) { title = t; return this; }
+
+        ListDialog setItems(CharSequence[] i, DialogInterface.OnClickListener l) { items = i; listener = l; return this; }
+
+        Dialog show() {
+            final Activity a = act;
+            final Dialog d = new Dialog(a);
+            d.requestWindowFeature(Window.FEATURE_NO_TITLE);
+            final int text = attr(a, R.attr.sbText);
+            final int accent = attr(a, R.attr.sbAccent);
+            final int row = attr(a, R.attr.sbRow);
+
+            LinearLayout box = new LinearLayout(a);
+            box.setOrientation(LinearLayout.VERTICAL);
+            box.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+            int pad = dp(a, 8);
+            box.setPadding(pad, pad, pad, pad);
+
+            if (title != null && title.length() > 0) {
+                TextView t = new TextView(a);
+                t.setText(title);
+                t.setTextSize(16);
+                t.setTypeface(null, android.graphics.Typeface.BOLD);
+                t.setTextColor(attr(a, R.attr.sbTextSecondary));
+                t.setPadding(dp(a, 12), dp(a, 8), dp(a, 12), dp(a, 8));
+                box.addView(t);
+            }
+            LinearLayout list = new LinearLayout(a);
+            list.setOrientation(LinearLayout.VERTICAL);
+            for (int i = 0; i < items.length; i++) {
+                final int which = i;
+                TextView r = new TextView(a);
+                r.setText(items[i]);
+                r.setTextSize(17);
+                r.setTextColor(text);
+                r.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+                r.setMinHeight(dp(a, 52));
+                r.setPadding(dp(a, 14), dp(a, 8), dp(a, 14), dp(a, 8));
+                r.setFocusable(true);
+                r.setClickable(true);
+                StateListDrawable bg = new StateListDrawable();
+                bg.addState(new int[]{android.R.attr.state_focused}, rect(a, row, 12, accent, 3));
+                bg.addState(new int[]{android.R.attr.state_pressed}, rect(a, row, 12));
+                r.setBackgroundDrawable(bg);
+                r.setOnClickListener(new View.OnClickListener() {
+                    @Override public void onClick(View v) {
+                        d.dismiss();
+                        if (listener != null) listener.onClick(d, which);
+                    }
+                });
+                list.addView(r, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            }
+            ScrollView sv = new ScrollView(a);
+            sv.addView(list);
+            box.addView(sv, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+            d.setContentView(box);
+            d.setCanceledOnTouchOutside(true);
+            d.show();
+            Window w = d.getWindow();
+            if (w != null) {
+                w.setBackgroundDrawable(rect(a, attr(a, R.attr.sbBg), 16));
+                int width = a.getResources().getDisplayMetrics().widthPixels - dp(a, 32);
+                w.setLayout(Math.min(width, dp(a, 420)), ViewGroup.LayoutParams.WRAP_CONTENT);
+            }
+            if (list.getChildCount() > 0) list.getChildAt(0).requestFocus();
+            return d;
+        }
     }
 
     static GradientDrawable oval(int color) {

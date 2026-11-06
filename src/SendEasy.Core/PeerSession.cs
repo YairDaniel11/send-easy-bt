@@ -140,6 +140,12 @@ public sealed class PeerSession : IDisposable
             if (body.Length > 0) await _out.WriteAsync(body);
             await _out.FlushAsync();
         }
+        catch (ObjectDisposedException ex)
+        {
+            // הצינור נסגר באמצע כתיבה: לצד הקורא זו שגיאת חיבור רגילה
+            Close(ex);
+            throw new IOException("החיבור נסגר", ex);
+        }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             Close(ex);

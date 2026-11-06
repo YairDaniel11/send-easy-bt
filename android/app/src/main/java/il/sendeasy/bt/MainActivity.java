@@ -478,7 +478,7 @@ public class MainActivity extends Activity implements Events.Listener {
         if (tap == 1) { openChat(d.getAddress()); return; }
         if (tap == 2) { pickFiles(d.getAddress()); return; }
         final String[] items = {getString(R.string.act_send_file), getString(R.string.act_chat)};
-        new AlertDialog.Builder(this)
+        new UiKit.ListDialog(this)
                 .setTitle(DeviceNames.display(this, d))
                 .setItems(items, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface dlg, int which) {
@@ -507,7 +507,7 @@ public class MainActivity extends Activity implements Events.Listener {
         if (hasPhoto) { labels.add(getString(R.string.dev_photo_remove)); ids.add(2); }
         labels.add(getString(R.string.dev_link_contact)); ids.add(3);
         if (phone != null) { labels.add(getString(R.string.dev_dial, Fmt.ltr(phone))); ids.add(4); }
-        new AlertDialog.Builder(this)
+        new UiKit.ListDialog(this)
                 .setTitle(DeviceNames.display(this, d))
                 .setItems(labels.toArray(new String[0]), new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface dlg, int which) {
@@ -1010,7 +1010,7 @@ public class MainActivity extends Activity implements Events.Listener {
                 getString(R.string.menu_bt_devices),
                 getString(R.string.menu_files_history),
                 getString(R.string.menu_about)};
-        new AlertDialog.Builder(this)
+        new UiKit.ListDialog(this)
                 .setItems(items, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface dlg, int which) {
                         if (which == 0) showSettings();
@@ -1320,6 +1320,19 @@ public class MainActivity extends Activity implements Events.Listener {
         t.setTypeface(null, android.graphics.Typeface.BOLD);
         t.setTextColor(0xFFFFFFFF);
         head.addView(t, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        // מעבר מהיר לחלון אחר: אותו תפריט ואותו מקום (שמאל) כמו במסך הראשי
+        TextView more = new TextView(this);
+        more.setText("⋮");
+        more.setTextSize(24);
+        more.setTextColor(0xFFFFFFFF);
+        more.setGravity(android.view.Gravity.CENTER);
+        more.setFocusable(true);
+        more.setClickable(true);
+        more.setContentDescription(getString(R.string.menu_more));
+        more.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { d.dismiss(); showMenu(); }
+        });
+        head.addView(more, new LinearLayout.LayoutParams(UiKit.dp(this, 48), ViewGroup.LayoutParams.MATCH_PARENT));
         head.setClickable(true);
         head.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { d.dismiss(); }
