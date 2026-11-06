@@ -81,7 +81,7 @@ public class MainActivity extends Activity implements Events.Listener {
             @Override public void onItemClick(AdapterView<?> p, View v, int pos, long id) { onDevice(devices.get(pos)); }
         });
         list.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
-            @Override public boolean onItemLongClick(AdapterView<?> p, View v, int pos, long id) { onDevice(devices.get(pos)); return true; }
+            @Override public boolean onItemLongClick(AdapterView<?> p, View v, int pos, long id) { showDeviceMenu(devices.get(pos)); return true; }
         });
 
         updateBar = (TextView) findViewById(R.id.updateBar);
@@ -435,7 +435,7 @@ public class MainActivity extends Activity implements Events.Listener {
             String name = DeviceNames.display(MainActivity.this, d);
             ((TextView) v.findViewById(R.id.rowTitle)).setText(name);
             ((TextView) v.findViewById(R.id.rowSub)).setText(Fmt.ltr(d.getAddress()) + (isComputer(d) ? "  ·  מחשב" : ""));
-            UiKit.avatar((TextView) v.findViewById(R.id.avatar), name, 48);
+            DeviceProfile.applyAvatar((TextView) v.findViewById(R.id.avatar), d.getAddress(), name, 48);
             TextView badge = (TextView) v.findViewById(R.id.rowBadge);
             Integer un = unreadMap.get(d.getAddress());
             if (un != null && un > 0) {
@@ -489,6 +489,91 @@ public class MainActivity extends Activity implements Events.Listener {
                 .show();
     }
 
+    // ------------------------------------------------------------ פרופיל מכשיר (לחיצה ארוכה)
+
+    private static final int REQ_PROFILE_PHOTO = 31;
+    private static final int REQ_PROFILE_CONTACT = 32;
+    private String profileAddress;
+
+    /** לחיצה ארוכה על מכשיר: שינוי שם, תמונה, שיוך לאיש קשר וחיוג. */
+    private void showDeviceMenu(final BluetoothDevice d) {
+        final String addr = d.getAddress();
+        final String phone = DeviceProfile.phone(this, addr);
+        final boolean hasPhoto = DeviceProfile.hasPhoto(this, addr);
+        final ArrayList<String> labels = new ArrayList<String>();
+        final ArrayList<Integer> ids = new ArrayList<Integer>();
+        labels.add(getString(R.string.act_rename)); ids.add(0);
+        labels.add(getString(R.string.dev_photo_pick)); ids.add(1);
+        if (hasPhoto) { labels.add(getString(R.string.dev_photo_remove)); ids.add(2); }
+        labels.add(getString(R.string.dev_link_contact)); ids.add(3);
+        if (phone != null) { labels.add(getString(R.string.dev_dial, Fmt.ltr(phone))); ids.add(4); }
+        new AlertDialog.Builder(this)
+                .setTitle(DeviceNames.display(this, d))
+                .setItems(labels.toArray(new String[0]), new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface dlg, int which) {
+                        profileAddress = addr;
+                        switch (ids.get(which)) {
+                            case 0:
+                                DeviceNames.rename(MainActivity.this, addr, nameOf(d), new Runnable() {
+                                    @Override public void run() { reload(); }
+                                });
+                                break;
+                            case 1: pickProfilePhoto(); break;
+                            case 2: DeviceProfile.removePhoto(MainActivity.this, addr); reload(); break;
+                            case 3: pickContact(); break;
+                            case 4: dial(phone); break;
+                        }
+                    }
+                })
+                .show();
+    }
+
+    private void pickProfilePhoto() {
+        try {
+            Intent i = new Intent(Intent.ACTION_GET_CONTENT);
+            i.setType("image/*");
+            startActivityForResult(i, REQ_PROFILE_PHOTO);
+        } catch (RuntimeException e) {
+            Toast.makeText(this, R.string.dev_no_picker, Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void pickContact() {
+        try {
+            Intent i = new Intent(Intent.ACTION_PICK, android.provider.ContactsContract.CommonDataKinds.Phone.CONTENT_URI);
+            startActivityForResult(i, REQ_PROFILE_CONTACT);
+        } catch (RuntimeException e) {
+            Toast.makeText(this, R.string.dev_no_contacts, Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void dial(String phone) {
+        try {
+            startActivity(new Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(phone))));
+        } catch (RuntimeException e) {
+            Toast.makeText(this, R.string.dev_no_dialer, Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void onProfileResult(int req, Intent data) {
+        String addr = profileAddress;
+        if (addr == null || data == null || data.getData() == null) return;
+        if (req == REQ_PROFILE_PHOTO) {
+            boolean ok = DeviceProfile.savePhoto(this, addr, data.getData());
+            if (!ok) Toast.makeText(this, R.string.dev_photo_failed, Toast.LENGTH_LONG).show();
+        } else {
+            DeviceProfile.Contact c = DeviceProfile.importContact(this, addr, data.getData());
+            if (c.name.length() == 0 && c.phone.length() == 0) {
+                Toast.makeText(this, R.string.dev_contact_failed, Toast.LENGTH_LONG).show();
+            } else {
+                if (c.name.length() > 0) Prefs.setAlias(this, addr, c.name);
+                if (c.phone.length() > 0) DeviceProfile.setPhone(this, addr, c.phone);
+                Toast.makeText(this, getString(R.string.dev_linked, c.name), Toast.LENGTH_SHORT).show();
+            }
+        }
+        reload();
+    }
+
     private void openChat(String address) {
         Intent i = new Intent(this, ChatActivity.class);
         i.putExtra(ChatActivity.EXTRA_ADDRESS, address);
@@ -503,6 +588,10 @@ public class MainActivity extends Activity implements Events.Listener {
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
+        if (req == REQ_PROFILE_PHOTO || req == REQ_PROFILE_CONTACT) {
+            if (res == RESULT_OK) onProfileResult(req, data);
+            return;
+        }
         if (req == REQ_SAVE_TREE || req == REQ_SAVE_BROWSE) {
             if (res == RESULT_OK && data != null) onSaveDirChosen(req, data);
             return;

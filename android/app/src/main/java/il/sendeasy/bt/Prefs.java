@@ -155,6 +155,19 @@ final class Prefs {
         e.apply();
     }
 
+    /** מספר טלפון של מכשיר מצומד (משיוך לאיש קשר). null = לא ידוע. */
+    static String devPhone(Context c, String address) {
+        String a = sp(c).getString("phone_" + address, null);
+        return a == null || a.trim().length() == 0 ? null : a;
+    }
+
+    static void setDevPhone(Context c, String address, String phone) {
+        String n = phone == null ? "" : phone.trim();
+        SharedPreferences.Editor e = sp(c).edit();
+        if (n.length() == 0) e.remove("phone_" + address); else e.putString("phone_" + address, n);
+        e.apply();
+    }
+
     /** תיקיית שמירה מותאמת כנתיב רגיל (API 19-28). null = ברירת המחדל. */
     static String saveDir(Context c) {
         String s = sp(c).getString("saveDir", null);

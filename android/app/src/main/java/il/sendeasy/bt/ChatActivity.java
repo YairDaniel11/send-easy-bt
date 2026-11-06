@@ -211,7 +211,7 @@ public class ChatActivity extends Activity implements Events.Listener {
 
         titleT.setText(Fmt.ltr(deviceName));
         subT.setText(R.string.chat_sub);
-        UiKit.avatar(avatarT, deviceName, 40);
+        DeviceProfile.applyAvatar(avatarT, address, deviceName, 40);
 
         adapter = new Adapter();
         list.setAdapter(adapter);
