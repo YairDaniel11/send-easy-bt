@@ -38,7 +38,8 @@ public partial class ReceiveToast : Window
         else Bar.IsIndeterminate = true;
         double secs = Math.Max(_clock.Elapsed.TotalSeconds, 0.5);
         var speed = got / secs;
-        InfoText.Text = TrayApp.Ltr(TrayApp.FormatSize(got)) + (_file.Size > 0 ? " מתוך " + TrayApp.Ltr(TrayApp.FormatSize(_file.Size)) : "")
+        var pct = _file.Size > 0 ? Math.Min(100, (int)(got * 100 / _file.Size)) + "%  ·  " : "";
+        InfoText.Text = pct + TrayApp.Ltr(TrayApp.FormatSize(got)) + (_file.Size > 0 ? " מתוך " + TrayApp.Ltr(TrayApp.FormatSize(_file.Size)) : "")
                         + "  ·  " + TrayApp.Ltr(TrayApp.FormatSize((long)speed) + "/s");
     }
 

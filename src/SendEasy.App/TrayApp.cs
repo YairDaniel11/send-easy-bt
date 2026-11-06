@@ -430,7 +430,11 @@ sealed class TrayApp : IDisposable
     void OnProgress(IncomingFile f, long got)
     {
         // הקלטות ותמונות מהצ'אט מופיעות בשיחה ולא בחלון קבלה
-        if (f.FromChat || ChatLog.IsVoiceName(f.Name)) return;
+        if (f.FromChat || ChatLog.IsVoiceName(f.Name))
+        {
+            if (f.FromChat && !ChatLog.IsVoiceName(f.Name) && _chat is { IsLoaded: true }) _chat.ShowReceiveProgress(f.FromName, f.Name, got, f.Size);
+            return;
+        }
         if (!_toasts.TryGetValue(f, out var toast))
         {
             toast = new ReceiveToast(f, _settings.ToastPosition);

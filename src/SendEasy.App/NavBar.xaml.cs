@@ -20,10 +20,10 @@ public partial class NavBar : UserControl
     void Apply()
     {
         if (SendBtn == null) return;
-        SendBtn.Visibility = Current == "send" ? Visibility.Collapsed : Visibility.Visible;
-        ChatBtn.Visibility = Current == "chat" ? Visibility.Collapsed : Visibility.Visible;
-        HistoryBtn.Visibility = Current == "history" ? Visibility.Collapsed : Visibility.Visible;
-        SettingsBtn.Visibility = Current == "settings" ? Visibility.Collapsed : Visibility.Visible;
+        SendBtn.Visibility = Current == "send" ? Visibility.Hidden : Visibility.Visible;
+        ChatBtn.Visibility = Current == "chat" ? Visibility.Hidden : Visibility.Visible;
+        HistoryBtn.Visibility = Current == "history" ? Visibility.Hidden : Visibility.Visible;
+        SettingsBtn.Visibility = Current == "settings" ? Visibility.Hidden : Visibility.Visible;
     }
 
     /// <summary>אחרי המעבר לחלון אחר: סוגר את החלון הנוכחי (לפי ההגדרה). חלון השליחה לא נסגר, כי ייתכן שיש בו שליחה בתהליך.</summary>

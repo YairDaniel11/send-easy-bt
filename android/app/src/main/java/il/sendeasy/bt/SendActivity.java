@@ -220,7 +220,7 @@ public class SendActivity extends Activity {
                             int pct = total > 0 ? (int) (sent * 100 / total) : 0;
                             bar.setProgress(pct);
                             double secs = Math.max((System.currentTimeMillis() - t0) / 1000.0, 0.5);
-                            infoT.setText(Fmt.ltr(Fmt.size(sent) + " / " + Fmt.size(total)) + "   " + Fmt.ltr(Fmt.speed(sent / secs)));
+                            infoT.setText(pct + "%   " + Fmt.ltr(Fmt.size(sent) + " / " + Fmt.size(total)) + "   " + Fmt.ltr(Fmt.speed(sent / secs)));
                         }
                     });
                 }

@@ -9,12 +9,14 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <ui:TitleBar Grid.Row="0" Title="קבצים - שליחה קלה - BT" FlowDirection="LeftToRight"/>
+        <local:NavBar Grid.Row="1" Current="history" Margin="16,6,16,0" HorizontalAlignment="Left"/>
 
-        <Grid Grid.Row="1">
+        <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="230"/>
                 <ColumnDefinition Width="*"/>
@@ -105,12 +107,7 @@
             </Grid>
         </Grid>
 
-        <Grid Grid.Row="2" Margin="16,10,16,14">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="Auto"/>
-        </Grid.ColumnDefinitions>
-        <local:NavBar Grid.Column="1" Current="history" VerticalAlignment="Center"/>
+        <Grid Grid.Row="3" Margin="16,10,16,14">
         <StackPanel Orientation="Horizontal">
             <ui:Button x:Name="OpenBtn" Content="פתח" Appearance="Primary" Click="Open_Click" MinWidth="80" Margin="0,0,8,0" IsEnabled="False" ToolTip="פותח את הקובץ או התיקייה"/>
             <ui:Button x:Name="ShowBtn" Content="הצג בתיקייה" Click="Show_Click" Margin="0,0,8,0" IsEnabled="False" ToolTip="פותח את סייר הקבצים ומסמן את הקובץ"/>

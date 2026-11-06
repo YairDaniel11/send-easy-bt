@@ -161,6 +161,15 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         else if (_cur == null) Open(address, name);
     }
 
+    /// <summary>התקדמות קבלת קובץ מהצ'אט: מוצגת בכותרת השיחה עם אחוזים.</summary>
+    public void ShowReceiveProgress(string from, string name, long got, long size)
+    {
+        if (_cur == null || (_cur.Name != from && !string.IsNullOrEmpty(from))) return;
+        if (size > 0 && got >= size) return; // הסיום מתעדכן ברענון השיחה
+        int pct = size > 0 ? (int)Math.Min(100, got * 100 / size) : 0;
+        HeaderStatus.Text = $"מקבל {TrayApp.Ltr(name)}... {pct}%";
+    }
+
     /// <summary>פותח את השיחה עם מכשיר (ויוצר אותה אם אין).</summary>
     public void Open(ulong address, string name)
     {
@@ -765,13 +774,15 @@ public partial class ChatWindow : Wpf.Ui.Controls.FluentWindow
         if (font != null) rtb.FontFamily = font;
         if (shrinkMax > 0)
         {
-            // בבועה הרוחב לפי הטקסט (עד המקסימום), ולא תמיד המקסימום
+            // בבועה הרוחב לפי הטקסט (עד המקסימום). מודדים TextBlock עם אותם Inlines/גופן, עם מרווח ביטחון נדיב כדי שלא יישבר לשורה
             try
             {
-                var ft = new FormattedText(Emoticons.ToGlyphs(text), System.Globalization.CultureInfo.GetCultureInfo("he-IL"), FlowDirection.RightToLeft,
-                    new Typeface(rtb.FontFamily, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal), fontSize, Brushes.Black, 1.0)
-                { MaxTextWidth = shrinkMax };
-                rtb.Width = Math.Min(shrinkMax, Math.Ceiling(ft.WidthIncludingTrailingWhitespace) + 16);
+                var meas = new TextBlock { FontSize = fontSize, TextWrapping = TextWrapping.NoWrap, FlowDirection = FlowDirection.RightToLeft };
+                if (font != null) meas.FontFamily = font; else meas.FontFamily = rtb.FontFamily;
+                Emoticons.Fill(meas, text, fontSize);
+                meas.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                var w = Math.Ceiling(meas.DesiredSize.Width) + 28;
+                rtb.Width = w >= shrinkMax ? shrinkMax : w;
             }
             catch { }
         }
