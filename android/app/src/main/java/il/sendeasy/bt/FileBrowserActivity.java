@@ -276,7 +276,7 @@ public class FileBrowserActivity extends Activity {
     private void newFolder() {
         final android.widget.EditText et = new android.widget.EditText(this);
         et.setSingleLine(true);
-        new android.app.AlertDialog.Builder(this)
+        new UiKit.Alert(this)
                 .setTitle(R.string.browser_new_folder)
                 .setView(et)
                 .setPositiveButton(android.R.string.ok, new android.content.DialogInterface.OnClickListener() {

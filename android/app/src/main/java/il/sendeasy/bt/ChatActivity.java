@@ -852,7 +852,7 @@ public class ChatActivity extends Activity implements Events.Listener {
 
     /** תמונות או קבצים לא נשלחו: מציעים לנסות שוב (למשל כשהמחשב היה כבוי). */
     private void offerRetry(final List<Uri> failed, String reason) {
-        AlertDialog d = new AlertDialog.Builder(this)
+        UiKit.AlertDlg d = new UiKit.Alert(this)
                 .setMessage(getString(R.string.chat_failed) + ": " + reason + "\n\n" + getString(R.string.retry_offer, failed.size()))
                 .setPositiveButton(R.string.retry_btn, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface x, int w) { sendImages(failed); }
@@ -1024,7 +1024,7 @@ public class ChatActivity extends Activity implements Events.Listener {
 
     /** ההודעה לא נשלחה: מציעים לשמור אותה כטיוטה שתישלח עם ההודעה הבאה. ביטול מחזיר את הטקסט לתיבה. */
     private void offerDraft(final String text, String reason) {
-        AlertDialog d = new AlertDialog.Builder(this)
+        UiKit.AlertDlg d = new UiKit.Alert(this)
                 .setMessage(getString(R.string.chat_failed) + ": " + reason + "\n\n" + getString(R.string.draft_offer))
                 .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface x, int w) {
@@ -1154,7 +1154,7 @@ public class ChatActivity extends Activity implements Events.Listener {
     /** האזנה להקלטה לפני שליחה (אם הוגדר בהגדרות): שלח, האזן, או מחק. */
     private void showVoicePreview(final File f) {
         final MediaPlayer[] mp = new MediaPlayer[1];
-        final AlertDialog d = new AlertDialog.Builder(this)
+        final UiKit.AlertDlg d = new UiKit.Alert(this)
                 .setMessage("ההקלטה מוכנה")
                 .setCancelable(false)
                 .setPositiveButton("שלח", new DialogInterface.OnClickListener() {
@@ -1166,7 +1166,7 @@ public class ChatActivity extends Activity implements Events.Listener {
                 .setNeutralButton("האזן", null)
                 .create();
         d.show();
-        d.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(new View.OnClickListener() {
+        d.getButton(DialogInterface.BUTTON_NEUTRAL).setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
                 if (mp[0] != null) { releasePreview(mp); return; }
                 try {
@@ -1467,7 +1467,7 @@ public class ChatActivity extends Activity implements Events.Listener {
         iv.setAdjustViewBounds(true);
         iv.setMaxHeight(UiKit.dp(this, 300));
         iv.setPadding(pad, pad, pad, pad);
-        AlertDialog d = new AlertDialog.Builder(this)
+        UiKit.AlertDlg d = new UiKit.Alert(this)
                 .setTitle(R.string.paste_title)
                 .setView(iv)
                 .setPositiveButton(R.string.paste_send, new DialogInterface.OnClickListener() {
@@ -1675,7 +1675,7 @@ public class ChatActivity extends Activity implements Events.Listener {
     }
 
     private void confirmDeleteMessage(final ChatStore.Msg m) {
-        android.app.AlertDialog d = new AlertDialog.Builder(this)
+        UiKit.AlertDlg d = new UiKit.Alert(this)
                 .setMessage(R.string.msg_delete_confirm)
                 .setPositiveButton(R.string.chat_delete_btn, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface x, int w) {
@@ -1699,7 +1699,7 @@ public class ChatActivity extends Activity implements Events.Listener {
         if (android.os.Build.VERSION.SDK_INT >= 11) t.setTextIsSelectable(true);
         android.widget.ScrollView sv = new android.widget.ScrollView(this);
         sv.addView(t);
-        new AlertDialog.Builder(this)
+        new UiKit.Alert(this)
                 .setView(sv)
                 .setPositiveButton("העתק הכל", new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) { copyMsg(m); }

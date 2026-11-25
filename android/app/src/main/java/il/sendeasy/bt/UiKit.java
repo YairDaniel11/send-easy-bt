@@ -128,6 +128,152 @@ final class UiKit {
         }
     }
 
+    /** דיאלוג אישור עם אותה מסגרת אחת של ListDialog (במקום AlertDialog של המערכת עם המסגרת הכפולה). */
+    static final class AlertDlg extends Dialog {
+        private final android.widget.Button[] buttons = new android.widget.Button[3];
+
+        private final Activity owner;
+
+        AlertDlg(Activity a) { super(a); owner = a; }
+
+        @Override public void show() {
+            super.show();
+            Window w = getWindow();
+            if (w != null) {
+                w.setBackgroundDrawable(rect(owner, attr(owner, R.attr.sbBg), 16));
+                int width = owner.getResources().getDisplayMetrics().widthPixels - dp(owner, 32);
+                w.setLayout(Math.min(width, dp(owner, 420)), ViewGroup.LayoutParams.WRAP_CONTENT);
+                w.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
+            }
+        }
+
+        /** מקבל DialogInterface.BUTTON_POSITIVE / NEGATIVE / NEUTRAL; null אם אין כפתור כזה. */
+        android.widget.Button getButton(int which) {
+            if (which == DialogInterface.BUTTON_POSITIVE) return buttons[0];
+            if (which == DialogInterface.BUTTON_NEGATIVE) return buttons[1];
+            if (which == DialogInterface.BUTTON_NEUTRAL) return buttons[2];
+            return null;
+        }
+    }
+
+    /** תחליף ל-AlertDialog.Builder: אותם setTitle/setMessage/setView/כפתורים/create/show. */
+    static final class Alert {
+        private final Activity act;
+        private CharSequence title, message;
+        private View view;
+        private boolean cancelable = true;
+        private DialogInterface.OnCancelListener onCancel;
+        private final CharSequence[] labels = new CharSequence[3];
+        private final DialogInterface.OnClickListener[] listeners = new DialogInterface.OnClickListener[3];
+
+        Alert(Activity a) { act = a; }
+
+        Alert setTitle(int r) { title = act.getString(r); return this; }
+        Alert setTitle(CharSequence t) { title = t; return this; }
+        Alert setMessage(int r) { message = act.getString(r); return this; }
+        Alert setMessage(CharSequence m) { message = m; return this; }
+        Alert setView(View v) { view = v; return this; }
+        Alert setCancelable(boolean c) { cancelable = c; return this; }
+        Alert setOnCancelListener(DialogInterface.OnCancelListener l) { onCancel = l; return this; }
+        Alert setPositiveButton(int r, DialogInterface.OnClickListener l) { return btn(0, act.getString(r), l); }
+        Alert setPositiveButton(CharSequence t, DialogInterface.OnClickListener l) { return btn(0, t, l); }
+        Alert setNegativeButton(int r, DialogInterface.OnClickListener l) { return btn(1, act.getString(r), l); }
+        Alert setNegativeButton(CharSequence t, DialogInterface.OnClickListener l) { return btn(1, t, l); }
+        Alert setNeutralButton(int r, DialogInterface.OnClickListener l) { return btn(2, act.getString(r), l); }
+        Alert setNeutralButton(CharSequence t, DialogInterface.OnClickListener l) { return btn(2, t, l); }
+
+        private Alert btn(int i, CharSequence t, DialogInterface.OnClickListener l) {
+            labels[i] = t; listeners[i] = l; return this;
+        }
+
+        AlertDlg create() {
+            final Activity a = act;
+            final AlertDlg d = new AlertDlg(a);
+            d.requestWindowFeature(Window.FEATURE_NO_TITLE);
+            final int text = attr(a, R.attr.sbText);
+            final int accent = attr(a, R.attr.sbAccent);
+            final int row = attr(a, R.attr.sbRow);
+
+            LinearLayout box = new LinearLayout(a);
+            box.setOrientation(LinearLayout.VERTICAL);
+            box.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+            int pad = dp(a, 16);
+            box.setPadding(pad, pad, pad, dp(a, 10));
+            if (title != null && title.length() > 0) {
+                TextView t = new TextView(a);
+                t.setText(title);
+                t.setTextSize(18);
+                t.setTypeface(null, android.graphics.Typeface.BOLD);
+                t.setTextColor(text);
+                t.setPadding(0, 0, 0, dp(a, 10));
+                box.addView(t);
+            }
+            if (message != null && message.length() > 0) {
+                TextView m = new TextView(a);
+                m.setText(message);
+                m.setTextSize(16);
+                m.setTextColor(text);
+                m.setPadding(0, dp(a, 2), 0, dp(a, 12));
+                box.addView(m);
+            }
+            if (view != null) {
+                if (view.getParent() instanceof ViewGroup) ((ViewGroup) view.getParent()).removeView(view);
+                box.addView(view, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            }
+            LinearLayout bar = new LinearLayout(a);
+            bar.setOrientation(LinearLayout.HORIZONTAL);
+            bar.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+            bar.setPadding(0, dp(a, 8), 0, 0);
+            int[] order = {0, 2, 1}; // אישור, ניטרלי, ביטול (מימין לשמאל)
+            android.widget.Button first = null;
+            for (int k = 0; k < order.length; k++) {
+                final int i = order[k];
+                if (labels[i] == null) continue;
+                android.widget.Button b = new android.widget.Button(a);
+                b.setText(labels[i]);
+                b.setTextSize(16);
+                b.setAllCaps(false);
+                b.setTextColor(i == 0 ? 0xFFFFFFFF : text);
+                b.setMinHeight(dp(a, 46));
+                b.setMinWidth(0);
+                b.setFocusable(true);
+                StateListDrawable bg = new StateListDrawable();
+                bg.addState(new int[]{android.R.attr.state_focused}, rect(a, i == 0 ? accent : row, 12, text, 3));
+                bg.addState(new int[]{android.R.attr.state_pressed}, rect(a, i == 0 ? accent : row, 12, accent, 2));
+                bg.addState(new int[0], rect(a, i == 0 ? accent : row, 12));
+                b.setBackgroundDrawable(bg);
+                final DialogInterface.OnClickListener l = listeners[i];
+                final int which = i == 0 ? DialogInterface.BUTTON_POSITIVE : i == 1 ? DialogInterface.BUTTON_NEGATIVE : DialogInterface.BUTTON_NEUTRAL;
+                b.setOnClickListener(new View.OnClickListener() {
+                    @Override public void onClick(View v) {
+                        d.dismiss();
+                        if (l != null) l.onClick(d, which);
+                    }
+                });
+                d.buttons[i] = b;
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+                lp.setMargins(dp(a, 4), 0, dp(a, 4), 0);
+                bar.addView(b, lp);
+                if (first == null) first = b;
+            }
+            if (first != null) box.addView(bar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+            ScrollView sv = new ScrollView(a);
+            sv.addView(box);
+            d.setContentView(sv);
+            d.setCancelable(cancelable);
+            d.setCanceledOnTouchOutside(cancelable);
+            if (onCancel != null) d.setOnCancelListener(onCancel);
+            return d;
+        }
+
+        AlertDlg show() {
+            AlertDlg d = create();
+            d.show();
+            return d;
+        }
+    }
+
     static GradientDrawable oval(int color) {
         GradientDrawable g = new GradientDrawable();
         g.setShape(GradientDrawable.OVAL);

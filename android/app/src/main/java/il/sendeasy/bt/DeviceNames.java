@@ -29,7 +29,7 @@ final class DeviceNames {
         et.setInputType(InputType.TYPE_CLASS_TEXT);
         et.setText(resolve(act, address, realName));
         et.setSelection(et.getText().length());
-        AlertDialog.Builder b = new AlertDialog.Builder(act)
+        UiKit.Alert b = new UiKit.Alert(act)
                 .setTitle(R.string.rename_title)
                 .setView(et)
                 .setPositiveButton(R.string.rename_save, new DialogInterface.OnClickListener() {
@@ -47,7 +47,7 @@ final class DeviceNames {
                 }
             });
         }
-        AlertDialog dlg = b.create();
+        UiKit.AlertDlg dlg = b.create();
         dlg.show();
         et.requestFocus();
     }

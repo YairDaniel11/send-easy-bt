@@ -346,7 +346,7 @@ final class ChatStore {
     /** דיאלוג אישור למחיקת שיחה. פוקוס התחלתי על "ביטול". */
     static void confirmDelete(android.app.Activity a, final String address, String name, final Runnable after) {
         final Context app = a.getApplicationContext();
-        android.app.AlertDialog d = new android.app.AlertDialog.Builder(a)
+        UiKit.AlertDlg d = new UiKit.Alert(a)
                 .setMessage(a.getString(R.string.chat_delete_confirm, Fmt.ltr(name)))
                 .setPositiveButton(R.string.chat_delete_btn, new android.content.DialogInterface.OnClickListener() {
                     @Override public void onClick(android.content.DialogInterface x, int w) {

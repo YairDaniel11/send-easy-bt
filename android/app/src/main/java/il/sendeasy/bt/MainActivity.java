@@ -153,7 +153,7 @@ public class MainActivity extends Activity implements Events.Listener {
         BluetoothAdapter bt = BluetoothAdapter.getDefaultAdapter();
         if (bt == null || bt.isEnabled() || askedEnableBt) return;
         askedEnableBt = true;
-        new AlertDialog.Builder(this)
+        new UiKit.Alert(this)
                 .setMessage("הבלוטוס כבוי. להפעיל אותו?")
                 .setPositiveButton("הפעל", new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
@@ -170,7 +170,7 @@ public class MainActivity extends Activity implements Events.Listener {
         final android.os.PowerManager pm = (android.os.PowerManager) getSystemService(POWER_SERVICE);
         if (pm == null || pm.isIgnoringBatteryOptimizations(getPackageName())) return;
         Prefs.setAskedBatteryExemption(this);
-        new AlertDialog.Builder(this)
+        new UiKit.Alert(this)
                 .setMessage("כדי שהמחשב יזהה את הטלפון גם כשהאפליקציה סגורה, צריך לאפשר לה לפעול ברקע בלי חיסכון בסוללה. לאפשר?")
                 .setPositiveButton("אפשר", new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
@@ -637,7 +637,7 @@ public class MainActivity extends Activity implements Events.Listener {
     private static UpdateChecker.Info available;
 
     private ApkDownloader downloader;
-    private AlertDialog progressDlg;
+    private UiKit.AlertDlg progressDlg;
     /** קובץ שמחכה לחזרה ממסך ההרשאה "התקנת אפליקציות לא מוכרות". */
     private File pendingInstall;
 
@@ -651,7 +651,7 @@ public class MainActivity extends Activity implements Events.Listener {
 
     private void showUpdateDialog(final UpdateChecker.Info info) {
         final boolean auto = info.apkUrl != null;
-        new AlertDialog.Builder(this)
+        new UiKit.Alert(this)
                 .setMessage(getString(auto ? R.string.upd_new_auto : R.string.upd_new, Fmt.ltr(info.version)))
                 .setPositiveButton(auto ? R.string.upd_install : R.string.upd_open, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
@@ -684,7 +684,7 @@ public class MainActivity extends Activity implements Events.Listener {
         box.addView(bar, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         box.addView(txt, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        progressDlg = new AlertDialog.Builder(this)
+        progressDlg = new UiKit.Alert(this)
                 .setTitle(R.string.upd_downloading)
                 .setView(box)
                 .setNegativeButton(R.string.upd_cancel, new DialogInterface.OnClickListener() {
@@ -717,7 +717,7 @@ public class MainActivity extends Activity implements Events.Listener {
                 closeProgress();
                 int msg = code == ApkDownloader.ERR_SIZE ? R.string.upd_err_size
                         : code == ApkDownloader.ERR_DISK ? R.string.upd_err_disk : R.string.upd_err_net;
-                new AlertDialog.Builder(MainActivity.this).setMessage(msg).setPositiveButton(android.R.string.ok, null).show();
+                new UiKit.Alert(MainActivity.this).setMessage(msg).setPositiveButton(android.R.string.ok, null).show();
             }
         });
     }
@@ -730,7 +730,7 @@ public class MainActivity extends Activity implements Events.Listener {
 
     private void closeProgress() {
         downloader = null;
-        AlertDialog d = progressDlg;
+        UiKit.AlertDlg d = progressDlg;
         progressDlg = null;
         if (d != null) {
             try { d.dismiss(); } catch (RuntimeException ignored) { }
@@ -740,7 +740,7 @@ public class MainActivity extends Activity implements Events.Listener {
     private void installApk(final File apk) {
         if (isFinishing()) return;
         if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
-            new AlertDialog.Builder(this)
+            new UiKit.Alert(this)
                     .setMessage(R.string.upd_allow_source)
                     .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
                         @Override public void onClick(DialogInterface d, int w) {
@@ -769,7 +769,7 @@ public class MainActivity extends Activity implements Events.Listener {
             i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
             startActivity(i);
         } catch (RuntimeException e) { // כולל ActivityNotFoundException
-            new AlertDialog.Builder(this).setMessage(R.string.upd_install_failed)
+            new UiKit.Alert(this).setMessage(R.string.upd_install_failed)
                     .setPositiveButton(android.R.string.ok, null).show();
         }
     }
@@ -786,7 +786,7 @@ public class MainActivity extends Activity implements Events.Listener {
                 } else if (manual) {
                     int msg = status == UpdateChecker.NO_NET ? R.string.upd_no_net
                             : status == UpdateChecker.UP_TO_DATE ? R.string.upd_current : R.string.upd_failed;
-                    new AlertDialog.Builder(MainActivity.this)
+                    new UiKit.Alert(MainActivity.this)
                             .setMessage(msg)
                             .setPositiveButton(android.R.string.ok, null).show();
                 }
@@ -801,7 +801,7 @@ public class MainActivity extends Activity implements Events.Listener {
 
     /** מאנדרואיד 8 שירות חזית חייב התראה, ואפליקציה לא יכולה להסתיר אותה לגמרי. רק המשתמש יכול, בהגדרות המערכת. */
     private void offerHideInSystemSettings() {
-        new AlertDialog.Builder(this)
+        new UiKit.Alert(this)
                 .setTitle(R.string.svc_hide_title)
                 .setMessage(R.string.svc_hide_msg)
                 .setPositiveButton(R.string.svc_hide_open, new DialogInterface.OnClickListener() {
@@ -1007,7 +1007,7 @@ public class MainActivity extends Activity implements Events.Listener {
     }
 
     private void confirmDeleteChats(final List<BluetoothDevice> withChat, final boolean[] sel) {
-        AlertDialog dlg = new AlertDialog.Builder(this)
+        UiKit.AlertDlg dlg = new UiKit.Alert(this)
                 .setMessage(R.string.chats_delete_confirm)
                 .setPositiveButton(R.string.chat_delete_btn, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
@@ -1187,7 +1187,7 @@ public class MainActivity extends Activity implements Events.Listener {
         addRow(general, actionRow(getString(R.string.set_tap_mode), new Runnable() {
             @Override public void run() {
                 final String[] opts = {getString(R.string.tap_ask), getString(R.string.act_chat), getString(R.string.act_send_file)};
-                new AlertDialog.Builder(MainActivity.this)
+                new UiKit.Alert(MainActivity.this)
                         .setTitle(R.string.set_tap_mode)
                         .setSingleChoiceItems(opts, Prefs.deviceTapMode(MainActivity.this), new DialogInterface.OnClickListener() {
                             @Override public void onClick(DialogInterface dlg, int which) {
@@ -1323,9 +1323,23 @@ public class MainActivity extends Activity implements Events.Listener {
         return box;
     }
 
+    /** כל החלונות המלאים הפתוחים (חלון בתוך חלון), כדי שהתפריט מהכותרת יסגור את כולם ולא רק את העליון. */
+    private final ArrayList<android.app.Dialog> openPages = new ArrayList<android.app.Dialog>();
+
+    private void dismissAllPages() {
+        for (android.app.Dialog p : new ArrayList<android.app.Dialog>(openPages)) {
+            try { p.dismiss(); } catch (RuntimeException ignored) { }
+        }
+        openPages.clear();
+    }
+
     /** מסך מלא בעיצוב המסך הראשי: סרגל כותרת עם חזרה, ותוכן נגלל. חזרה (או המקש הרך הימני) סוגרת אותו. */
     private android.app.Dialog pageDialog(String title, View content) {
         final android.app.Dialog d = new android.app.Dialog(this, ThemeUtil.isDark(this) ? R.style.AppTheme_Dark : R.style.AppTheme_Light);
+        openPages.add(d);
+        d.setOnDismissListener(new DialogInterface.OnDismissListener() {
+            @Override public void onDismiss(DialogInterface x) { openPages.remove(d); }
+        });
         LinearLayout outer = new LinearLayout(this);
         outer.setOrientation(LinearLayout.VERTICAL);
         outer.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
@@ -1353,7 +1367,7 @@ public class MainActivity extends Activity implements Events.Listener {
         more.setClickable(true);
         more.setContentDescription(getString(R.string.menu_more));
         more.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { d.dismiss(); showMenu(); }
+            @Override public void onClick(View v) { dismissAllPages(); showMenu(); }
         });
         head.addView(more, new LinearLayout.LayoutParams(UiKit.dp(this, 48), ViewGroup.LayoutParams.MATCH_PARENT));
         head.setClickable(true);
