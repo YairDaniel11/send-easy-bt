@@ -1187,12 +1187,11 @@ public class MainActivity extends Activity implements Events.Listener {
         addRow(general, actionRow(getString(R.string.set_tap_mode), new Runnable() {
             @Override public void run() {
                 final String[] opts = {getString(R.string.tap_ask), getString(R.string.act_chat), getString(R.string.act_send_file)};
-                new UiKit.Alert(MainActivity.this)
-                        .setTitle(R.string.set_tap_mode)
-                        .setSingleChoiceItems(opts, Prefs.deviceTapMode(MainActivity.this), new DialogInterface.OnClickListener() {
+                new UiKit.ListDialog(MainActivity.this)
+                        .setTitle(getString(R.string.set_tap_mode))
+                        .setItems(opts, new DialogInterface.OnClickListener() {
                             @Override public void onClick(DialogInterface dlg, int which) {
                                 Prefs.setDeviceTapMode(MainActivity.this, which);
-                                dlg.dismiss();
                             }
                         })
                         .show();
