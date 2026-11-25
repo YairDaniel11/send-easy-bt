@@ -164,6 +164,28 @@ public class MainActivity extends Activity implements Events.Listener {
                 .show();
     }
 
+    /** בקשה חד-פעמית לפטור מחיסכון בסוללה, כדי שהמערכת לא תעצור את שירות הקבלה ברקע. */
+    private void askBatteryExemption() {
+        if (Build.VERSION.SDK_INT < 23 || Prefs.askedBatteryExemption(this) || !Prefs.receiveEnabled(this)) return;
+        final android.os.PowerManager pm = (android.os.PowerManager) getSystemService(POWER_SERVICE);
+        if (pm == null || pm.isIgnoringBatteryOptimizations(getPackageName())) return;
+        Prefs.setAskedBatteryExemption(this);
+        new AlertDialog.Builder(this)
+                .setMessage("כדי שהמחשב יזהה את הטלפון גם כשהאפליקציה סגורה, צריך לאפשר לה לפעול ברקע בלי חיסכון בסוללה. לאפשר?")
+                .setPositiveButton("אפשר", new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) {
+                        try {
+                            startActivity(new Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                                    Uri.parse("package:" + getPackageName())));
+                        } catch (RuntimeException e) {
+                            try { startActivity(new Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)); } catch (RuntimeException ignored) { }
+                        }
+                    }
+                })
+                .setNegativeButton("לא עכשיו", null)
+                .show();
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
@@ -174,6 +196,7 @@ public class MainActivity extends Activity implements Events.Listener {
         reload();
         askEnableBluetooth();
         startServiceIfNeeded();
+        askBatteryExemption();
         refreshUpdateBar();
         if (pendingInstall != null) {
             File f = pendingInstall;

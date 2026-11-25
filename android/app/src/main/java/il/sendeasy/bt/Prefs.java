@@ -60,6 +60,15 @@ final class Prefs {
         sp(c).edit().putBoolean("showSvcNotif", on).apply();
     }
 
+    /** האם כבר שאלנו את המשתמש על פטור מחיסכון בסוללה (פעם אחת). */
+    static boolean askedBatteryExemption(Context c) {
+        return sp(c).getBoolean("askedBattery", false);
+    }
+
+    static void setAskedBatteryExemption(Context c) {
+        sp(c).edit().putBoolean("askedBattery", true).apply();
+    }
+
     /** הצגת התראה בעת קבלת הודעה/קובץ (ברירת מחדל כן). */
     static boolean notifyEvents(Context c) {
         return sp(c).getBoolean("notifyEvents", true);
